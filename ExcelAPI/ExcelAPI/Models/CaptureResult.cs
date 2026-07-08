@@ -14,5 +14,8 @@ namespace ExcelAPI.Models
 
         /// <summary>List of form fields extracted from cell comments/notes.</summary>
         public List<ExcelField> Fields { get; set; } = new();
+
+        /// <summary>Page setup debug information for verifying coordinate alignment (temporary).</summary>
+        public PageSetupDebug? PageSetup { get; set; }
     }
 }

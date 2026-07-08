@@ -19,16 +19,16 @@ namespace ExcelAPI.Services
     ///   2. Convert the PDF to a high-resolution PNG (300 DPI) via PDFtoImage (PDFium)
     ///   3. Extract field metadata from cell comments/notes
     ///
-    /// Scale Factor: 1 Excel point = 1/72 inch. PNG at 300 DPI.
-    /// PNG pixel = Excel point * (300 / 72) = Excel point * 4.1667
+    /// Coordinate System:
+    ///   - Field positions are relative to the Print Area origin (not worksheet origin)
+    ///   - Scale is constant: pointsToPixels = DPI / 72 = 300 / 72 ≈ 4.1667
+    ///   - pixel = (cellPoint - printAreaOriginPoint) * (DPI / 72)
+    ///   - NOTE: pngWidth/printAreaWidth is NOT used as scale because the PNG
+    ///     includes page margins while the print area range does not. Using that
+    ///     ratio would inflate coordinates by the margin factor (typically ~1.2x).
     /// </summary>
     public class ExcelCaptureService : IExcelCaptureService
     {
-        // Scale factor from Excel points to PNG pixels at 300 DPI
-        // 1 inch = 72 points (Excel) = 300 pixels (PNG)
-        // So: PNG pixels = Excel points * (300 / 72)
-        private const double PointsToPixels = 300.0 / 72.0;
-
         private readonly IWebHostEnvironment _env;
         private readonly IOptions<ExcelCaptureOptions> _options;
         private readonly ILogger<ExcelCaptureService> _logger;
@@ -349,6 +349,181 @@ namespace ExcelAPI.Services
                     printArea,
                     worksheet.Name);
 
+                // --- Step 6a: Read Print Area Range origin and dimensions ---
+                // These are used as the coordinate origin for field positioning.
+                // All field coordinates are relative to the Print Area, not the worksheet.
+                double printAreaLeft = 0, printAreaTop = 0, printAreaWidth = 0, printAreaHeight = 0;
+                int printAreaCols = 0, printAreaRows = 0;
+                double? firstColWidthPt = null, firstRowHeightPt = null;
+                Excel.Range? printRange = null;
+                try
+                {
+                    printRange = worksheet.Range[printArea];
+                    printAreaLeft = printRange.Left;
+                    printAreaTop = printRange.Top;
+                    printAreaWidth = printRange.Width;
+                    printAreaHeight = printRange.Height;
+                    printAreaCols = printRange.Columns.Count;
+                    printAreaRows = printRange.Rows.Count;
+
+                    // Get first column and first row measurements
+                    try
+                    {
+                        var firstCol = printRange.Columns[1];
+                        firstColWidthPt = firstCol.Width;
+                        Marshal.ReleaseComObject(firstCol);
+                    }
+                    catch { }
+                    try
+                    {
+                        var firstRow = printRange.Rows[1];
+                        firstRowHeightPt = firstRow.Height;
+                        Marshal.ReleaseComObject(firstRow);
+                    }
+                    catch { }
+
+                    _logger.LogInformation(
+                        "[AUDIT] PrintArea Range: Address=\"{Address}\" | " +
+                        "Origin: Left={Left:F1}pt, Top={Top:F1}pt | " +
+                        "Content: Width={Width:F1}pt, Height={Height:F1}pt | " +
+                        "Grid: {Cols}col x {Rows}row | " +
+                        "FirstColWidth={FCW:F1}pt, FirstRowHeight={FRH:F1}pt",
+                        printRange.AddressLocal[false, false],
+                        printAreaLeft, printAreaTop,
+                        printAreaWidth, printAreaHeight,
+                        printAreaCols, printAreaRows,
+                        firstColWidthPt ?? 0, firstRowHeightPt ?? 0);
+                }
+                finally
+                {
+                    if (printRange != null)
+                        Marshal.ReleaseComObject(printRange);
+                }
+
+                // --- Step 6b: Read Page Setup and calculate printed page offset ---
+                // The PNG shows the PRINTED PAGE (with margins, centering, etc.),
+                // not the raw worksheet. We need to determine where the print area
+                // content actually appears on the rendered page.
+                double leftMarginPt = 0, topMarginPt = 0, rightMarginPt = 0, bottomMarginPt = 0;
+                bool centerHorizontally = false, centerVertically = false;
+                int zoomSetting = 0;
+                int fitToPagesWide = 0, fitToPagesTall = 0;
+                double pageWidthPt = 612, pageHeightPt = 792;  // Default to Letter
+                XlPageOrientation orientation = XlPageOrientation.xlPortrait;
+                double printedOriginXPts = 0, printedOriginYPts = 0;
+
+                try
+                {
+                    // Read page setup values
+                    leftMarginPt = worksheet.PageSetup.LeftMargin;
+                    rightMarginPt = worksheet.PageSetup.RightMargin;
+                    topMarginPt = worksheet.PageSetup.TopMargin;
+                    bottomMarginPt = worksheet.PageSetup.BottomMargin;
+                    centerHorizontally = worksheet.PageSetup.CenterHorizontally;
+                    centerVertically = worksheet.PageSetup.CenterVertically;
+                    orientation = worksheet.PageSetup.Orientation;
+
+                    // Zoom and FitToPages are mutually exclusive
+                    try
+                    {
+                        zoomSetting = worksheet.PageSetup.Zoom;
+                    }
+                    catch { /* Zoom may be null/0 when FitToPages is active */ }
+
+                    try
+                    {
+                        fitToPagesWide = worksheet.PageSetup.FitToPagesWide;
+                    }
+                    catch { }
+
+                    try
+                    {
+                        fitToPagesTall = worksheet.PageSetup.FitToPagesTall;
+                    }
+                    catch { }
+
+                    // Map paper size to points
+                    (pageWidthPt, pageHeightPt) = GetPaperSizePoints(
+                        (XlPaperSize)(int)worksheet.PageSetup.PaperSize,
+                        orientation);
+
+                    // Calculate where the print area content starts on the printed page
+                    // The printable area is the page minus margins.
+                    // If centering is enabled, the content is centered within the printable area.
+                    double printableWidthPt = pageWidthPt - leftMarginPt - rightMarginPt;
+                    double printableHeightPt = pageHeightPt - topMarginPt - bottomMarginPt;
+
+                    // Base origin: top-left of printable area (inside margins)
+                    printedOriginXPts = leftMarginPt;
+                    printedOriginYPts = topMarginPt;
+
+                    // Apply horizontal centering: shift content right by half the unused space
+                    if (centerHorizontally && printAreaWidth < printableWidthPt)
+                    {
+                        printedOriginXPts += (printableWidthPt - printAreaWidth) / 2.0;
+                    }
+
+                    // Apply vertical centering: shift content down by half the unused space
+                    if (centerVertically && printAreaHeight < printableHeightPt)
+                    {
+                        printedOriginYPts += (printableHeightPt - printAreaHeight) / 2.0;
+                    }
+
+                    // Log complete page setup diagnostics
+                    _logger.LogInformation(
+                        "[PAGE] Setup: " +
+                        "Paper={PaperSize}x{Orientation} ({PageW:F1}x{PageH:F1}pt) | " +
+                        "Margins: L={LM:F1} R={RM:F1} T={TM:F1} B={BM:F1}pt | " +
+                        "Printable: {PW:F1}x{PH:F1}pt | " +
+                        "CenterH={CH}, CenterV={CV} | " +
+                        "Zoom={Zoom}, FitToPages={FTPW}x{FTPH} | " +
+                        "PrintAreaContent: {PAW:F1}x{PAH:F1}pt | " +
+                        "PrintedOrigin: ({OX:F1},{OY:F1})pt",
+                        (int)worksheet.PageSetup.PaperSize, orientation,
+                        pageWidthPt, pageHeightPt,
+                        leftMarginPt, rightMarginPt, topMarginPt, bottomMarginPt,
+                        printableWidthPt, printableHeightPt,
+                        centerHorizontally, centerVertically,
+                        zoomSetting, fitToPagesWide, fitToPagesTall,
+                        printAreaWidth, printAreaHeight,
+                        printedOriginXPts, printedOriginYPts);
+
+                    // Warn if FitToPages or Zoom will affect content scaling
+                    if (fitToPagesWide > 0 || fitToPagesTall > 0)
+                    {
+                        _logger.LogWarning(
+                            "[PAGE] FitToPages is active ({FTPW}x{FTPH}) — " +
+                            "Excel will scale the print area content to fit the page. " +
+                            "The DPI/72 pixel scale assumes 100% zoom and the rendered " +
+                            "cell dimensions may differ from cellWidth * DPI/72. " +
+                            "Field overlay accuracy may be reduced for this workbook.",
+                            fitToPagesWide, fitToPagesTall);
+                    }
+                    else if (zoomSetting > 0 && zoomSetting != 100)
+                    {
+                        _logger.LogWarning(
+                            "[PAGE] Custom Zoom is set to {Zoom}% — " +
+                            "Excel will scale the content by {Zoom}%. " +
+                            "The DPI/72 pixel scale assumes 100% zoom; fields may " +
+                            "need additional scaling by {Zoom/100:F2}x.",
+                            zoomSetting, zoomSetting, zoomSetting / 100.0);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[PAGE] Failed to read page setup, using defaults.");
+                }
+
+                // Convert printed origin to PNG pixels at DPI
+                const double dpi = 300.0;
+                const double pointsToPixels = dpi / 72.0;
+                double printedOriginX = printedOriginXPts * pointsToPixels;
+                double printedOriginY = printedOriginYPts * pointsToPixels;
+
+                _logger.LogInformation(
+                    "[PAGE] Printed origin in pixels: ({OX:F1},{OY:F1})px (at {DPI} DPI)",
+                    printedOriginX, printedOriginY, dpi);
+
                 // --- Step 7 & 8: Export Print Area to PDF, then convert to PNG ---
 
                 // Generate unique filenames for the intermediate PDF and final PNG
@@ -424,11 +599,6 @@ namespace ExcelAPI.Services
 
                 cancellationToken.ThrowIfCancellationRequested();
 
-                // --- Step 9: Extract field metadata from cell comments ---
-                _logger.LogDebug("Extracting field metadata from cell comments...");
-                var fields = ExtractFields(worksheet, printArea);
-                _logger.LogInformation("Extracted {Count} field(s) from cell comments", fields.Count);
-
                 // --- Step 10: Read PNG dimensions ---
                 int pngWidth = 0, pngHeight = 0;
                 try
@@ -444,6 +614,60 @@ namespace ExcelAPI.Services
                     _logger.LogWarning(ex, "Failed to read PNG dimensions from: {PngPath}", previewPath);
                 }
 
+                // --- Step 11: Verify the point-to-pixel scale ---
+                // The scale from Excel points to PNG pixels at the rendering DPI is:
+                //   scale = DPI / 72 ≈ 4.1667
+                // This was computed in Step 6b as `pointsToPixels`.
+                //
+                // Additionally, the PNG shows the FULL PAGE (including margins).
+                // The PRINTED ORIGIN offset (computed in Step 6b) shifts the
+                // print area content from the raw worksheet origin to where it
+                // actually appears on the page.
+                //
+                // Final formula:
+                //   pixel = printedOrigin + (cellPoint - printAreaOriginPoint) * (DPI / 72)
+
+                double scaleX = dpi / 72.0;
+                double scaleY = dpi / 72.0;
+
+                _logger.LogInformation(
+                    "[AUDIT] Final coordinate system:\n" +
+                    "  Printed origin:         ({OX:F1},{OY:F1}) px\n" +
+                    "  Point-to-pixel scale:   {Scale:F4} px/pt (at {DPI} DPI)\n" +
+                    "  Formula: pixel = printedOrigin + (cellPoint - printAreaOrigin) * scale",
+                    printedOriginX, printedOriginY, scaleX, dpi);
+
+                // --- Step 12: Extract field metadata from cell comments ---
+                // Coordinates now include the printed page offset.
+                _logger.LogDebug("Extracting field metadata from cell comments...");
+                var fields = ExtractFields(
+                    worksheet,
+                    printAreaLeft, printAreaTop,
+                    printedOriginX, printedOriginY,
+                    scaleX, scaleY);
+                _logger.LogInformation("Extracted {Count} field(s) from cell comments", fields.Count);
+
+                // Log coordinate conversion trace for the first field (comparison table)
+                if (fields.Count > 0)
+                {
+                    var f = fields[0];
+                    double offsetLeft = f.ExcelLeft - f.PrintAreaLeft;
+                    double offsetTop = f.ExcelTop - f.PrintAreaTop;
+                    _logger.LogInformation(
+                        "[COORD] First field \"{Cell}\" | " +
+                        "PrintedOrigin=({OX:F1},{OY:F1})px + " +
+                        "(ExcelPt=({EL:F1},{ET:F1}) - OriginPt=({OL:F1},{OT:F1}))" +
+                        " x {Scale:F4}px/pt => " +
+                        "Pixel=({PL:F1},{PT:F1})px Size=({PW:F1}x{PH:F1})px",
+                        f.Cell,
+                        printedOriginX, printedOriginY,
+                        f.ExcelLeft, f.ExcelTop,
+                        f.PrintAreaLeft, f.PrintAreaTop,
+                        scaleX,
+                        f.Left, f.Top,
+                        f.Width, f.Height);
+                }
+
                 // Build and return the complete capture result
                 return new CaptureResult
                 {
@@ -453,7 +677,24 @@ namespace ExcelAPI.Services
                         Width = pngWidth,
                         Height = pngHeight
                     },
-                    Fields = fields
+                    Fields = fields,
+                    PageSetup = new PageSetupDebug
+                    {
+                        PrintedOriginX = Math.Round(printedOriginX, 1),
+                        PrintedOriginY = Math.Round(printedOriginY, 1),
+                        LeftMargin = leftMarginPt,
+                        TopMargin = topMarginPt,
+                        CenterHorizontally = centerHorizontally,
+                        CenterVertically = centerVertically,
+                        PageWidthPt = Math.Round(pageWidthPt, 1),
+                        PageHeightPt = Math.Round(pageHeightPt, 1),
+                        PrintAreaWidthPt = Math.Round(printAreaWidth, 1),
+                        PrintAreaHeightPt = Math.Round(printAreaHeight, 1),
+                        Scale = dpi / 72.0,
+                        Zoom = zoomSetting,
+                        FitToPagesWide = fitToPagesWide,
+                        FitToPagesTall = fitToPagesTall
+                    }
                 };
             }
             catch (COMException ex)
@@ -524,9 +765,24 @@ namespace ExcelAPI.Services
         /// Extracts form field metadata from cell comments in the worksheet.
         /// Uses Excel's SpecialCells to find ONLY cells with comments (NOT all cells).
         /// Each comment is expected to contain a field type (e.g., "Type=Text").
-        /// Coordinates are converted from Excel points to PNG pixels at 300 DPI.
+        ///
+        /// Coordinate System:
+        ///   pixel = printedOrigin + (cellPoint - printAreaOriginPoint) * (DPI / 72)
+        ///
+        /// Where:
+        ///   - printedOrigin = where the print area content starts on the rendered page
+        ///     (accounts for page margins and centering)
+        ///   - printAreaOrigin = where the print area starts in the worksheet (cell Left/Top)
+        ///   - DPI / 72 = points-to-pixels conversion at the rendering resolution
         /// </summary>
-        private static List<ExcelField> ExtractFields(Excel.Worksheet worksheet, string printArea)
+        private static List<ExcelField> ExtractFields(
+            Excel.Worksheet worksheet,
+            double printAreaLeft,
+            double printAreaTop,
+            double printedOriginX,
+            double printedOriginY,
+            double scaleX,
+            double scaleY)
         {
             var fields = new List<ExcelField>();
 
@@ -566,21 +822,47 @@ namespace ExcelAPI.Services
                         string cellAddress = cell.AddressLocal[false, false];
                         string fieldType = ParseFieldType(commentText);
 
-                        double leftPt = cell.Left;
-                        double topPt = cell.Top;
-                        double widthPt = cell.Width;
-                        double heightPt = cell.Height;
+                        // Raw cell coordinates in Excel points
+                        double cellLeftPt = cell.Left;
+                        double cellTopPt = cell.Top;
+                        double cellWidthPt = cell.Width;
+                        double cellHeightPt = cell.Height;
+
+                        // Calculate content offset within the print area (in points)
+                        double offsetLeftPt = cellLeftPt - printAreaLeft;
+                        double offsetTopPt = cellTopPt - printAreaTop;
+
+                        // Convert to PNG pixels on the printed page:
+                        // pixel = printedOrigin + (cellPoint - printAreaOriginPoint) * scale
+                        double pixelLeft = scaleX > 0
+                            ? printedOriginX + offsetLeftPt * scaleX
+                            : 0;
+                        double pixelTop = scaleY > 0
+                            ? printedOriginY + offsetTopPt * scaleY
+                            : 0;
+                        double pixelWidth = scaleX > 0
+                            ? cellWidthPt * scaleX
+                            : 0;
+                        double pixelHeight = scaleY > 0
+                            ? cellHeightPt * scaleY
+                            : 0;
 
                         fields.Add(new ExcelField
                         {
                             Id = $"field_{cellAddress}",
                             Cell = cellAddress,
                             Type = fieldType,
-                            Left = Math.Round(leftPt * PointsToPixels, 1),
-                            Top = Math.Round(topPt * PointsToPixels, 1),
-                            Width = Math.Round(widthPt * PointsToPixels, 1),
-                            Height = Math.Round(heightPt * PointsToPixels, 1),
-                            Comment = commentText
+                            Left = Math.Round(pixelLeft, 1),
+                            Top = Math.Round(pixelTop, 1),
+                            Width = Math.Round(pixelWidth, 1),
+                            Height = Math.Round(pixelHeight, 1),
+                            Comment = commentText,
+
+                            // Debug metadata for verifying alignment
+                            ExcelLeft = cellLeftPt,
+                            ExcelTop = cellTopPt,
+                            PrintAreaLeft = printAreaLeft,
+                            PrintAreaTop = printAreaTop
                         });
                     }
                     finally
@@ -632,6 +914,33 @@ namespace ExcelAPI.Services
             }
 
             return "Unknown";
+        }
+
+        /// <summary>
+        /// Converts an Excel paper size and orientation to page dimensions in points.
+        /// 1 point = 1/72 inch.
+        /// </summary>
+        private static (double width, double height) GetPaperSizePoints(XlPaperSize paperSize, XlPageOrientation orientation)
+        {
+            (double w, double h) = paperSize switch
+            {
+                XlPaperSize.xlPaperLetter or XlPaperSize.xlPaperLetterSmall => (612.0, 792.0),       // 8.5 x 11 in
+                XlPaperSize.xlPaperLegal => (612.0, 1008.0),       // 8.5 x 14 in
+                XlPaperSize.xlPaperA4 or XlPaperSize.xlPaperA4Small => (595.0, 842.0),  // 210 x 297 mm
+                XlPaperSize.xlPaperA3 => (842.0, 1191.0),          // 297 x 420 mm
+                XlPaperSize.xlPaperA5 => (420.0, 595.0),           // 148 x 210 mm
+                XlPaperSize.xlPaperB5 => (499.0, 709.0),           // 176 x 250 mm
+                XlPaperSize.xlPaperExecutive => (522.0, 756.0),    // 7.25 x 10.5 in
+                XlPaperSize.xlPaperTabloid => (792.0, 1224.0),     // 11 x 17 in
+                XlPaperSize.xlPaperLedger => (1224.0, 792.0),      // 17 x 11 in
+                XlPaperSize.xlPaperEnvelope10 => (684.0, 360.0),   // 9.5 x 4.125 in
+                _ => (612.0, 792.0)  // Default to Letter
+            };
+
+            if (orientation == XlPageOrientation.xlLandscape)
+                return (h, w);
+
+            return (w, h);
         }
 
         /// <summary>
