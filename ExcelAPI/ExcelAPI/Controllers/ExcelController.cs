@@ -130,21 +130,18 @@ namespace ExcelAPI.Controllers
             // --- Steps 3-9: Delegate to service, then clean up ---
             try
             {
-                string imageUrl = await _excelCaptureService.CapturePrintAreaAsync(filePath, timeoutCts.Token);
+                var result = await _excelCaptureService.CapturePrintAreaAsync(filePath, timeoutCts.Token);
 
                 sw.Stop();
                 _logger.LogInformation(
-                    "Upload completed successfully: {FileName} -> {ImageUrl} (total: {Total}ms)",
-                    file.FileName, imageUrl, sw.ElapsedMilliseconds);
+                    "Upload completed successfully: {FileName} -> {ImageUrl} ({FieldCount} fields, {Total}ms)",
+                    file.FileName, result.ImageUrl, result.Fields.Count, sw.ElapsedMilliseconds);
 
-                return Ok(new ApiResponse<UploadResponse>
+                return Ok(new ApiResponse<CaptureResult>
                 {
                     Success = true,
                     Message = "Print area captured successfully.",
-                    Data = new UploadResponse
-                    {
-                        ImageUrl = imageUrl
-                    }
+                    Data = result
                 });
             }
             catch (PrintAreaNotConfiguredException ex)

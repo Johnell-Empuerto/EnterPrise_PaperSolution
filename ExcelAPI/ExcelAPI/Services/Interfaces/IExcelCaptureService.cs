@@ -1,3 +1,5 @@
+using ExcelAPI.Models;
+
 namespace ExcelAPI.Services.Interfaces
 {
     /// <summary>
@@ -8,7 +10,7 @@ namespace ExcelAPI.Services.Interfaces
     {
         /// <summary>
         /// Opens an Excel workbook, reads the configured print area from the first worksheet,
-        /// and captures it as a PNG image.
+        /// captures it as a 300 DPI PNG image, and extracts field metadata from cell comments.
         /// </summary>
         /// <param name="excelFilePath">
         /// Full file path to the Excel workbook (.xlsx or .xls).
@@ -17,7 +19,8 @@ namespace ExcelAPI.Services.Interfaces
         /// Token to cancel the operation if it exceeds the configured timeout or the client disconnects.
         /// </param>
         /// <returns>
-        /// The relative URL path to the saved preview image (e.g., "/preview/page_abc.png").
+        /// A <see cref="CaptureResult"/> containing the image URL, page dimensions,
+        /// and a list of form fields extracted from cell comments.
         /// </returns>
         /// <exception cref="InvalidOperationException">
         /// Thrown when no print area is configured, Excel cannot be started,
@@ -26,6 +29,6 @@ namespace ExcelAPI.Services.Interfaces
         /// <exception cref="OperationCanceledException">
         /// Thrown when the operation is cancelled due to timeout or client disconnect.
         /// </exception>
-        Task<string> CapturePrintAreaAsync(string excelFilePath, CancellationToken cancellationToken = default);
+        Task<CaptureResult> CapturePrintAreaAsync(string excelFilePath, CancellationToken cancellationToken = default);
     }
 }

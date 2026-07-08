@@ -5,26 +5,55 @@ import Image from "next/image";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
+interface ExcelField {
+  id: string;
+  cell: string;
+  type: string;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  comment: string;
+}
+
+interface PageInfo {
+  width: number;
+  height: number;
+}
+
+interface CaptureResult {
+  imageUrl?: string;
+  page?: PageInfo;
+  fields?: ExcelField[];
+}
+
 interface UploadResponse {
   success: boolean;
   message: string;
-  data?: {
-    imageUrl?: string;
-  };
+  data?: CaptureResult;
 }
 
 export default function Home() {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [isError, setIsError] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [zoom, setZoom] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const imageUrl = captureResult?.imageUrl
+    ? `${API_BASE_URL}${captureResult.imageUrl}`
+    : null;
+
+  const fields = captureResult?.fields ?? [];
+  const page = captureResult?.page;
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     setSelectedFile(file);
-    setImageUrl(null);
+    setCaptureResult(null);
     setMessage(null);
     setIsError(false);
   };
@@ -41,7 +70,7 @@ export default function Home() {
     setIsLoading(true);
     setMessage(null);
     setIsError(false);
-    setImageUrl(null);
+    setCaptureResult(null);
 
     try {
       const formData = new FormData();
@@ -55,9 +84,12 @@ export default function Home() {
       const result: UploadResponse = await response.json();
 
       if (response.ok && result.success && result.data?.imageUrl) {
-        setImageUrl(`${API_BASE_URL}${result.data.imageUrl}`);
-        setMessage(result.message);
+        setCaptureResult(result.data);
+        setMessage(
+          `${result.data.fields?.length ?? 0} field(s) detected.`,
+        );
         setIsError(false);
+        setZoom(0.5); // Default zoom to fit most screens
       } else {
         setMessage(result.message || "Failed to process file.");
         setIsError(true);
@@ -74,11 +106,27 @@ export default function Home() {
 
   const handleReset = () => {
     setSelectedFile(null);
-    setImageUrl(null);
+    setCaptureResult(null);
     setMessage(null);
     setIsError(false);
+    setZoom(1);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const zoomIn = () => setZoom((z) => Math.min(z + 0.25, 3));
+  const zoomOut = () => setZoom((z) => Math.max(z - 0.25, 0.25));
+  const zoomReset = () => setZoom(1);
+
+  const fieldTypeColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case "text": return "#3B82F6";
+      case "date": return "#10B981";
+      case "checkbox": return "#F59E0B";
+      case "signature": return "#8B5CF6";
+      case "number": return "#EF4444";
+      default: return "#FFD400";
     }
   };
 
@@ -88,18 +136,8 @@ export default function Home() {
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center gap-3">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-            <svg
-              className="w-5 h-5 text-white"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={2}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-              />
+            <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           </div>
           <div>
@@ -107,7 +145,7 @@ export default function Home() {
               PaperLess Enterprise
             </h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Excel Print Area Capture
+              Excel Print Area Capture &mdash; Field Metadata
             </p>
           </div>
         </div>
@@ -122,12 +160,11 @@ export default function Home() {
               Upload Excel File
             </h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
-              Select an Excel file with a configured Print Area to capture as an
-              image.
+              Select an Excel file with a configured Print Area and field
+              definitions in cell comments.
             </p>
 
             <form onSubmit={handleUpload} className="space-y-5">
-              {/* File Input */}
               <div className="relative">
                 <input
                   ref={fileInputRef}
@@ -138,26 +175,14 @@ export default function Home() {
                 />
                 {selectedFile && (
                   <p className="mt-2 text-xs text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
-                    <svg
-                      className="w-3.5 h-3.5 text-emerald-500"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                      strokeWidth={2}
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                      />
+                    <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)}{" "}
-                    KB)
+                    {selectedFile.name} ({(selectedFile.size / 1024).toFixed(1)} KB)
                   </p>
                 )}
               </div>
 
-              {/* Action Buttons */}
               <div className="flex gap-3">
                 <button
                   type="submit"
@@ -166,49 +191,23 @@ export default function Home() {
                 >
                   {isLoading ? (
                     <>
-                      <svg
-                        className="animate-spin h-4 w-4 text-white"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                      >
-                        <circle
-                          className="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
-                          stroke="currentColor"
-                          strokeWidth="4"
-                        />
-                        <path
-                          className="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-                        />
+                      <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                       </svg>
                       Processing...
                     </>
                   ) : (
                     <>
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        viewBox="0 0 24 24"
-                        stroke="currentColor"
-                        strokeWidth={2}
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-                        />
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                       </svg>
                       Upload & Capture
                     </>
                   )}
                 </button>
 
-                {imageUrl && (
+                {captureResult && (
                   <button
                     type="button"
                     onClick={handleReset}
@@ -224,41 +223,19 @@ export default function Home() {
 
         {/* Status Message */}
         {message && (
-          <div
-            className={`mt-5 p-4 rounded-xl text-sm ${
-              isError
-                ? "bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900"
-                : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
-            }`}
-          >
+          <div className={`mt-5 p-4 rounded-xl text-sm ${
+            isError
+              ? "bg-red-50 dark:bg-red-950/50 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900"
+              : "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900"
+          }`}>
             <div className="flex items-start gap-2.5">
               {isError ? (
-                <svg
-                  className="w-5 h-5 mt-0.5 shrink-0 text-red-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
+                <svg className="w-5 h-5 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               ) : (
-                <svg
-                  className="w-5 h-5 mt-0.5 shrink-0 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
+                <svg className="w-5 h-5 mt-0.5 shrink-0 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               )}
               <span>{message}</span>
@@ -266,40 +243,145 @@ export default function Home() {
           </div>
         )}
 
-        {/* Preview Section */}
-        {imageUrl && (
+        {/* Preview with Field Overlay */}
+        {captureResult && imageUrl && page && (
           <div className="mt-6 bg-white dark:bg-slate-900 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden">
-            <div className="p-6 sm:p-8">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-50 mb-4 flex items-center gap-2">
-                <svg
-                  className="w-5 h-5 text-emerald-500"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  strokeWidth={2}
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
+            {/* Toolbar */}
+            <div className="flex items-center justify-between px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+              <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                Captured Print Area Preview
-              </h3>
-              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50 dark:bg-slate-950">
-                <div className="relative flex items-center justify-center p-4">
-                  <Image
-                    src={imageUrl}
-                    alt="Excel Print Area Preview"
-                    width={800}
-                    height={600}
-                    className="max-w-full h-auto object-contain rounded-lg shadow-sm"
-                    unoptimized
-                    priority
-                  />
-                </div>
+                <span>{page.width} &times; {page.height} px</span>
+                <span className="text-slate-300 dark:text-slate-600">|</span>
+                <span>{fields.length} field(s)</span>
+              </div>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={zoomOut}
+                  disabled={zoom <= 0.25}
+                  className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
+                  title="Zoom out"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+                  </svg>
+                </button>
+                <button
+                  onClick={zoomReset}
+                  className="px-2 py-1 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-colors min-w-[3rem] text-center"
+                >
+                  {Math.round(zoom * 100)}%
+                </button>
+                <button
+                  onClick={zoomIn}
+                  disabled={zoom >= 3}
+                  className="p-1.5 rounded-md hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400 disabled:opacity-30 transition-colors"
+                  title="Zoom in"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                  </svg>
+                </button>
               </div>
             </div>
+
+            {/* Canvas with PNG + Field Overlay */}
+            {/*
+              Zoom/pan approach:
+              - The container div handles scrolling (pan).
+              - The inner scaled div uses transform: scale(zoom) with transformOrigin: "top left".
+              - Both the PNG and the field overlay share the same coordinate system (PNG pixels at 300 DPI).
+              - The field overlay has position: absolute over the PNG.
+              - Scaling via CSS transform keeps the PNG and overlay perfectly aligned.
+            */}
+            <div
+              className="overflow-auto max-h-[80vh] bg-slate-100 dark:bg-slate-950"
+              style={{ cursor: zoom > 1 ? "grab" : "default" }}
+            >
+              <div
+                ref={previewRef}
+                className="relative"
+                style={{
+                  width: page.width,
+                  height: page.height,
+                  transform: `scale(${zoom})`,
+                  transformOrigin: "top left",
+                }}
+              >
+                {/* PNG Image */}
+                <Image
+                  src={imageUrl}
+                  alt="Excel Print Area Preview"
+                  width={page.width}
+                  height={page.height}
+                  className="block"
+                  unoptimized
+                  priority
+                  draggable={false}
+                />
+
+                {/* Field Overlay — fields are positioned in the same coordinate space as the PNG */}
+                {fields.map((field) => {
+                  const color = fieldTypeColor(field.type);
+                  return (
+                    <div
+                      key={field.id}
+                      className="absolute pointer-events-auto cursor-pointer group"
+                      style={{
+                        left: field.left,
+                        top: field.top,
+                        width: field.width,
+                        height: field.height,
+                        backgroundColor: `${color}20`,
+                        border: `2px solid ${color}`,
+                        borderRadius: "2px",
+                        transition: "background-color 0.15s, box-shadow 0.15s",
+                      }}
+                      title={`${field.cell}: ${field.type}\n${field.comment}`}
+                    >
+                      {/* Field label shown on hover */}
+                      <div
+                        className="absolute -top-6 left-0 px-2 py-0.5 rounded text-[10px] font-medium whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                        style={{ backgroundColor: color, color: "#fff" }}
+                      >
+                        {field.cell} &middot; {field.type}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Field Legend */}
+            {fields.length > 0 && (
+              <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950">
+                <div className="flex flex-wrap gap-3">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+                    Fields:
+                  </span>
+                  {fields.map((field) => {
+                    const color = fieldTypeColor(field.type);
+                    return (
+                      <span
+                        key={field.id}
+                        className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs"
+                        style={{
+                          backgroundColor: `${color}15`,
+                          color: color,
+                          border: `1px solid ${color}40`,
+                        }}
+                      >
+                        <span className="font-mono text-[10px] opacity-70">{field.cell}</span>
+                        <span>{field.type}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -307,8 +389,7 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-slate-200 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 text-center text-xs text-slate-400 dark:text-slate-600">
-          PaperLess Enterprise &mdash; Phase 1 &middot; Excel Print Area Capture
-          API
+          PaperLess Enterprise &mdash; Phase 2 &middot; Field Metadata Pipeline
         </div>
       </footer>
     </div>
