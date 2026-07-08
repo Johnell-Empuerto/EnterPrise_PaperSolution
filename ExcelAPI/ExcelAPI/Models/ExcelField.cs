@@ -45,5 +45,11 @@ namespace ExcelAPI.Models
 
         /// <summary>Print Area origin Top in Excel points (for debug verification).</summary>
         public double PrintAreaTop { get; set; }
+
+        /// <summary>Whether this cell is part of a merged range.</summary>
+        public bool IsMerged { get; set; }
+
+        /// <summary>The address of the merged range (e.g., "A1:B2"), if applicable.</summary>
+        public string? MergeAddress { get; set; }
     }
 }

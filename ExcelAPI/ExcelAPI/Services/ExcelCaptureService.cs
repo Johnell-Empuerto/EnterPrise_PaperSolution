@@ -822,11 +822,50 @@ namespace ExcelAPI.Services
                         string cellAddress = cell.AddressLocal[false, false];
                         string fieldType = ParseFieldType(commentText);
 
-                        // Raw cell coordinates in Excel points
-                        double cellLeftPt = cell.Left;
-                        double cellTopPt = cell.Top;
-                        double cellWidthPt = cell.Width;
-                        double cellHeightPt = cell.Height;
+                        // --- Determine geometry source: MergeArea or individual cell ---
+                        // When a cell is part of a merged range, cell.Left/Top/Width/Height
+                        // only reflects the anchor cell, not the entire merged region.
+                        // We must use MergeArea to get the full merged region dimensions.
+                        bool isMerged = false;
+                        string? mergeAddress = null;
+                        double cellLeftPt, cellTopPt, cellWidthPt, cellHeightPt;
+
+                        try
+                        {
+                            isMerged = cell.MergeCells;
+                        }
+                        catch
+                        {
+                            isMerged = false;
+                        }
+
+                        if (isMerged)
+                        {
+                            // Use MergeArea for the complete merged region geometry
+                            Excel.Range? mergeArea = null;
+                            try
+                            {
+                                mergeArea = cell.MergeArea;
+                                cellLeftPt = mergeArea.Left;
+                                cellTopPt = mergeArea.Top;
+                                cellWidthPt = mergeArea.Width;
+                                cellHeightPt = mergeArea.Height;
+                                mergeAddress = mergeArea.AddressLocal[false, false];
+                            }
+                            finally
+                            {
+                                if (mergeArea != null)
+                                    Marshal.ReleaseComObject(mergeArea);
+                            }
+                        }
+                        else
+                        {
+                            // Normal (non-merged) cell — use cell's own geometry
+                            cellLeftPt = cell.Left;
+                            cellTopPt = cell.Top;
+                            cellWidthPt = cell.Width;
+                            cellHeightPt = cell.Height;
+                        }
 
                         // Calculate content offset within the print area (in points)
                         double offsetLeftPt = cellLeftPt - printAreaLeft;
@@ -857,6 +896,8 @@ namespace ExcelAPI.Services
                             Width = Math.Round(pixelWidth, 1),
                             Height = Math.Round(pixelHeight, 1),
                             Comment = commentText,
+                            IsMerged = isMerged,
+                            MergeAddress = mergeAddress,
 
                             // Debug metadata for verifying alignment
                             ExcelLeft = cellLeftPt,
