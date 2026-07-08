@@ -668,6 +668,220 @@ namespace ExcelAPI.Services
                         f.Width, f.Height);
                 }
 
+                // ================================================================
+                // Phase 2.8 - Render Calibration Test (Bypass PDF)
+                // Tests whether Excel->PDF or PDF->PNG introduces the error.
+                // ================================================================
+                if (fields.Count > 0 && pdfPath != null && System.IO.File.Exists(pdfPath))
+                {
+                    try
+                    {
+                        // ================================================================
+                        // Test 1: MergeArea geometry from Excel COM
+                        // ================================================================
+                        try
+                        {
+                            var testField1 = fields[0];
+                            if (worksheet != null && !string.IsNullOrEmpty(testField1.Cell))
+                            {
+                                Excel.Range? fr = null;
+                                try
+                                {
+                                    fr = worksheet.Range[testField1.Cell];
+                                    var ma = fr.MergeArea;
+                                    if (ma != null)
+                                    {
+                                        // COM properties are dynamic; cast to explicit types to avoid CS1973
+                                        string cellAddr = ma.Address ?? "";
+                                        double maLeft = ma.Left;
+                                        double maTop = ma.Top;
+                                        double maWidth = ma.Width;
+                                        double maHeight = ma.Height;
+                                        int maRows = ma.Rows.Count;
+                                        int maCols = ma.Columns.Count;
+                                        _logger.LogInformation(
+                                            "[CALIB:1] MergeArea Geometry for \"{Cell}\" - " +
+                                            "Address=\"{Address}\" | " +
+                                            "Left={L:F2} Top={T:F2} Width={W:F2} Height={H:F2} | " +
+                                            "Rows={Rows} Cols={Cols}",
+                                            testField1.Cell, cellAddr,
+                                            maLeft, maTop, maWidth, maHeight,
+                                            maRows, maCols);
+                                        Marshal.ReleaseComObject(ma);
+                                    }
+                                }
+                                finally
+                                {
+                                    if (fr != null) Marshal.ReleaseComObject(fr);
+                                }
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[CALIB:1] MergeArea diagnostic failed: {Msg}", ex.Message);
+                        }
+
+                        // ================================================================
+                        // Test 2: Annotated PDF - Draw red rectangle at calculated coords.
+                        // If rectangle aligns with cell -> Excel->PDF coords are CORRECT.
+                        //   Bug is in PDF->PNG (PDFium rendering layer).
+                        // If rectangle is offset -> Bug is in coordinate calculation.
+                        // ================================================================
+                        try
+                        {
+                            byte[] pdfBytesAnn = System.IO.File.ReadAllBytes(pdfPath);
+                            using var pdfBmp = PDFtoImage.Conversion.ToImage(
+                                pdfBytesAnn,
+                                page: 0,
+                                options: new PDFtoImage.RenderOptions { Dpi = 300, WithAnnotations = false });
+
+                            if (pdfBmp != null)
+                            {
+                                using var annBmp = new SkiaSharp.SKBitmap(pdfBmp.Width, pdfBmp.Height);
+                                using var srcPix = pdfBmp.PeekPixels();
+                                using var dstPix = annBmp.PeekPixels();
+                                srcPix.ReadPixels(dstPix.Info, dstPix.GetPixels(), dstPix.RowBytes, 0, 0);
+
+                                using var canvas = new SkiaSharp.SKCanvas(annBmp);
+                                using var redPen = new SkiaSharp.SKPaint
+                                {
+                                    Color = new SkiaSharp.SKColor(255, 0, 0, 160),
+                                    Style = SkiaSharp.SKPaintStyle.Stroke,
+                                    StrokeWidth = 3
+                                };
+                                using var crossPen = new SkiaSharp.SKPaint
+                                {
+                                    Color = new SkiaSharp.SKColor(255, 0, 0, 220),
+                                    Style = SkiaSharp.SKPaintStyle.Stroke,
+                                    StrokeWidth = 1
+                                };
+
+                                var tf = fields[0];
+                                float x0 = (float)tf.Left;
+                                float y0 = (float)tf.Top;
+                                float ww = (float)tf.Width;
+                                float hh = (float)tf.Height;
+                                canvas.DrawRect(x0, y0, ww, hh, redPen);
+                                canvas.DrawLine(x0 - 5, y0, x0 + 5, y0, crossPen);
+                                canvas.DrawLine(x0, y0 - 5, x0, y0 + 5, crossPen);
+
+                                string annPath = Path.Combine(previewFolder, $"annotated_{fileId}.png");
+                                using var annImg = SkiaSharp.SKImage.FromBitmap(annBmp);
+                                using var annData = annImg.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                                System.IO.File.WriteAllBytes(annPath, annData.ToArray());
+
+                                _logger.LogInformation(
+                                    "[CALIB:2] Annotated PNG saved: {Path}\n" +
+                                    "  Red rectangle at calculated coords:\n" +
+                                    "    L={L:F1} T={T:F1} W={W:F1} H={H:F1}\n" +
+                                    "  If rectangle ALIGNS with cell -> PDF coords are CORRECT.\n" +
+                                    "    Bug is in PDF->PNG (PDFium rendering).\n" +
+                                    "  If rectangle is OFFSET -> Bug is in coordinate calc\n" +
+                                    "    (Excel->PDF transform or printed origin is wrong).",
+                                    annPath,
+                                    tf.Left, tf.Top, tf.Width, tf.Height);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[CALIB:2] Annotated PDF test failed: {Msg}", ex.Message);
+                        }
+
+                        // ================================================================
+                        // Test 4: Multi-DPI rendering - detect if error changes with DPI.
+                        // Render PDF at 72/150/300/600 DPI, measure first field dimensions.
+                        // If error % CHANGES with DPI -> PDFium applies additional scaling.
+                        // If error % STAYS THE SAME -> PDF itself is already transformed.
+                        // ================================================================
+                        try
+                        {
+                            byte[] pdfBytesM = System.IO.File.ReadAllBytes(pdfPath);
+                            var mf = fields[0];
+                            double fwPt = mf.ExcelWidthPt;
+                            double fhPt = mf.ExcelHeightPt;
+
+                            int[] dpiVals = { 72, 150, 300, 600 };
+                            string dpiLog = "";
+
+                            foreach (int td in dpiVals)
+                            {
+                                using var db = PDFtoImage.Conversion.ToImage(
+                                    pdfBytesM,
+                                page: 0,
+                                options: new PDFtoImage.RenderOptions { Dpi = td, WithAnnotations = false });
+                                if (db == null) continue;
+
+                                double ts = td / 72.0;
+                                double exW = fwPt * ts;
+                                double exH = fhPt * ts;
+
+                                int dw = db.Width;
+                                int dh = db.Height;
+
+                                int eL = (int)Math.Round(printedOriginX * td / 300.0 + (mf.ExcelLeft - printAreaLeft) * ts);
+                                int eT = (int)Math.Round(printedOriginY * td / 300.0 + (mf.ExcelTop - printAreaTop) * ts);
+                                int eR = eL + (int)Math.Round(exW);
+                                int eB = eT + (int)Math.Round(exH);
+                                int eMx = (eL + eR) / 2;
+                                int eMy = (eT + eB) / 2;
+
+                                int aL = eL, aT = eT, aR = eR, aB = eB;
+                                if (eMx >= 0 && eMx < dw && eMy >= 0 && eMy < dh)
+                                {
+                                    const int mg = 20;
+                                    const byte th = 240;
+
+                                    int sY = Math.Clamp(eMy, 0, dh - 1);
+                                    for (int x = Math.Max(0, eL - mg); x <= Math.Min(dw - 1, eL); x++)
+                                    { var p = db.GetPixel(x, sY); if (p.Red < th || p.Green < th || p.Blue < th) { aL = x; break; } }
+                                    for (int x = Math.Max(0, eR); x < Math.Min(dw, eR + mg); x++)
+                                    { var p = db.GetPixel(x, sY); if (p.Red < th || p.Green < th || p.Blue < th) aR = x; else if (x > aR + 3) break; }
+
+                                    int sX = Math.Clamp(eMx, 0, dw - 1);
+                                    for (int y = Math.Max(0, eT - mg); y <= Math.Min(dh - 1, eT); y++)
+                                    { var p = db.GetPixel(sX, y); if (p.Red < th || p.Green < th || p.Blue < th) { aT = y; break; } }
+                                    for (int y = Math.Max(0, eB); y < Math.Min(dh, eB + mg); y++)
+                                    { var p = db.GetPixel(sX, y); if (p.Red < th || p.Green < th || p.Blue < th) aB = y; else if (y > aB + 3) break; }
+                                }
+
+                                double aW = aR - aL;
+                                double aH = aB - aT;
+                                double wR = exW > 0 ? aW / exW : 0;
+                                double hR = exH > 0 ? aH / exH : 0;
+
+                                dpiLog += string.Format(
+                                    "  {0}DPI: scale={1:F4} expW={2:F1} actW={3:F1} ratio={4:F6}  expH={5:F1} actH={6:F1} ratio={7:F6}\n",
+                                    td, ts, exW, aW, wR, exH, aH, hR);
+                            }
+
+                            _logger.LogInformation(
+                                "[CALIB:4] Multi-DPI Rendering Test - Field \"{Cell}\" ({WPt:F1}x{HPt:F1}pt)\n" +
+                                "{DpiLog}" +
+                                "  ANALYSIS:\n" +
+                                "  If ratios are CONSTANT across all DPIs:\n" +
+                                "    - PDF itself is already scaled (bug in Excel->PDF export).\n" +
+                                "    Fix: Adjust DPI/72 scale by the observed ratio.\n" +
+                                "  If ratios CHANGE with DPI:\n" +
+                                "    - PDFium applies its own scaling on PDF content.\n" +
+                                "    Fix: Investigate PDFium render options.\n" +
+                                "  If ALL ratios ~= 1.0:\n" +
+                                "    - Coordinate system IS correct. Problem elsewhere.\n" +
+                                "  Reference: At 300 DPI, expected scale = 300/72 = {Ref:F4}",
+                                mf.Cell ?? "", fwPt, fhPt,
+                                dpiLog,
+                                scaleX);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.LogWarning(ex, "[CALIB:4] Multi-DPI test failed: {Msg}", ex.Message);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[CALIB] Render calibration test failed: {Msg}", ex.Message);
+                    }
+                }
+
                 // Build and return the complete capture result
                 return new CaptureResult
                 {

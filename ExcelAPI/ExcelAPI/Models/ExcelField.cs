@@ -46,6 +46,12 @@ namespace ExcelAPI.Models
         /// <summary>Print Area origin Top in Excel points (for debug verification).</summary>
         public double PrintAreaTop { get; set; }
 
+        /// <summary>Raw cell Width in Excel points (for debug verification).</summary>
+        public double ExcelWidthPt { get; set; }
+
+        /// <summary>Raw cell Height in Excel points (for debug verification).</summary>
+        public double ExcelHeightPt { get; set; }
+
         /// <summary>Whether this cell is part of a merged range.</summary>
         public bool IsMerged { get; set; }
 
