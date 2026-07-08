@@ -1,0 +1,21 @@
+Test File,Status,HTTP Code,Success,Message,Image URL,File Size (KB),Time (s)
+01_simple_table.xlsx,FAIL,200,,"",,8,0
+02_borders.xlsx,FAIL,200,,"",,8,0
+03_merged_cells.xlsx,FAIL,200,,"",,8,0
+04_wrapped_text.xlsx,FAIL,200,,"",,8,0
+05_fonts.xlsx,FAIL,200,,"",,8,0
+06_font_sizes_colors.xlsx,FAIL,200,,"",,8,0
+07_background_fills.xlsx,FAIL,200,,"",,8,0
+08_shapes.xlsx,FAIL,200,,"",,8,0
+09_hidden_rows.xlsx,FAIL,200,,"",,8,0
+10_hidden_columns.xlsx,FAIL,200,,"",,8,0
+11_frozen_panes.xlsx,FAIL,200,,"",,8,0
+12_variable_sizes.xlsx,FAIL,200,,"",,8,0
+13_landscape.xlsx,FAIL,200,,"",,8,0
+14_fit_to_page.xlsx,FAIL,200,,"",,8,0
+15_multiple_areas.xlsx,FAIL,500,,"",,8,0
+16_large_area.xlsx,FAIL,200,,"",,12,0
+17_multiple_worksheets.xlsx,FAIL,200,,"",,8,0
+18_print_titles.xlsx,FAIL,200,,"",,8,0
+19_headers_footers.xlsx,FAIL,200,,"",,8,0
+20_empty_print_area.xlsx,PASS (expected),400,,"",,8,0

@@ -1,0 +1,23 @@
+# Next.js
+paperless/node_modules/
+paperless/.next/
+paperless/out/
+
+# ASP.NET
+**/bin/
+**/obj/
+
+# Generated files
+ExcelAPI/ExcelAPI/Uploads/
+ExcelAPI/ExcelAPI/Preview/
+ExcelAPI/ExcelAPI/Logs/
+
+# Environment
+.env
+.env.local
+paperless/.env.local
+
+# IDE
+.vs/
+.vscode/
+.idea/
