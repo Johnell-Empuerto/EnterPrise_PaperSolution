@@ -36,5 +36,7 @@ namespace ExcelAPI.Models
 
         /// <summary>An unexpected internal error occurred.</summary>
         public const string InternalError = "INTERNAL_ERROR";
+
+public const string InvalidRequest = "INVALID_REQUEST";
     }
 }

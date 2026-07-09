@@ -1,6 +1,7 @@
 using ExcelAPI.Models;
 using ExcelAPI.Services;
 using ExcelAPI.Services.Interfaces;
+using ExcelAPI.Generators;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -17,6 +18,12 @@ builder.Services.Configure<ExcelCaptureOptions>(
 
 // Register application services
 builder.Services.AddScoped<IExcelCaptureService, ExcelCaptureService>();
+builder.Services.AddScoped<IFormSaveService, FormSaveService>();
+builder.Services.AddScoped<XmlGenerator>();
+builder.Services.AddScoped<DatabaseGenerator>();
+builder.Services.AddScoped<WorkbookGenerator>();
+builder.Services.AddScoped<PreviewGenerator>();
+builder.Services.AddScoped<PdfGenerator>();
 
 // Register background cleanup service
 builder.Services.AddHostedService<PreviewCleanupService>();
@@ -51,6 +58,8 @@ foreach (var dir in directoriesToCreate)
     app.Logger.LogInformation("Ensured directory exists: {Directory}", dir);
 }
 
+Directory.CreateDirectory(Path.Combine(contentRoot, "Forms"));
+
 // --- Configure the HTTP request pipeline ---
 
 if (app.Environment.IsDevelopment())
@@ -72,6 +81,13 @@ app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(previewPath),
     RequestPath = "/preview"
+});
+
+string formsPath = Path.Combine(contentRoot, "Forms");
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(formsPath),
+    RequestPath = "/forms"
 });
 
 // Enable authorization
