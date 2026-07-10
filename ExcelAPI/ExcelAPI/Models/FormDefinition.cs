@@ -36,6 +36,7 @@ namespace ExcelAPI.Models
         public string? FreezePane { get; set; }
         public Dictionary<string, CellStyleInfo> CellStyles { get; set; } = new();
         public Dictionary<string, string> CellValues { get; set; } = new();
+        public Dictionary<string, string> Metadata { get; set; } = new();
     }
 
     public class PageSettings

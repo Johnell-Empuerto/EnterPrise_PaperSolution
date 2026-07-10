@@ -2,6 +2,8 @@ using ExcelAPI.Models;
 using ExcelAPI.Services;
 using ExcelAPI.Services.Interfaces;
 using ExcelAPI.Generators;
+using ExcelAPI.Rendering;
+using ExcelAPI.Runtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,6 +26,66 @@ builder.Services.AddScoped<DatabaseGenerator>();
 builder.Services.AddScoped<WorkbookGenerator>();
 builder.Services.AddScoped<PreviewGenerator>();
 builder.Services.AddScoped<PdfGenerator>();
+
+// Register FormLess rendering core
+builder.Services.AddSingleton<OpenXmlParser>();
+builder.Services.AddSingleton<GeometryBuilder>();
+builder.Services.AddSingleton<PageGeometryResolver>();
+builder.Services.AddSingleton<MarginResolver>();
+builder.Services.AddSingleton<ScalingResolver>();
+builder.Services.AddSingleton<PrintLayoutEngine>();
+builder.Services.AddSingleton<CoordinateEngine>();
+builder.Services.AddSingleton<CellGeometryEngine>();
+builder.Services.AddSingleton<FillEngine>();
+builder.Services.AddSingleton<GridlineLayer>();
+builder.Services.AddSingleton<BorderEngine>();
+
+// Register IRenderLayer implementations (order = render order)
+builder.Services.AddSingleton<IRenderLayer, FillEngine>();
+builder.Services.AddSingleton<IRenderLayer, GridlineLayer>();
+builder.Services.AddSingleton<IRenderLayer, BorderEngine>();
+builder.Services.AddSingleton<IRenderLayer, TextEngine>();
+
+// Register Text Rendering Engine (Phase 11C / M4)
+builder.Services.AddSingleton<FontResolver>();
+builder.Services.AddSingleton<TextLayoutEngine>();
+builder.Services.AddSingleton<TextEngine>();
+
+// Register Style Resolution Engine (Phase 11E)
+builder.Services.AddSingleton<ThemeResolver>();
+builder.Services.AddSingleton<ColorResolver>();
+builder.Services.AddSingleton<StyleCache>();
+builder.Services.AddSingleton<StyleResolver>();
+
+// Register Image & Shape Engine (Phase 11F)
+builder.Services.AddSingleton<DrawingParser>();
+builder.Services.AddSingleton<ImageResolver>();
+builder.Services.AddSingleton<ImageEngine>();
+builder.Services.AddSingleton<ShapeResolver>();
+builder.Services.AddSingleton<ShapeEngine>();
+
+// Register IRenderLayer for images and shapes (Layer 5 = images, Layer 6 = shapes)
+builder.Services.AddSingleton<IRenderLayer, ImageEngine>();
+builder.Services.AddSingleton<IRenderLayer, ShapeEngine>();
+
+// Register Production Export Engine (Phase 11G)
+builder.Services.AddSingleton<ExportOptions>();
+builder.Services.AddSingleton<PageRenderer>();
+builder.Services.AddSingleton<ExportCoordinator>();
+
+// Register Form Runtime Engine (Phase 11I)
+builder.Services.AddSingleton<FieldTypeResolver>();
+builder.Services.AddSingleton<FieldDetector>();
+builder.Services.AddSingleton<FormRuntimeBuilder>();
+builder.Services.AddSingleton<RuntimeSerializer>();
+
+// Register COM Runtime Metadata Service (Phase 11J.8)
+// Replaces CoordinateEngine + GeometryBuilder in the Runtime GET path
+// by persisting and loading Excel COM field rectangles directly.
+builder.Services.AddSingleton<RuntimeMetadataService>();
+
+// RendererCoordinator depends on IEnumerable<IRenderLayer>
+builder.Services.AddSingleton<RendererCoordinator>();
 
 // Register background cleanup service
 builder.Services.AddHostedService<PreviewCleanupService>();

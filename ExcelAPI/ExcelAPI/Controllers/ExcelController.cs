@@ -130,7 +130,7 @@ namespace ExcelAPI.Controllers
             // --- Steps 3-9: Delegate to service, then clean up ---
             try
             {
-                var result = await _excelCaptureService.CapturePrintAreaAsync(filePath, timeoutCts.Token);
+                var result = await _excelCaptureService.CapturePrintAreaAsync(filePath, null, timeoutCts.Token);
 
                 sw.Stop();
                 _logger.LogInformation(

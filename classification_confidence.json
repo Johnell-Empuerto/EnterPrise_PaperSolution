@@ -1,0 +1,28 @@
+{
+  "total_forms": 457,
+  "classifications": {
+    "no_print_area": {
+      "count": 457,
+      "pct": 100.0,
+      "forms": [
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        41,
+        42,
+        43,
+        44
+      ]
+    }
+  },
+  "error_stats": {
+    "mean": 0.0,
+    "median": 0,
+    "p95": 0,
+    "max": 0,
+    "near_perfect_pct": 100.0
+  }
+}

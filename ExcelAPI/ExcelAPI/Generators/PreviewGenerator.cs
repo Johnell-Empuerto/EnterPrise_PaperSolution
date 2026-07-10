@@ -1,28 +1,90 @@
 using ExcelAPI.Models;
-using SkiaSharp;
+using ExcelAPI.Rendering;
 using Microsoft.Extensions.Logging;
 
 namespace ExcelAPI.Generators
 {
+    /// <summary>
+    /// Generates preview PNG images for forms.
+    /// Delegates all rendering to ExportCoordinator (Phase 11G Production Export Engine).
+    ///
+    /// No rendering logic should exist in this class — it only coordinates
+    /// the export options and delegates to ExportCoordinator.ExportPng().
+    /// </summary>
     public class PreviewGenerator
     {
         private readonly ILogger<PreviewGenerator> _logger;
-        private const double DPI = 300.0;
-        private const double PointsToPixels = DPI / 72.0;
+        private readonly ExportCoordinator _exportCoordinator;
+        private readonly string? _xlsxPath;
 
-        public PreviewGenerator(ILogger<PreviewGenerator> logger)
+        public PreviewGenerator(ILogger<PreviewGenerator> logger, ExportCoordinator exportCoordinator)
         {
             _logger = logger;
+            _exportCoordinator = exportCoordinator;
         }
 
+        public PreviewGenerator(ILogger<PreviewGenerator> logger, ExportCoordinator exportCoordinator, string xlsxPath)
+        {
+            _logger = logger;
+            _exportCoordinator = exportCoordinator;
+            _xlsxPath = xlsxPath;
+        }
+
+        /// <summary>
+        /// Generate a preview PNG for the given form and sheet.
+        /// Delegates to ExportCoordinator.ExportPng() with default preview options.
+        /// Falls back to overlay-only if XLSX is unavailable or rendering fails.
+        /// </summary>
         public string Generate(FormDefinition form, string sheetId, string outputPath)
         {
             var sheet = form.Sheets.FirstOrDefault(s => s.Id == sheetId);
             if (sheet == null)
                 throw new ArgumentException($"Sheet not found: {sheetId}");
 
-            if (sheet.PrintArea == null)
-                throw new InvalidOperationException("No print area configured for this sheet.");
+            string xlsxPath = _xlsxPath ?? form.Metadata.GetValueOrDefault("xlsxPath", "");
+            if (!string.IsNullOrEmpty(xlsxPath) && System.IO.File.Exists(xlsxPath))
+            {
+                try
+                {
+                    var options = new ExportOptions
+                    {
+                        Dpi = 300,
+                        FilePrefix = Path.GetFileNameWithoutExtension(outputPath),
+                        OutputDirectory = Path.GetDirectoryName(outputPath),
+                        PngCompressionLevel = 100,
+                        TransparentBackground = false,
+                        IncludePageNumbers = false,
+                        MaxPages = 1
+                    };
+
+                    var results = _exportCoordinator.ExportPng(xlsxPath, form, sheetId, options);
+                    if (results.Count > 0)
+                    {
+                        // If ExportCoordinator used a different filename, copy/rename
+                        if (!string.Equals(results[0], outputPath, StringComparison.OrdinalIgnoreCase)
+                            && System.IO.File.Exists(results[0]))
+                        {
+                            var bytes = System.IO.File.ReadAllBytes(results[0]);
+                            System.IO.File.WriteAllBytes(outputPath, bytes);
+                        }
+
+                        _logger.LogInformation("Preview generated via ExportCoordinator: {Path}", outputPath);
+                        return outputPath;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "ExportCoordinator failed, falling back to overlay-only preview");
+                }
+            }
+
+            // Fallback: overlay-only preview
+            return GenerateOverlayOnly(form, sheetId, sheet, outputPath);
+        }
+
+        private string GenerateOverlayOnly(FormDefinition form, string sheetId, SheetDefinition sheet, string outputPath)
+        {
+            const double PointsToPixels = 300.0 / 72.0;
 
             double pageWidthPx = sheet.PageSettings.WidthPt * PointsToPixels;
             double pageHeightPx = sheet.PageSettings.HeightPt * PointsToPixels;
@@ -30,96 +92,27 @@ namespace ExcelAPI.Generators
             int width = (int)Math.Round(pageWidthPx);
             int height = (int)Math.Round(pageHeightPx);
 
-            using var bitmap = new SKBitmap(width, height);
-            using var canvas = new SKCanvas(bitmap);
+            using var bitmap = new SkiaSharp.SKBitmap(width, height);
+            using var canvas = new SkiaSharp.SKCanvas(bitmap);
 
-            canvas.Clear(SKColors.White);
-
-            // Draw content within print area
-            double printAreaLeftPx = sheet.PrintArea.LeftPt * PointsToPixels;
-            double printAreaTopPx = sheet.PrintArea.TopPt * PointsToPixels;
-            double printAreaWidthPx = sheet.PrintArea.WidthPt * PointsToPixels;
-            double printAreaHeightPx = sheet.PrintArea.HeightPt * PointsToPixels;
-
-            DrawPrintArea(canvas, sheet, printAreaLeftPx, printAreaTopPx, printAreaWidthPx, printAreaHeightPx);
+            canvas.Clear(SkiaSharp.SKColors.White);
 
             // Draw clusters as overlays
             var sheetClusters = form.Clusters.Where(c => c.SheetId == sheetId).ToList();
             foreach (var cluster in sheetClusters)
             {
-                DrawClusterOverlay(canvas, cluster, pointsToPixels: PointsToPixels);
+                DrawClusterOverlay(canvas, cluster, PointsToPixels);
             }
 
-            using var image = SKImage.FromBitmap(bitmap);
-            using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+            using var image = SkiaSharp.SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
             System.IO.File.WriteAllBytes(outputPath, data.ToArray());
 
-            _logger.LogInformation("Preview generated: {Path} ({W}x{H})", outputPath, width, height);
+            _logger.LogInformation("Overlay-only preview generated: {Path} ({W}x{H})", outputPath, width, height);
             return outputPath;
         }
 
-        private static void DrawPrintArea(SKCanvas canvas, SheetDefinition sheet,
-            double leftPx, double topPx, double widthPx, double heightPx)
-        {
-            using var borderPaint = new SKPaint
-            {
-                Color = new SKColor(200, 200, 200, 128),
-                Style = SKPaintStyle.Stroke,
-                StrokeWidth = 1
-            };
-
-            canvas.DrawRect((float)leftPx, (float)topPx, (float)widthPx, (float)heightPx, borderPaint);
-
-            double x = leftPx;
-            double y = topPx;
-
-            int maxRow = 0;
-            if (sheet.RowHeights.Count > 0)
-                maxRow = sheet.RowHeights.Keys.Max();
-            if (sheet.PrintArea != null)
-                maxRow = Math.Max(maxRow, sheet.PrintArea.Rows);
-
-            int maxCol = 0;
-            if (sheet.ColumnWidths.Count > 0)
-                maxCol = sheet.ColumnWidths.Keys.Max();
-            if (sheet.PrintArea != null)
-                maxCol = Math.Max(maxCol, sheet.PrintArea.Cols);
-
-            for (int row = 1; row <= maxRow; row++)
-            {
-                double h = sheet.RowHeights.TryGetValue(row, out var rh) ? rh : 15;
-                h *= PointsToPixels;
-
-                using var linePaint = new SKPaint
-                {
-                    Color = new SKColor(220, 220, 220, 100),
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 0.5f
-                };
-                canvas.DrawLine((float)x, (float)(y + h), (float)(x + widthPx), (float)(y + h), linePaint);
-
-                y += h;
-            }
-
-            y = topPx;
-            for (int col = 1; col <= maxCol; col++)
-            {
-                double w = sheet.ColumnWidths.TryGetValue(col, out var cw) ? cw : 64;
-                w *= PointsToPixels;
-
-                using var linePaint = new SKPaint
-                {
-                    Color = new SKColor(220, 220, 220, 100),
-                    Style = SKPaintStyle.Stroke,
-                    StrokeWidth = 0.5f
-                };
-                canvas.DrawLine((float)(x + w), (float)y, (float)(x + w), (float)(y + heightPx), linePaint);
-
-                x += w;
-            }
-        }
-
-        private static void DrawClusterOverlay(SKCanvas canvas, ClusterDefinition cluster, double pointsToPixels)
+        private static void DrawClusterOverlay(SkiaSharp.SKCanvas canvas, ClusterDefinition cluster, double pointsToPixels)
         {
             float left = (float)(cluster.LeftPt * pointsToPixels);
             float top = (float)(cluster.TopPt * pointsToPixels);
@@ -128,33 +121,32 @@ namespace ExcelAPI.Generators
 
             var color = cluster.Type switch
             {
-                "text" => new SKColor(59, 130, 246, 40),
-                "date" => new SKColor(16, 185, 129, 40),
-                "checkbox" => new SKColor(245, 158, 11, 40),
-                "signature" => new SKColor(139, 92, 246, 40),
-                "number" => new SKColor(239, 68, 68, 40),
-                _ => new SKColor(255, 212, 0, 40)
+                "text" => new SkiaSharp.SKColor(59, 130, 246, 40),
+                "date" => new SkiaSharp.SKColor(16, 185, 129, 40),
+                "checkbox" => new SkiaSharp.SKColor(245, 158, 11, 40),
+                "signature" => new SkiaSharp.SKColor(139, 92, 246, 40),
+                "number" => new SkiaSharp.SKColor(239, 68, 68, 40),
+                _ => new SkiaSharp.SKColor(255, 212, 0, 40)
             };
 
             var borderColor = color.WithAlpha(180);
 
-            using var fillPaint = new SKPaint
+            using var fillPaint = new SkiaSharp.SKPaint
             {
                 Color = color,
-                Style = SKPaintStyle.Fill
+                Style = SkiaSharp.SKPaintStyle.Fill
             };
-            using var borderPaint = new SKPaint
+            using var borderPaint = new SkiaSharp.SKPaint
             {
                 Color = borderColor,
-                Style = SKPaintStyle.Stroke,
+                Style = SkiaSharp.SKPaintStyle.Stroke,
                 StrokeWidth = 2
             };
 
             canvas.DrawRect(left, top, width, height, fillPaint);
             canvas.DrawRect(left, top, width, height, borderPaint);
 
-            // Draw cluster label
-            using var textPaint = new SKPaint
+            using var textPaint = new SkiaSharp.SKPaint
             {
                 Color = borderColor.WithAlpha(220),
                 TextSize = 10,

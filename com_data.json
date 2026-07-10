@@ -1,0 +1,105 @@
+{
+  "sheet": "_Fields",
+  "all_sheets": [
+    {
+      "name": "_Fields",
+      "print_area": ""
+    },
+    {
+      "name": "Sheet1",
+      "print_area": "$A$1:$D$12"
+    }
+  ],
+  "LeftMargin": "50.4",
+  "RightMargin": "50.4",
+  "TopMargin": "54.0",
+  "BottomMargin": "54.0",
+  "CenterHorizontally": "False",
+  "CenterVertically": "False",
+  "Zoom": "100",
+  "FitToPagesWide": "1",
+  "FitToPagesTall": "1",
+  "PaperSize": "1.0",
+  "Orientation": "1.0",
+  "PrintArea_raw": "",
+  "print_area_source": "UsedRange",
+  "print_area_address": "$A$1:$G$1",
+  "printRange_Left": 0.0,
+  "printRange_Top": 0.0,
+  "printRange_Width": 336.0,
+  "printRange_Height": 14.4,
+  "printRange_Cols": 7,
+  "printRange_Rows": 1,
+  "printRange_Address": "$A$1:$G$1",
+  "columns": [
+    {
+      "col_index": 1,
+      "Column": 1,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 0.0,
+      "Address": "$A$1"
+    },
+    {
+      "col_index": 2,
+      "Column": 2,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 48.0,
+      "Address": "$B$1"
+    },
+    {
+      "col_index": 3,
+      "Column": 3,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 96.0,
+      "Address": "$C$1"
+    },
+    {
+      "col_index": 4,
+      "Column": 4,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 144.0,
+      "Address": "$D$1"
+    },
+    {
+      "col_index": 5,
+      "Column": 5,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 192.0,
+      "Address": "$E$1"
+    },
+    {
+      "col_index": 6,
+      "Column": 6,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 240.0,
+      "Address": "$F$1"
+    },
+    {
+      "col_index": 7,
+      "Column": 7,
+      "ColumnWidth": 8.11,
+      "Width": 48.0,
+      "Left": 288.0,
+      "Address": "$G$1"
+    }
+  ],
+  "rows": [
+    {
+      "row_index": 1,
+      "Row": 1,
+      "RowHeight": 14.4,
+      "Height": 14.4,
+      "Top": 0.0,
+      "Address": "$A$1:$G$1"
+    }
+  ],
+  "sum_col_Width": 336.0,
+  "sum_row_Height": 14.4,
+  "merged_fields": "ERROR: (-2147352567, 'Exception occurred.', (0, 'Microsoft Excel', 'No cells were found.', 'xlmain11.chm', 0, -2146827284), None)"
+}

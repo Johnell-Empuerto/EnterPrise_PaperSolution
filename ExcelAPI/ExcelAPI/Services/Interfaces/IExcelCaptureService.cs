@@ -15,6 +15,11 @@ namespace ExcelAPI.Services.Interfaces
         /// <param name="excelFilePath">
         /// Full file path to the Excel workbook (.xlsx or .xls).
         /// </param>
+        /// <param name="fileId">
+        /// Optional deterministic file ID for the PNG filename.
+        /// If provided, the PNG will be named page_{fileId}.png instead of a random GUID.
+        /// This ensures the preview URL matches the template ID — single source of truth.
+        /// </param>
         /// <param name="cancellationToken">
         /// Token to cancel the operation if it exceeds the configured timeout or the client disconnects.
         /// </param>
@@ -29,6 +34,6 @@ namespace ExcelAPI.Services.Interfaces
         /// <exception cref="OperationCanceledException">
         /// Thrown when the operation is cancelled due to timeout or client disconnect.
         /// </exception>
-        Task<CaptureResult> CapturePrintAreaAsync(string excelFilePath, CancellationToken cancellationToken = default);
+        Task<CaptureResult> CapturePrintAreaAsync(string excelFilePath, string? fileId = null, CancellationToken cancellationToken = default);
     }
 }

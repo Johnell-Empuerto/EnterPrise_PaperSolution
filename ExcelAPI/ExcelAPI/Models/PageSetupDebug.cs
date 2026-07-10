@@ -39,6 +39,12 @@ namespace ExcelAPI.Models
         /// <summary>Point-to-pixel scale factor (DPI / 72).</summary>
         public double Scale { get; set; }
 
+        /// <summary>Actual X scale from rendered PNG (pngWidth / pageWidthPt).</summary>
+        public double ActualScaleX { get; set; }
+
+        /// <summary>Actual Y scale from rendered PNG (pngHeight / pageHeightPt).</summary>
+        public double ActualScaleY { get; set; }
+
         /// <summary>Zoom setting (0 if using FitToPages).</summary>
         public int Zoom { get; set; }
 

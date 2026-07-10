@@ -1,5 +1,9 @@
 using System.Runtime.InteropServices;
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Text.Json;
+using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Microsoft.Office.Interop.Excel;
 using Excel = Microsoft.Office.Interop.Excel;
 using Microsoft.Extensions.Options;
@@ -33,6 +37,10 @@ namespace ExcelAPI.Services
         private readonly IOptions<ExcelCaptureOptions> _options;
         private readonly ILogger<ExcelCaptureService> _logger;
 
+        // ── Phase 10: Runtime State Capture ────────────────────────────────
+        private readonly List<RuntimeStateSnapshot> _runtimeSnapshots = new();
+        private const string RuntimeCaptureDir = "RuntimeCapture";
+
         public ExcelCaptureService(
             IWebHostEnvironment env,
             IOptions<ExcelCaptureOptions> options,
@@ -44,7 +52,7 @@ namespace ExcelAPI.Services
         }
 
         /// <inheritdoc />
-        public async Task<CaptureResult> CapturePrintAreaAsync(string excelFilePath, CancellationToken cancellationToken = default)
+        public async Task<CaptureResult> CapturePrintAreaAsync(string excelFilePath, string? fileId = null, CancellationToken cancellationToken = default)
         {
             // Ensure the Excel file exists
             if (!System.IO.File.Exists(excelFilePath))
@@ -400,6 +408,26 @@ namespace ExcelAPI.Services
                         Marshal.ReleaseComObject(printRange);
                 }
 
+                // --- Step 6a.5: Compute content width from column widths ---
+                // Replace COM Range.Width with a width computed from XLSX worksheet XML.
+                // This accounts for the Calibri 11pt → Aptos Narrow 11pt font change
+                // that affects default column width in centering calculations.
+                double contentWidthPt = ComputeContentWidthFromXlsx(
+                    excelFilePath, worksheet?.Name, worksheet?.Index ?? 0, printArea, printAreaCols);
+                if (contentWidthPt > 0)
+                {
+                    _logger.LogInformation(
+                        "[COLS] Content width override: Range.Width={Old:F2}pt -> Computed={New:F2}pt ({Cols} cols)",
+                        printAreaWidth, contentWidthPt, printAreaCols);
+                    printAreaWidth = contentWidthPt;
+                }
+                else
+                {
+                    _logger.LogInformation(
+                        "[COLS] Using Range.Width={Width:F2}pt ({Cols} cols) — no XLSX column data available",
+                        printAreaWidth, printAreaCols);
+                }
+
                 // --- Step 6b: Read Page Setup and calculate printed page offset ---
                 // The PNG shows the PRINTED PAGE (with margins, centering, etc.),
                 // not the raw worksheet. We need to determine where the print area
@@ -527,9 +555,9 @@ namespace ExcelAPI.Services
                 // --- Step 7 & 8: Export Print Area to PDF, then convert to PNG ---
 
                 // Generate unique filenames for the intermediate PDF and final PNG
-                string fileId = Guid.NewGuid().ToString("N");
-                string pdfFileName = $"page_{fileId}.pdf";
-                string previewFileName = $"page_{fileId}.png";
+                string localFileId = fileId ?? Guid.NewGuid().ToString("N");
+                string pdfFileName = $"page_{localFileId}.pdf";
+                string previewFileName = $"page_{localFileId}.png";
                 pdfPath = Path.Combine(previewFolder, pdfFileName);
                 string previewPath = Path.Combine(previewFolder, previewFileName);
 
@@ -614,38 +642,48 @@ namespace ExcelAPI.Services
                     _logger.LogWarning(ex, "Failed to read PNG dimensions from: {PngPath}", previewPath);
                 }
 
-                // --- Step 11: Verify the point-to-pixel scale ---
-                // The scale from Excel points to PNG pixels at the rendering DPI is:
-                //   scale = DPI / 72 ≈ 4.1667
-                // This was computed in Step 6b as `pointsToPixels`.
-                //
-                // Additionally, the PNG shows the FULL PAGE (including margins).
-                // The PRINTED ORIGIN offset (computed in Step 6b) shifts the
-                // print area content from the raw worksheet origin to where it
-                // actually appears on the page.
-                //
-                // Final formula:
-                //   pixel = printedOrigin + (cellPoint - printAreaOriginPoint) * (DPI / 72)
+                // --- Step 11: Compute actual point-to-pixel scale from rendered PNG ---
+                // Always use the actual rendered dimensions, not the assumed DPI/72.
+                // scaleX = pngWidth / pageWidthPt
+                // scaleY = pngHeight / pageHeightPt
 
-                double scaleX = dpi / 72.0;
-                double scaleY = dpi / 72.0;
+                double scaleX = pngWidth > 0 && pageWidthPt > 0
+                    ? pngWidth / pageWidthPt
+                    : dpi / 72.0;
+                double scaleY = pngHeight > 0 && pageHeightPt > 0
+                    ? pngHeight / pageHeightPt
+                    : dpi / 72.0;
+
+                double theoreticalScale = dpi / 72.0;
+                double scaleRatioX = scaleX / theoreticalScale;
+                double scaleRatioY = scaleY / theoreticalScale;
+
+                // Recompute printed origin using the ACTUAL scale
+                double actualPrintedOriginX = printedOriginXPts * scaleX;
+                double actualPrintedOriginY = printedOriginYPts * scaleY;
+
+                _logger.LogInformation(
+                    "[SCALE] Actual X={SX:F6} Y={SY:F6} theoretical={T:F6} " +
+                    "ratio X={RX:F6} Y={RY:F6} | png={PW}x{PH}px page={PPW:F1}x{PPH:F1}pt",
+                    scaleX, scaleY, theoreticalScale,
+                    scaleRatioX, scaleRatioY,
+                    pngWidth, pngHeight, pageWidthPt, pageHeightPt);
 
                 _logger.LogInformation(
                     "[AUDIT] Final coordinate system:\n" +
-                    "  Printed origin:         ({OX:F1},{OY:F1}) px\n" +
-                    "  Point-to-pixel scale:   {Scale:F4} px/pt (at {DPI} DPI)\n" +
-                    "  Formula: pixel = printedOrigin + (cellPoint - printAreaOrigin) * scale",
-                    printedOriginX, printedOriginY, scaleX, dpi);
+                    "  Printed origin: ({OXP:F1},{OYP:F1})pt -> ({OX:F1},{OY:F1})px\n" +
+                    "  Scale: {S:F6} px/pt (theoretical {T:F6})",
+                    printedOriginXPts, printedOriginYPts,
+                    actualPrintedOriginX, actualPrintedOriginY, scaleX, theoreticalScale);
 
-                // --- Step 12: Extract field metadata from cell comments ---
-                // Coordinates now include the printed page offset.
+                // --- Step 12: Extract fields using ACTUAL scale and origin ---
                 _logger.LogDebug("Extracting field metadata from cell comments...");
                 var fields = ExtractFields(
                     worksheet,
                     printAreaLeft, printAreaTop,
-                    printedOriginX, printedOriginY,
-                    scaleX, scaleY);
-                _logger.LogInformation("Extracted {Count} field(s) from cell comments", fields.Count);
+                    actualPrintedOriginX, actualPrintedOriginY,
+                    scaleX, scaleY,
+                    pageWidthPt, pageHeightPt);
 
                 // Log coordinate conversion trace for the first field (comparison table)
                 if (fields.Count > 0)
@@ -660,7 +698,7 @@ namespace ExcelAPI.Services
                         " x {Scale:F4}px/pt => " +
                         "Pixel=({PL:F1},{PT:F1})px Size=({PW:F1}x{PH:F1})px",
                         f.Cell,
-                        printedOriginX, printedOriginY,
+                        actualPrintedOriginX, actualPrintedOriginY,
                         f.ExcelLeft, f.ExcelTop,
                         f.PrintAreaLeft, f.PrintAreaTop,
                         scaleX,
@@ -765,7 +803,7 @@ namespace ExcelAPI.Services
                                 canvas.DrawLine(x0 - 5, y0, x0 + 5, y0, crossPen);
                                 canvas.DrawLine(x0, y0 - 5, x0, y0 + 5, crossPen);
 
-                                string annPath = Path.Combine(previewFolder, $"annotated_{fileId}.png");
+                                string annPath = Path.Combine(previewFolder, $"annotated_{localFileId}.png");
                                 using var annImg = SkiaSharp.SKImage.FromBitmap(annBmp);
                                 using var annData = annImg.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
                                 System.IO.File.WriteAllBytes(annPath, annData.ToArray());
@@ -818,7 +856,11 @@ namespace ExcelAPI.Services
                                 int dw = db.Width;
                                 int dh = db.Height;
 
-                                int eL = (int)Math.Round(printedOriginX * td / 300.0 + (mf.ExcelLeft - printAreaLeft) * ts);
+                                // Actual scale at this DPI from rendered image
+                                double actualScaleForDPI = pageWidthPt > 0 ? (double)dw / pageWidthPt : ts;
+
+                                // Expected position using the actual rendered scale
+                                int eL = (int)Math.Round(printedOriginXPts * actualScaleForDPI + (mf.ExcelLeft - printAreaLeft) * actualScaleForDPI);
                                 int eT = (int)Math.Round(printedOriginY * td / 300.0 + (mf.ExcelTop - printAreaTop) * ts);
                                 int eR = eL + (int)Math.Round(exW);
                                 int eB = eT + (int)Math.Round(exH);
@@ -850,8 +892,8 @@ namespace ExcelAPI.Services
                                 double hR = exH > 0 ? aH / exH : 0;
 
                                 dpiLog += string.Format(
-                                    "  {0}DPI: scale={1:F4} expW={2:F1} actW={3:F1} ratio={4:F6}  expH={5:F1} actH={6:F1} ratio={7:F6}\n",
-                                    td, ts, exW, aW, wR, exH, aH, hR);
+                                    "  {0}DPI: thScale={1:F4} actScale={2:F4} expW={3:F1} actW={4:F1} wRatio={5:F6} expH={6:F1} actH={7:F1} hRatio={8:F6}\n",
+                                    td, ts, actualScaleForDPI, exW, aW, wR, exH, aH, hR);
                             }
 
                             _logger.LogInformation(
@@ -894,8 +936,8 @@ namespace ExcelAPI.Services
                     Fields = fields,
                     PageSetup = new PageSetupDebug
                     {
-                        PrintedOriginX = Math.Round(printedOriginX, 1),
-                        PrintedOriginY = Math.Round(printedOriginY, 1),
+                        PrintedOriginX = Math.Round(actualPrintedOriginX, 2),
+                        PrintedOriginY = Math.Round(actualPrintedOriginY, 2),
                         LeftMargin = leftMarginPt,
                         TopMargin = topMarginPt,
                         CenterHorizontally = centerHorizontally,
@@ -905,6 +947,8 @@ namespace ExcelAPI.Services
                         PrintAreaWidthPt = Math.Round(printAreaWidth, 1),
                         PrintAreaHeightPt = Math.Round(printAreaHeight, 1),
                         Scale = dpi / 72.0,
+                        ActualScaleX = Math.Round(scaleX, 6),
+                        ActualScaleY = Math.Round(scaleY, 6),
                         Zoom = zoomSetting,
                         FitToPagesWide = fitToPagesWide,
                         FitToPagesTall = fitToPagesTall
@@ -975,6 +1019,533 @@ namespace ExcelAPI.Services
             }
         }
 
+        // ═══════════════════════════════════════════════════════════════════
+        // Phase 10 — Live Excel Runtime State Capture
+        // ═══════════════════════════════════════════════════════════════════
+
+        #region Phase 10 Runtime State Capture
+
+        /// <summary>Win32 GetDeviceCaps constants.</summary>
+        private const int LOGPIXELSX = 88;
+        private const int LOGPIXELSY = 90;
+        private const int HORZRES = 8;
+        private const int VERTRES = 10;
+        private const int PHYSICALWIDTH = 110;
+        private const int PHYSICALHEIGHT = 111;
+        private const int PHYSICALOFFSETX = 112;
+        private const int PHYSICALOFFSETY = 113;
+
+        [DllImport("gdi32.dll", SetLastError = true)]
+        private static extern int GetDeviceCaps(IntPtr hdc, int index);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern IntPtr GetDC(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern int ReleaseDC(IntPtr hWnd, IntPtr hDC);
+
+        /// <summary>
+        /// Captures the complete COM runtime state at the current pipeline stage.
+        /// Writes a JSON snapshot to a timestamped file and logs key differences
+        /// if a previous snapshot exists.
+        /// </summary>
+        private void CaptureGeometryTimeline(
+            string stage,
+            Application? excelApp,
+            Workbook? workbook,
+            Worksheet? worksheet,
+            string? printArea,
+            List<ExcelField>? fields,
+            string previewFolder)
+        {
+            try
+            {
+                var snapshot = new RuntimeStateSnapshot
+                {
+                    Stage = stage,
+                    WorkbookName = workbook?.Name ?? "",
+                    WorksheetName = worksheet?.Name ?? "",
+                    WorksheetIndex = worksheet?.Index ?? 0,
+                };
+
+                if (worksheet != null)
+                {
+                    DumpPageSetup(snapshot, worksheet);
+                    DumpWindowState(snapshot, worksheet);
+                    DumpRangeGeometry(snapshot, worksheet, printArea);
+                    DumpShapes(snapshot, worksheet);
+                    DumpFieldCells(snapshot, worksheet, fields);
+                }
+
+                if (excelApp != null)
+                {
+                    DumpPrinterState(snapshot, excelApp, previewFolder);
+                    snapshot.ActivePrinter = excelApp.ActivePrinter;
+                    snapshot.Version = excelApp.Version;
+                }
+
+                // Auto-diff against previous snapshot
+                if (_runtimeSnapshots.Count > 0)
+                {
+                    var prev = _runtimeSnapshots[^1];
+                    LogSnapshotDiff(prev, snapshot);
+                }
+
+                _runtimeSnapshots.Add(snapshot);
+
+                // Write JSON to disk
+                string capturesDir = Path.Combine(previewFolder, RuntimeCaptureDir);
+                Directory.CreateDirectory(capturesDir);
+                string fileName = $"snapshot_{stage.Replace(" ", "_")}_{Guid.NewGuid():N}.json";
+                string filePath = Path.Combine(capturesDir, fileName);
+                var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                    DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
+                });
+                System.IO.File.WriteAllText(filePath, json);
+                _logger.LogInformation("[PHASE10] Snapshot saved: {Path} ({JsonLen} bytes)", filePath, json.Length);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[PHASE10] Failed to capture runtime state at stage \"{Stage}\"", stage);
+            }
+        }
+
+        /// <summary>Capture every PageSetup property from COM.</summary>
+        private void DumpPageSetup(RuntimeStateSnapshot snap, Worksheet ws)
+        {
+            var ps = new PageSetupSnapshot();
+            try
+            {
+                var pageSetup = ws.PageSetup;
+                ps.LeftMargin = pageSetup.LeftMargin;
+                ps.RightMargin = pageSetup.RightMargin;
+                ps.TopMargin = pageSetup.TopMargin;
+                ps.BottomMargin = pageSetup.BottomMargin;
+
+                try { ps.HeaderMargin = pageSetup.HeaderMargin; } catch { }
+                try { ps.FooterMargin = pageSetup.FooterMargin; } catch { }
+
+                ps.CenterHorizontally = pageSetup.CenterHorizontally;
+                ps.CenterVertically = pageSetup.CenterVertically;
+                ps.PaperSize = (int)(double)pageSetup.PaperSize;
+                ps.Orientation = (int)pageSetup.Orientation;
+
+                try { ps.Zoom = pageSetup.Zoom; } catch { }
+                ps.FitToPagesWide = pageSetup.FitToPagesWide;
+                ps.FitToPagesTall = pageSetup.FitToPagesTall;
+                ps.Draft = pageSetup.Draft;
+                ps.BlackAndWhite = pageSetup.BlackAndWhite;
+                ps.Order = (int)pageSetup.Order;
+
+                ps.PrintQuality = pageSetup.PrintQuality;
+                ps.FirstPageNumber = pageSetup.FirstPageNumber;
+                ps.PrintTitleRows = pageSetup.PrintTitleRows;
+                ps.PrintTitleColumns = pageSetup.PrintTitleColumns;
+                ps.PrintArea = pageSetup.PrintArea;
+
+                // Calculate page dimensions
+                var (pw, ph) = GetPaperSizePoints((XlPaperSize)ps.PaperSize, (XlPageOrientation)ps.Orientation);
+                ps.PageWidthPt = pw;
+                ps.PageHeightPt = ph;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[PHASE10] PageSetup dump failed");
+            }
+            snap.PageSetup = ps;
+        }
+
+        /// <summary>Capture window state and view properties.</summary>
+        private void DumpWindowState(RuntimeStateSnapshot snap, Worksheet ws)
+        {
+            try
+            {
+                var win = ws.Parent?.GetType().GetProperty("ActiveWindow")?.GetValue(ws.Parent) as Microsoft.Office.Interop.Excel.Window;
+                if (win == null) return;
+
+                var ws2 = new WindowStateSnapshot
+                {
+                    Zoom = win.Zoom,
+                    View = (int)win.View,
+                    ScrollRow = win.ScrollRow,
+                    ScrollColumn = win.ScrollColumn,
+                    
+                    DisplayGridlines = win.DisplayGridlines,
+                    DisplayHeadings = win.DisplayHeadings,
+                    DisplayZeros = win.DisplayZeros,
+                };
+                try { ws2.VisibleRange = win.VisibleRange?.Address; } catch { }
+                snap.WindowState = ws2;
+            }
+            catch
+            {
+                // Window access may fail in non-interactive mode
+            }
+        }
+
+        /// <summary>Capture UsedRange, PrintArea, and CurrentRegion geometry.</summary>
+        private void DumpRangeGeometry(RuntimeStateSnapshot snap, Worksheet ws, string? printArea)
+        {
+            // UsedRange
+            try
+            {
+                Excel.Range? ur = null;
+                try
+                {
+                    ur = ws.UsedRange;
+                    snap.UsedRange = new RangeGeometry
+                    {
+                        Left = ur.Left,
+                        Top = ur.Top,
+                        Width = ur.Width,
+                        Height = ur.Height,
+                        ColumnsCount = ur.Columns.Count,
+                        RowsCount = ur.Rows.Count,
+                        Address = ur.Address,
+                    };
+                    snap.UsedRangeAddress = ur.Address;
+                }
+                finally { if (ur != null) Marshal.ReleaseComObject(ur); }
+            }
+            catch { }
+
+            // PrintArea range
+            if (!string.IsNullOrEmpty(printArea))
+            {
+                try
+                {
+                    Excel.Range? pr = null;
+                    try
+                    {
+                        pr = ws.Range[printArea];
+                        snap.PrintArea = new RangeGeometry
+                        {
+                            Left = pr.Left,
+                            Top = pr.Top,
+                            Width = pr.Width,
+                            Height = pr.Height,
+                            ColumnsCount = pr.Columns.Count,
+                            RowsCount = pr.Rows.Count,
+                            Address = pr.Address,
+                        };
+                        snap.PrintAreaAddress = printArea;
+                    }
+                    finally { if (pr != null) Marshal.ReleaseComObject(pr); }
+                }
+                catch { }
+            }
+
+            // SheetDimension from first cell
+            try
+            {
+                Excel.Range? c1 = null;
+                try
+                {
+                    c1 = ws.Cells[1, 1];
+                    snap.SheetDimension = c1.CurrentRegion?.Address ?? "";
+                }
+                finally { if (c1 != null) Marshal.ReleaseComObject(c1); }
+            }
+            catch { }
+        }
+
+        /// <summary>Capture all printable shape bounds.</summary>
+        private void DumpShapes(RuntimeStateSnapshot snap, Worksheet ws)
+        {
+            try
+            {
+                var shapes = ws.Shapes;
+                if (shapes == null || shapes.Count == 0) return;
+
+                var list = new List<ShapeSnapshot>();
+                foreach (Microsoft.Office.Interop.Excel.Shape shape in shapes)
+                {
+                    try
+                    {
+                        list.Add(new ShapeSnapshot
+                        {
+                            Name = shape.Name,
+                            Left = shape.Left,
+                            Top = shape.Top,
+                            Width = shape.Width,
+                            Height = shape.Height,
+                            Visible = shape.Visible == Microsoft.Office.Core.MsoTriState.msoTrue,
+                            Type = (int)shape.Type,
+                            TypeName = shape.Type.ToString(),
+                            
+                            ZOrderPosition = shape.ZOrderPosition,
+                        });
+                    }
+                    finally
+                    {
+                        Marshal.ReleaseComObject(shape);
+                    }
+                }
+                snap.Shapes = list;
+            }
+            catch
+            {
+                // No shapes or access denied
+            }
+        }
+
+        /// <summary>Capture per-field cell geometry at the moment of capture.</summary>
+        private void DumpFieldCells(RuntimeStateSnapshot snap, Worksheet ws, List<ExcelField>? fields)
+        {
+            if (fields == null || fields.Count == 0) return;
+
+            var list = new List<FieldCellSnapshot>();
+            foreach (var f in fields)
+            {
+                if (string.IsNullOrEmpty(f.Cell)) continue;
+                try
+                {
+                    Excel.Range? cell = null;
+                    try
+                    {
+                        cell = ws.Range[f.Cell];
+                        var fc = new FieldCellSnapshot
+                        {
+                            CellAddress = f.Cell,
+                            FieldType = f.Type,
+                            CellLeft = cell.Left,
+                            CellTop = cell.Top,
+                            CellWidth = cell.Width,
+                            CellHeight = cell.Height,
+                        };
+
+                        // MergeArea
+                        try
+                        {
+                            fc.IsMerged = cell.MergeCells;
+                            if (fc.IsMerged)
+                            {
+                                Excel.Range? ma = null;
+                                try
+                                {
+                                    ma = cell.MergeArea;
+                                    fc.MergeAddress = ma.Address;
+                                    fc.MergeLeft = ma.Left;
+                                    fc.MergeTop = ma.Top;
+                                    fc.MergeWidth = ma.Width;
+                                    fc.MergeHeight = ma.Height;
+                                }
+                                finally { if (ma != null) Marshal.ReleaseComObject(ma); }
+                            }
+                        }
+                        catch { }
+
+                        // EntireColumn/Row
+                        try
+                        {
+                            Excel.Range? ec = null;
+                            try { ec = cell.EntireColumn; fc.EntireColumnLeft = ec.Left; fc.EntireColumnWidth = ec.Width; }
+                            finally { if (ec != null) Marshal.ReleaseComObject(ec); }
+                        }
+                        catch { }
+                        try
+                        {
+                            Excel.Range? er = null;
+                            try { er = cell.EntireRow; fc.EntireRowTop = er.Top; fc.EntireRowHeight = er.Height; }
+                            finally { if (er != null) Marshal.ReleaseComObject(er); }
+                        }
+                        catch { }
+
+                        // CurrentRegion
+                        try
+                        {
+                            Excel.Range? cr = null;
+                            try { cr = cell.CurrentRegion; fc.CurrentRegionAddress = cr.Address; }
+                            finally { if (cr != null) Marshal.ReleaseComObject(cr); }
+                        }
+                        catch { }
+
+                        list.Add(fc);
+                    }
+                    finally { if (cell != null) Marshal.ReleaseComObject(cell); }
+                }
+                catch { }
+            }
+            snap.FieldCells = list;
+        }
+
+        /// <summary>Capture printer device context via Win32 GetDeviceCaps.</summary>
+        private void DumpPrinterState(RuntimeStateSnapshot snap, Application excelApp, string previewFolder)
+        {
+            var ps = new PrinterStateSnapshot();
+            try
+            {
+                ps.ActivePrinter = excelApp.ActivePrinter;
+
+                // Try to get printer DC from the active printer
+                // Note: Full GetDeviceCaps requires knowing the printer's DC handle,
+                // which is printer-specific. We capture the printer name for manual lookup.
+                string? printerName = excelApp.ActivePrinter;
+                if (!string.IsNullOrEmpty(printerName))
+                {
+                    ps.PrinterDriver = printerName;
+
+                    // Log the printer name so we can manually run GetDeviceCaps
+                    _logger.LogInformation(
+                        "[PHASE10:PRINTER] ActivePrinter=\"{Printer}\"", printerName);
+                }
+
+                // Snapshot the initial display DC for reference DPI
+                IntPtr hdc = GetDC(IntPtr.Zero);
+                if (hdc != IntPtr.Zero)
+                {
+                    try
+                    {
+                        ps.LogicalPixelsX = GetDeviceCaps(hdc, LOGPIXELSX);
+                        ps.LogicalPixelsY = GetDeviceCaps(hdc, LOGPIXELSY);
+                        ps.HorizontalResolution = GetDeviceCaps(hdc, HORZRES);
+                        ps.VerticalResolution = GetDeviceCaps(hdc, VERTRES);
+                        ps.PhysicalWidth = GetDeviceCaps(hdc, PHYSICALWIDTH);
+                        ps.PhysicalHeight = GetDeviceCaps(hdc, PHYSICALHEIGHT);
+                        ps.PhysicalOffsetX = GetDeviceCaps(hdc, PHYSICALOFFSETX);
+                        ps.PhysicalOffsetY = GetDeviceCaps(hdc, PHYSICALOFFSETY);
+
+                        // Convert pixels to points at display DPI
+                        if (ps.LogicalPixelsX > 0)
+                        {
+                            ps.HardMarginLeftPt = ps.PhysicalOffsetX * 72.0 / ps.LogicalPixelsX;
+                        }
+                        if (ps.LogicalPixelsY > 0)
+                        {
+                            ps.HardMarginTopPt = ps.PhysicalOffsetY * 72.0 / ps.LogicalPixelsY;
+                        }
+
+                        _logger.LogInformation(
+                            "[PHASE10:DC] Display DC: DPI={DpiX}x{DpiY} " +
+                            "HORZRES={HRes} VERTRES={VRes} " +
+                            "PHYSICALW={PW} PHYSICALH={PH} " +
+                            "OFFSET=({OffX},{OffY})px -> HardMargin=({HMLeft:F2},{HMTop:F2})pt",
+                            ps.LogicalPixelsX, ps.LogicalPixelsY,
+                            ps.HorizontalResolution, ps.VerticalResolution,
+                            ps.PhysicalWidth, ps.PhysicalHeight,
+                            ps.PhysicalOffsetX, ps.PhysicalOffsetY,
+                            ps.HardMarginLeftPt, ps.HardMarginTopPt);
+                    }
+                    finally
+                    {
+                        ReleaseDC(IntPtr.Zero, hdc);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[PHASE10:DC] Printer state dump failed");
+            }
+            snap.Printer = ps;
+        }
+
+        /// <summary>
+        /// Compares two snapshots and logs every property that changed.
+        /// </summary>
+        private void LogSnapshotDiff(RuntimeStateSnapshot prev, RuntimeStateSnapshot curr)
+        {
+            _logger.LogInformation("[PHASE10:DIFF] Comparing \"{From}\" -> \"{To}\"", prev.Stage, curr.Stage);
+            bool anyChange = false;
+
+            // PageSetup diff
+            if (prev.PageSetup != null && curr.PageSetup != null)
+            {
+                LogIfChanged("PageSetup.LeftMargin", prev.PageSetup.LeftMargin, curr.PageSetup.LeftMargin);
+                LogIfChanged("PageSetup.RightMargin", prev.PageSetup.RightMargin, curr.PageSetup.RightMargin);
+                LogIfChanged("PageSetup.Zoom", prev.PageSetup.Zoom, curr.PageSetup.Zoom);
+                LogIfChanged("PageSetup.FitToPagesWide", prev.PageSetup.FitToPagesWide, curr.PageSetup.FitToPagesWide);
+                LogIfChanged("PageSetup.CenterHorizontally", prev.PageSetup.CenterHorizontally, curr.PageSetup.CenterHorizontally);
+                ref bool anyChangeRef2 = ref anyChange;
+                LogIfChanged("PageSetup.PrintArea", prev.PageSetup.PrintArea ?? "", curr.PageSetup.PrintArea ?? "");
+            }
+
+            // Range diff
+            if (prev.UsedRange != null && curr.UsedRange != null)
+            {
+                LogIfChanged("UsedRange.Left", prev.UsedRange.Left, curr.UsedRange.Left);
+                LogIfChanged("UsedRange.Width", prev.UsedRange.Width, curr.UsedRange.Width);
+            }
+            if (prev.PrintArea != null && curr.PrintArea != null)
+            {
+                LogIfChanged("PrintArea.Left", prev.PrintArea.Left, curr.PrintArea.Left);
+                LogIfChanged("PrintArea.Width", prev.PrintArea.Width, curr.PrintArea.Width);
+            }
+
+            // Printer diff
+            if (prev.Printer != null && curr.Printer != null)
+            {
+                LogIfChanged("Printer.ActivePrinter", prev.Printer.ActivePrinter ?? "", curr.Printer.ActivePrinter ?? "");
+            }
+
+            // Window diff
+            if (prev.WindowState != null && curr.WindowState != null)
+            {
+                LogIfChanged("Window.Zoom", prev.WindowState.Zoom, curr.WindowState.Zoom);
+                LogIfChanged("Window.View", prev.WindowState.View, curr.WindowState.View);
+                LogIfChanged("Window.ScrollRow", prev.WindowState.ScrollRow, curr.WindowState.ScrollRow);
+                LogIfChanged("Window.ScrollColumn", prev.WindowState.ScrollColumn, curr.WindowState.ScrollColumn);
+            }
+
+            // Shapes diff
+            int prevShapes = prev.Shapes?.Count ?? -1;
+            int currShapes = curr.Shapes?.Count ?? -1;
+            if (prevShapes != currShapes)
+            {
+                _logger.LogInformation("[PHASE10:DIFF] Shapes.Count: {Prev} -> {Curr}", prevShapes, currShapes);
+                anyChange = true;
+            }
+
+            if (!anyChange)
+            {
+                _logger.LogInformation("[PHASE10:DIFF] No changes detected between \"{From}\" and \"{To}\"",
+                    prev.Stage, curr.Stage);
+            }
+        }
+
+        private void LogIfChanged(string property, double prev, double curr)
+        {
+            if (Math.Abs(prev - curr) > 0.001)
+            {
+                _logger.LogInformation(
+                    "[PHASE10:DIFF] {Prop}: {Prev:F4} -> {Curr:F4} (Δ{Delta:+#0.000;-#0.000})",
+                    property, prev, curr, curr - prev);
+            }
+        }
+
+        private void LogIfChanged(string property, int prev, int curr)
+        {
+            if (prev != curr)
+            {
+                _logger.LogInformation(
+                    "[PHASE10:DIFF] {Prop}: {Prev} -> {Curr}",
+                    property, prev, curr);
+            }
+        }
+
+        private void LogIfChanged(string property, bool prev, bool curr)
+        {
+            if (prev != curr)
+            {
+                _logger.LogInformation(
+                    "[PHASE10:DIFF] {Prop}: {Prev} -> {Curr}",
+                    property, prev, curr);
+            }
+        }
+
+        private void LogIfChanged(string property, string prev, string curr)
+        {
+            if (prev != curr)
+            {
+                _logger.LogInformation(
+                    "[PHASE10:DIFF] {Prop}: \"{Prev}\" -> \"{Curr}\"",
+                    property, prev, curr);
+            }
+        }
+
+        #endregion
+
         /// <summary>
         /// Extracts form field metadata from cell comments in the worksheet.
         /// Uses Excel's SpecialCells to find ONLY cells with comments (NOT all cells).
@@ -996,7 +1567,9 @@ namespace ExcelAPI.Services
             double printedOriginX,
             double printedOriginY,
             double scaleX,
-            double scaleY)
+            double scaleY,
+            double pageWidthPt,
+            double pageHeightPt)
         {
             var fields = new List<ExcelField>();
 
@@ -1117,7 +1690,9 @@ namespace ExcelAPI.Services
                             ExcelLeft = cellLeftPt,
                             ExcelTop = cellTopPt,
                             PrintAreaLeft = printAreaLeft,
-                            PrintAreaTop = printAreaTop
+                            PrintAreaTop = printAreaTop,
+                            ExcelWidthPt = cellWidthPt,
+                            ExcelHeightPt = cellHeightPt
                         });
                     }
                     finally
@@ -1261,5 +1836,307 @@ namespace ExcelAPI.Services
             GC.Collect();
             GC.WaitForPendingFinalizers();
         }
+
+        #region Coordinate Helpers
+
+        /// <summary>
+        /// Computes the print area content width from XLSX worksheet column definitions.
+        /// For worksheets with explicit &lt;cols&gt; elements, sums the column widths.
+        /// For default-column worksheets, uses 50.1pt per column (Calibri 11pt legacy width).
+        /// Returns 0 if the XLSX cannot be read (caller falls back to Range.Width).
+        /// </summary>
+        private double ComputeContentWidthFromXlsx(
+            string excelFilePath, string? worksheetName, int worksheetIndex, string printArea, int printAreaCols)
+        {
+            _logger.LogDebug("[COLS] Computing content width from XLSX: Sheet=\"{Sheet}\" Index={Index} PA=\"{PA}\" Cols={Cols}",
+                worksheetName ?? "(null)", worksheetIndex, printArea, printAreaCols);
+
+            // Parse print area address to determine column range
+            if (!TryParsePrintAreaColumns(printArea, out int firstCol, out int lastCol))
+            {
+                firstCol = 1;
+                lastCol = printAreaCols;
+            }
+
+            int colsInRange = lastCol - firstCol + 1;
+            _logger.LogDebug("[COLS] Column range: {First} to {Last} ({Count} cols)", firstCol, lastCol, colsInRange);
+
+            try
+            {
+                using var archive = new ZipArchive(
+                    System.IO.File.OpenRead(excelFilePath), ZipArchiveMode.Read);
+
+                // Find the worksheet XML entry matching the COM-selected worksheet
+                // Uses worksheet Index (sheetId) as primary resolution key,
+                // falling back to name-based matching for robustness.
+                string? wsPath = ResolveWorksheetPath(archive, worksheetName, worksheetIndex);
+                if (wsPath == null)
+                {
+                    _logger.LogWarning("[COLS] Could not resolve worksheet path for \"{Sheet}\"", worksheetName);
+                    return 0;
+                }
+
+                var wsEntry = archive.GetEntry(wsPath);
+                if (wsEntry == null)
+                {
+                    _logger.LogWarning("[COLS] Worksheet entry not found: {Path}", wsPath);
+                    return 0;
+                }
+
+                using var reader = new StreamReader(wsEntry.Open());
+                var wsXml = XDocument.Load(reader);
+                XNamespace ns = wsXml.Root!.GetDefaultNamespace();
+
+                // Check for explicit &lt;cols&gt; element
+                var colsElement = wsXml.Descendants(ns + "cols").FirstOrDefault();
+
+                if (colsElement != null)
+                {
+                    // Explicit column widths defined in XLSX
+                    double totalWidth = 0;
+                    int colsFound = 0;
+
+                    foreach (var col in colsElement.Elements(ns + "col"))
+                    {
+                        int min = (int)col.Attribute("min")!;
+                        int max = (int)col.Attribute("max")!;
+                        double width = (double)col.Attribute("width")!;
+                        bool hidden = (bool?)col.Attribute("hidden") ?? false;
+
+                        // Only include columns within the print area range
+                        int overlapMin = Math.Max(min, firstCol);
+                        int overlapMax = Math.Min(max, lastCol);
+
+                        if (overlapMin <= overlapMax && !hidden)
+                        {
+                            int count = overlapMax - overlapMin + 1;
+
+                            // Convert from character units to points using the OOXML formula:
+                            //   pixelWidth = charWidth * maxDigitWidth + padding
+                            //   pointWidth = pixelWidth * 72 / 96
+                            // maxDigitWidth ≈ 7.33 for Calibri 11pt (legacy Normal font)
+                            // padding = 5 pixels (standard Excel constant at 96 DPI)
+                            // Reference: ECMA-376, 18.3.1.13 (col element)
+                            const double maxDigitWidth = 7.33;
+                            const double padding = 5.0;
+                            double pointWidth = (width * maxDigitWidth + padding) * 72.0 / 96.0;
+
+                            totalWidth += pointWidth * count;
+                            colsFound += count;
+
+                            _logger.LogDebug(
+                                "[COLS] Col {Min}-{Max}: charWidth={W:F2} -> {PW:F2}pt custom={C} hidden={H} -> +{Count} col(s), running total={Total:F2}pt",
+                                min, max, width, pointWidth,
+                                (bool?)col.Attribute("customWidth") ?? false,
+                                hidden, count, totalWidth);
+                        }
+                    }
+
+                    if (colsFound > 0)
+                    {
+                        _logger.LogInformation(
+                            "[COLS] Explicit column widths: {Found} cols in range {First}-{Last}, total={Total:F2}pt",
+                            colsFound, firstCol, lastCol, totalWidth);
+                        return totalWidth;
+                    }
+
+                    _logger.LogInformation(
+                        "[COLS] &lt;cols&gt; element found but no columns matched print area range {First}-{Last}, falling back to default",
+                        firstCol, lastCol);
+                }
+                else
+                {
+                    _logger.LogDebug("[COLS] No &lt;cols&gt; element found in worksheet XML");
+                }
+
+                // No explicit columns or none in range — use default column width
+                double defaultWidth = colsInRange * 50.1;
+                _logger.LogInformation(
+                    "[COLS] Default column width: {Cols} cols x 50.1pt = {Total:F2}pt (Calibri 11pt legacy width)",
+                    colsInRange, defaultWidth);
+                return defaultWidth;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[COLS] Failed to read XLSX column widths, falling back to Range.Width");
+                return 0;
+            }
+        }
+
+        /// <summary>
+        /// Resolves a worksheet name to its XLSX internal path (e.g., "xl/worksheets/sheet1.xml").
+        /// Uses the COM worksheet Index (sheetId) as the primary resolution key,
+        /// falling back to name-based matching for robustness.
+        /// Reads workbook.xml and relationships to map sheet names/IDs to files.
+        /// </summary>
+        private static string? ResolveWorksheetPath(ZipArchive archive, string? worksheetName, int worksheetIndex)
+        {
+            // =============================
+            // WORKSHEET RESOLUTION LOGGING
+            // =============================
+            System.Diagnostics.Debug.WriteLine("\n=========================");
+            System.Diagnostics.Debug.WriteLine("WORKSHEET RESOLUTION");
+            System.Diagnostics.Debug.WriteLine("=========================");
+            System.Diagnostics.Debug.WriteLine($"COM Name:   {worksheetName ?? "(null)"}");
+            System.Diagnostics.Debug.WriteLine($"COM Index:  {worksheetIndex}");
+
+            var wbEntry = archive.GetEntry("xl/workbook.xml");
+            if (wbEntry == null)
+            {
+                System.Diagnostics.Debug.WriteLine("FAILED: xl/workbook.xml not found in archive");
+                return null;
+            }
+
+            using var wbReader = new StreamReader(wbEntry.Open());
+            var wbXml = XDocument.Load(wbReader);
+            XNamespace wbNs = wbXml.Root!.GetDefaultNamespace();
+
+            // Collect all sheet definitions from workbook.xml
+            var sheetEntries = new List<(string name, string? sheetId, string? relId)>();
+            foreach (var sheet in wbXml.Descendants(wbNs + "sheet"))
+            {
+                string? name = sheet.Attribute("name")?.Value;
+                string? sid = sheet.Attribute("sheetId")?.Value;
+                string? rid = sheet.Attribute(
+                    XName.Get("id", "http://schemas.openxmlformats.org/officeDocument/2006/relationships"))?.Value;
+                sheetEntries.Add((name ?? "?", sid, rid));
+            }
+
+            // Log workbook.xml sheets
+            System.Diagnostics.Debug.WriteLine("\nWorkbook.xml Sheets:");
+            foreach (var (name, sid, rid) in sheetEntries)
+            {
+                System.Diagnostics.Debug.WriteLine($"  Sheet=\"{name}\" sheetId={sid} {rid}");
+            }
+
+            // Read workbook.xml.rels to map relationship IDs to target paths
+            var relsEntry = archive.GetEntry("xl/_rels/workbook.xml.rels");
+            if (relsEntry == null)
+            {
+                System.Diagnostics.Debug.WriteLine("FAILED: xl/_rels/workbook.xml.rels not found");
+                return null;
+            }
+
+            using var relsReader = new StreamReader(relsEntry.Open());
+            var relsXml = XDocument.Load(relsReader);
+            XNamespace relsNs = "http://schemas.openxmlformats.org/package/2006/relationships";
+
+            var relsMap = new Dictionary<string, string>();
+            foreach (var rel in relsXml.Descendants(relsNs + "Relationship"))
+            {
+                string? id = rel.Attribute("Id")?.Value;
+                string? target = rel.Attribute("Target")?.Value;
+                if (id != null && target != null)
+                {
+                    relsMap[id] = target.Replace('\\', '/');
+                }
+            }
+
+            // Log relationships
+            System.Diagnostics.Debug.WriteLine("\nRelationships:");
+            foreach (var (rid, target) in relsMap)
+            {
+                if (target.StartsWith("worksheets/", StringComparison.OrdinalIgnoreCase) ||
+                    target.StartsWith("xl/worksheets/", StringComparison.OrdinalIgnoreCase))
+                {
+                    System.Diagnostics.Debug.WriteLine($"  {rid}  {target}");
+                }
+            }
+
+            // Strategy 1: Match by sheetId == worksheetIndex (primary)
+            string? targetIndex = worksheetIndex.ToString();
+            string? matchedRelId = null;
+            foreach (var (name, sid, rid) in sheetEntries)
+            {
+                if (sid == targetIndex && rid != null)
+                {
+                    matchedRelId = rid;
+                    System.Diagnostics.Debug.WriteLine($"\nStrategy 1 (Index match): sheetId={sid} -> {rid}");
+                    break;
+                }
+            }
+
+            // Strategy 2: Fallback to exact name match
+            if (matchedRelId == null && !string.IsNullOrEmpty(worksheetName))
+            {
+                foreach (var (name, _, rid) in sheetEntries)
+                {
+                    if (name == worksheetName && rid != null)
+                    {
+                        matchedRelId = rid;
+                        System.Diagnostics.Debug.WriteLine($"\nStrategy 2 (Name match): \"{name}\" -> {rid}");
+                        break;
+                    }
+                }
+            }
+
+            // Strategy 3: Fallback to case-insensitive name match
+            if (matchedRelId == null && !string.IsNullOrEmpty(worksheetName))
+            {
+                foreach (var (name, _, rid) in sheetEntries)
+                {
+                    if (name != null && name.Equals(worksheetName, StringComparison.OrdinalIgnoreCase) && rid != null)
+                    {
+                        matchedRelId = rid;
+                        System.Diagnostics.Debug.WriteLine($"\nStrategy 3 (CI name match): \"{name}\" -> {rid}");
+                        break;
+                    }
+                }
+            }
+
+            if (matchedRelId == null)
+            {
+                System.Diagnostics.Debug.WriteLine("FAILED: No matching sheet found in workbook.xml");
+                return null;
+            }
+
+            // Resolve the relationship ID to a target path
+            if (relsMap.TryGetValue(matchedRelId, out string? targetPath) && targetPath != null)
+            {
+                string resolved = targetPath.StartsWith("xl/", StringComparison.OrdinalIgnoreCase)
+                    ? targetPath
+                    : "xl/" + targetPath;
+
+                System.Diagnostics.Debug.WriteLine($"\nResolved XML: {resolved}");
+                System.Diagnostics.Debug.WriteLine("SUCCESS");
+                return resolved;
+            }
+
+            System.Diagnostics.Debug.WriteLine($"FAILED: Relationship {matchedRelId} not found in workbook.xml.rels");
+            return null;
+        }
+
+        /// <summary>
+        /// Converts a column letter (e.g., "A", "Z", "AA") to a 1-based column index.
+        /// </summary>
+        private static int ColumnLetterToIndex(string letters)
+        {
+            int result = 0;
+            foreach (char c in letters.ToUpperInvariant())
+            {
+                result = result * 26 + (c - 'A' + 1);
+            }
+            return result;
+        }
+
+        /// <summary>
+        /// Parses a print area address like "$A$1:$D$10" to extract column indices (1-based).
+        /// Returns false if the address cannot be parsed.
+        /// </summary>
+        private static bool TryParsePrintAreaColumns(string printArea, out int firstCol, out int lastCol)
+        {
+            firstCol = 0;
+            lastCol = 0;
+
+            var match = Regex.Match(printArea, @"\$?([A-Z]+)\$?\d+:\$?([A-Z]+)\$?\d+", RegexOptions.IgnoreCase);
+            if (!match.Success || match.Groups.Count < 3)
+                return false;
+
+            firstCol = ColumnLetterToIndex(match.Groups[1].Value);
+            lastCol = ColumnLetterToIndex(match.Groups[2].Value);
+            return true;
+        }
+
+        #endregion
     }
 }

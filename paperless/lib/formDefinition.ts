@@ -80,6 +80,7 @@ export interface SheetDefinition {
   freezePane: string | null;
   cellStyles: Record<string, CellStyle>;
   cellValues: Record<string, string>;
+  metadata: Record<string, string>;
 }
 
 export interface ClusterDefinition {

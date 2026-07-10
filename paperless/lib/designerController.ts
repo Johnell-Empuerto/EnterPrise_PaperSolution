@@ -66,6 +66,7 @@ export function createDefaultSheet(index: number): SheetDefinition {
     freezePane: null,
     cellStyles: {},
     cellValues: {},
+    metadata: {},
   };
 }
 
