@@ -21,8 +21,9 @@ export function NumberField({ field, onFocus, style }: NumberFieldProps) {
     width: "100%",
     height: "100%",
     boxSizing: "border-box",
+    lineHeight: 1.2,
     backgroundColor: focused ? "#FFF9C4" : "#FFFDE7",
-    border: focused ? "2px solid #FDD835" : "1px solid #F9A825",
+    border: "none",
     borderRadius: "2px",
     padding: "1px 4px",
     fontSize: `${Math.max(8, field.fontSize * 0.85)}px`,
@@ -31,7 +32,9 @@ export function NumberField({ field, onFocus, style }: NumberFieldProps) {
     color: field.fontColor ?? "#333",
     textAlign: (field.alignment === "right" || field.alignment === "general") ? "right" : "left",
     outline: "none",
-    boxShadow: focused ? "0 0 0 2px rgba(253, 216, 53, 0.3)" : "none",
+    boxShadow: focused
+      ? "inset 0 0 0 2px #FDD835, 0 0 0 2px rgba(253, 216, 53, 0.3)"
+      : "inset 0 0 0 1px #F9A825",
     transition: "box-shadow 0.15s, background-color 0.15s",
     cursor: field.readOnly ? "default" : "text",
     opacity: field.readOnly ? 0.7 : 1,

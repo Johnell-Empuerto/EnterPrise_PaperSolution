@@ -20,6 +20,8 @@ interface FormPageProps {
   zoom: number;
   /** Called when a field is focused. */
   onFieldFocus?: (field: RuntimeField) => void;
+  /** Visual debug mode: renders green border around each overlay field. */
+  debug?: boolean;
 }
 
 /**
@@ -31,7 +33,7 @@ interface FormPageProps {
  * If previewUrl is provided, it is used directly. Otherwise, falls back
  * to constructing /preview/page_{templateId}.png for backward compatibility.
  */
-export function FormPage({ sheet, previewUrl, templateId, zoom, onFieldFocus }: FormPageProps) {
+export function FormPage({ sheet, previewUrl, templateId, zoom, onFieldFocus, debug }: FormPageProps) {
   const [bgError, setBgError] = useState(false);
 
   // Use the backend-provided previewUrl if available; otherwise fall back
@@ -46,23 +48,25 @@ export function FormPage({ sheet, previewUrl, templateId, zoom, onFieldFocus }: 
 
   return (
     <div
-      className="relative"
       style={{
+        position: "relative",
         width: sheet.pageWidthPx,
-        minHeight: sheet.pageHeightPx,
+        height: sheet.pageHeightPx,
         transform: `scale(${zoom})`,
         transformOrigin: "top left",
       }}
     >
-      {/* Background PNG */}
+      {/* Background PNG — fills the container exactly */}
       {!bgError ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={bgUrl}
           alt={`Sheet: ${sheet.name}`}
-          width={sheet.pageWidthPx}
-          height={sheet.pageHeightPx}
-          className="block"
+          style={{
+            display: "block",
+            width: sheet.pageWidthPx,
+            height: sheet.pageHeightPx,
+          }}
           onError={() => setBgError(true)}
           draggable={false}
         />
@@ -80,6 +84,7 @@ export function FormPage({ sheet, previewUrl, templateId, zoom, onFieldFocus }: 
         fields={sheet.fields}
         onFieldFocus={onFieldFocus}
         scale={zoom}
+        debug={debug}
       />
     </div>
   );

@@ -54,10 +54,12 @@ export function SignatureField({ field, onFocus, style }: SignatureFieldProps) {
     ...style,
     boxSizing: "border-box",
     backgroundColor: focused ? "#FFF9C4" : "#FFFDE7",
-    border: focused ? "2px solid #FDD835" : "1px solid #F9A825",
+    border: "none",
     borderRadius: "2px",
     cursor: field.readOnly ? "default" : "pointer",
-    boxShadow: focused ? "0 0 0 2px rgba(253, 216, 53, 0.3)" : "none",
+    boxShadow: focused
+      ? "inset 0 0 0 2px #FDD835, 0 0 0 2px rgba(253, 216, 53, 0.3)"
+      : "inset 0 0 0 1px #F9A825",
     transition: "box-shadow 0.15s, background-color 0.15s",
     overflow: "hidden",
     opacity: field.readOnly ? 0.7 : 1,

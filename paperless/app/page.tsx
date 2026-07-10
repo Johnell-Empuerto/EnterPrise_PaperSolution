@@ -11,6 +11,7 @@ export default function Home() {
   const [templateId, setTemplateId] = useState("");
   const [zoom, setZoom] = useState(0.5);
   const [focusedField, setFocusedField] = useState<RuntimeField | null>(null);
+  const [debug, setDebug] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -325,6 +326,18 @@ export default function Home() {
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                   </svg>
                 </button>
+                <div className="w-px h-5 bg-slate-300 dark:bg-slate-600 mx-1" />
+                <button
+                  onClick={() => setDebug((d) => !d)}
+                  className={`px-2 py-1 text-xs font-medium rounded-md transition-colors ${
+                    debug
+                      ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
+                      : "text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800"
+                  }`}
+                  title="Toggle overlay debug borders"
+                >
+                  Debug
+                </button>
               </div>
             </div>
 
@@ -337,6 +350,7 @@ export default function Home() {
                   previewUrl={uploadResult?.previewUrl}
                   zoom={zoom}
                   onFieldFocus={(field) => setFocusedField(field)}
+                  debug={debug}
                 />
               ))}
             </div>

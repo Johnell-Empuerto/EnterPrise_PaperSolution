@@ -24,8 +24,9 @@ export function TextField({ field, onFocus, style }: TextFieldProps) {
     width: "100%",
     height: "100%",
     boxSizing: "border-box",
+    lineHeight: 1.2,
     backgroundColor: focused ? "#FFF9C4" : "#FFFDE7",
-    border: focused ? "2px solid #FDD835" : "1px solid #F9A825",
+    border: "none",
     borderRadius: "2px",
     padding: isMultiline ? "2px 4px" : "1px 4px",
     fontSize: `${Math.max(8, field.fontSize * 0.85)}px`,
@@ -35,7 +36,9 @@ export function TextField({ field, onFocus, style }: TextFieldProps) {
     outline: "none",
     resize: "none",
     overflow: isMultiline ? "auto" : "hidden",
-    boxShadow: focused ? "0 0 0 2px rgba(253, 216, 53, 0.3)" : "none",
+    boxShadow: focused
+      ? "inset 0 0 0 2px #FDD835, 0 0 0 2px rgba(253, 216, 53, 0.3)"
+      : "inset 0 0 0 1px #F9A825",
     transition: "box-shadow 0.15s, background-color 0.15s",
     cursor: field.readOnly ? "default" : "text",
     opacity: field.readOnly ? 0.7 : 1,

@@ -13,6 +13,8 @@ interface OverlayFieldProps {
   field: RuntimeField;
   /** Called when the field receives focus. */
   onFocus?: () => void;
+  /** Visual debug mode: renders red (computed) and green (actual cell) borders. */
+  debug?: boolean;
 }
 
 /**
@@ -28,7 +30,7 @@ interface OverlayFieldProps {
  * Positions are NEVER recalculated in the frontend.
  * The backend (CoordinateEngine) is the single source of truth.
  */
-export function OverlayField({ field, onFocus }: OverlayFieldProps) {
+export function OverlayField({ field, onFocus, debug }: OverlayFieldProps) {
   // Fill style: the wrapper div provides the correct pixel dimensions via position:absolute.
   // Every child uses width:100%; height:100% to fill exactly those pixel boundaries.
   // boxSizing:border-box ensures padding/border are included in the 100% — no overflow.
@@ -76,9 +78,36 @@ export function OverlayField({ field, onFocus }: OverlayFieldProps) {
         width: field.widthPx,
         height: field.heightPx,
         zIndex: 10,
+        ...(debug ? {
+          outline: "2px solid #00FF00",
+          outlineOffset: "-1px",
+          backgroundColor: "rgba(0, 255, 0, 0.08)",
+        } : {}),
       }}
     >
       {renderField()}
+      {/* Debug label shows field dimensions */}
+      {debug && (
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            fontSize: "9px",
+            lineHeight: 1,
+            fontFamily: "monospace",
+            color: "#00FF00",
+            backgroundColor: "rgba(0,0,0,0.6)",
+            padding: "1px 2px",
+            borderRadius: "1px",
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+            zIndex: 20,
+          }}
+        >
+          {field.cellReference} {field.widthPx.toFixed(0)}x{field.heightPx.toFixed(0)}
+        </div>
+      )}
     </div>
   );
 }

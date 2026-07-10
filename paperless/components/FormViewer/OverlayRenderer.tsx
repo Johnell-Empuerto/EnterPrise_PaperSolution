@@ -10,6 +10,8 @@ interface OverlayRendererProps {
   onFieldFocus?: (field: RuntimeField) => void;
   /** Current zoom level (passed to fields for coordinate scaling). */
   scale: number;
+  /** Visual debug mode: renders green border around each overlay field. */
+  debug?: boolean;
 }
 
 /**
@@ -17,7 +19,7 @@ interface OverlayRendererProps {
  * Every field uses LeftPx/TopPx/WidthPx/HeightPx from the backend RuntimeField.
  * Positions are never recalculated in the frontend.
  */
-export function OverlayRenderer({ fields, onFieldFocus, scale }: OverlayRendererProps) {
+export function OverlayRenderer({ fields, onFieldFocus, scale, debug }: OverlayRendererProps) {
   if (!fields || fields.length === 0) {
     return (
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -35,6 +37,7 @@ export function OverlayRenderer({ fields, onFieldFocus, scale }: OverlayRenderer
           key={field.id}
           field={field}
           onFocus={() => onFieldFocus?.(field)}
+          debug={debug}
         />
       ))}
     </>

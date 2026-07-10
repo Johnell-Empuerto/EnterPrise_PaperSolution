@@ -669,6 +669,26 @@ namespace ExcelAPI.Services
                     scaleRatioX, scaleRatioY,
                     pngWidth, pngHeight, pageWidthPt, pageHeightPt);
 
+                // Verify PNG = PDF × Scale explicitly
+                double expectedPngW = pageWidthPt * (dpi / 72.0);
+                double expectedPngH = pageHeightPt * (dpi / 72.0);
+                double pngWDelta = pngWidth - expectedPngW;
+                double pngHDelta = pngHeight - expectedPngH;
+                _logger.LogInformation(
+                    "[PDF2PNG] PDF page: {PPW:F2}x{PPH:F2}pt (MediaBox)\n" +
+                    "  Expected PNG at {DPI}DPI: {EPW:F2}x{EPH:F2}px\n" +
+                    "  Actual PNG:              {APW}x{APH}px\n" +
+                    "  Delta:                   {DW:F2}x{DH:F2}px\n" +
+                    "  ScaleX={SX:F6} ScaleY={SY:F6} (raw {RSX:F6}x{RSY:F6})",
+                    pageWidthPt, pageHeightPt,
+                    dpi,
+                    expectedPngW, expectedPngH,
+                    pngWidth, pngHeight,
+                    pngWDelta, pngHDelta,
+                    scaleX, scaleY,
+                    pageWidthPt > 0 ? pngWidth / pageWidthPt : 0,
+                    pageHeightPt > 0 ? pngHeight / pageHeightPt : 0);
+
                 _logger.LogInformation(
                     "[AUDIT] Final coordinate system:\n" +
                     "  Printed origin: ({OXP:F1},{OYP:F1})pt -> ({OX:F1},{OY:F1})px\n" +
@@ -684,6 +704,54 @@ namespace ExcelAPI.Services
                     actualPrintedOriginX, actualPrintedOriginY,
                     scaleX, scaleY,
                     pageWidthPt, pageHeightPt);
+
+                // ================================================================
+                // Step 12b — Auto-correct coordinates from PNG content boundaries
+                // Excel's PDF export applies internal content scaling (FitToPages,
+                // DPI mismatch, etc.) that shifts/scale the rendered output vs
+                // the COM coordinates. We measure the actual content boundaries
+                // in the rendered PNG and adjust all field coordinates to match.
+                // ================================================================
+                if (fields.Count > 0 && System.IO.File.Exists(previewPath))
+                {
+                    try
+                    {
+                        double correctedOriginX = actualPrintedOriginX;
+                        double correctedOriginY = actualPrintedOriginY;
+                        double correctedScaleX = scaleX;
+                        double correctedScaleY = scaleY;
+
+                        bool corrected = AdjustCoordinatesFromPng(
+                            previewPath,
+                            fields,
+                            scaleX, scaleY,
+                            ref correctedOriginX, ref correctedOriginY,
+                            ref correctedScaleX, ref correctedScaleY);
+
+                        if (corrected)
+                        {
+                            _logger.LogInformation(
+                                "[CORRECT] Content boundary adjustment applied:\n" +
+                                "  Origin: ({OX:F1},{OY:F1})px -> ({CX:F1},{CY:F1})px (Δ {DX:F1},{DY:F1})\n" +
+                                "  Scale:  {SX:F6}x{SY:F6} -> {CSX:F6}x{CSY:F6}",
+                                actualPrintedOriginX, actualPrintedOriginY,
+                                correctedOriginX, correctedOriginY,
+                                correctedOriginX - actualPrintedOriginX,
+                                correctedOriginY - actualPrintedOriginY,
+                                scaleX, scaleY,
+                                correctedScaleX, correctedScaleY);
+                        }
+                        else
+                        {
+                            _logger.LogInformation(
+                                "[CORRECT] No correction needed — COM coordinates match PNG content boundaries.");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "[CORRECT] Content boundary correction failed: {Msg}", ex.Message);
+                    }
+                }
 
                 // Log coordinate conversion trace for the first field (comparison table)
                 if (fields.Count > 0)
@@ -704,6 +772,57 @@ namespace ExcelAPI.Services
                         scaleX,
                         f.Left, f.Top,
                         f.Width, f.Height);
+                }
+
+                // ================================================================
+                // Phase 11.11 — Comprehensive Field Audit for ALL fields
+                // Logs every COM measurement and transformation for every field,
+                // not just the first one.
+                // ================================================================
+                _logger.LogInformation(
+                    "[AUDIT:ALL] === BEGIN FIELD-LEVEL AUDIT ({Count} fields) ===",
+                    fields.Count);
+                _logger.LogInformation(
+                    "[AUDIT:ALL] PDF page: {PW:F2}x{PH:F2}pt | PNG: {IW}x{IH}px",
+                    pageWidthPt, pageHeightPt, pngWidth, pngHeight);
+                _logger.LogInformation(
+                    "[AUDIT:ALL] PrintedOrigin: ({OX:F2},{OY:F2})pt -> ({POX:F2},{POY:F2})px | " +
+                    "ScaleX={SX:F6} ScaleY={SY:F6} (theoretical={T:F6})",
+                    printedOriginXPts, printedOriginYPts,
+                    actualPrintedOriginX, actualPrintedOriginY,
+                    scaleX, scaleY, theoreticalScale);
+                _logger.LogInformation(
+                    "[AUDIT:ALL] PrintArea: Left={PAL:F2}pt Top={PAT:F2}pt " +
+                    "Width={PAW:F2}pt Height={PAH:F2}pt",
+                    printAreaLeft, printAreaTop, printAreaWidth, printAreaHeight);
+
+                foreach (var f in fields)
+                {
+                    double offsetLeftPt = f.ExcelLeft - f.PrintAreaLeft;
+                    double offsetTopPt = f.ExcelTop - f.PrintAreaTop;
+                    double expectedLeft = actualPrintedOriginX + offsetLeftPt * scaleX;
+                    double expectedTop = actualPrintedOriginY + offsetTopPt * scaleY;
+                    double expectedWidth = f.ExcelWidthPt * scaleX;
+                    double expectedHeight = f.ExcelHeightPt * scaleY;
+
+                    _logger.LogInformation(
+                        "[AUDIT:ALL] Field \"{Cell}\" ({Type})" +
+                        "\n  COM Range : Left={EL:F4}pt Top={ET:F4}pt Width={EW:F4}pt Height={EH:F4}pt" +
+                        "\n  Pt offset : Left={OL:F4}pt Top={OT:F4}pt" +
+                        "\n  Expected  : Left={PX:F2}px Top={PY:F2}px Width={PW:F2}px Height={PH:F2}px" +
+                        "\n  Rounded   : Left={RL:F1}px Top={RT:F1}px Width={RW:F1}px Height={RH:F1}px" +
+                        "\n  Match?    : L={LM} T={TM} W={WM} H={HM}" +
+                        "\n  Merged    : {MG} ({MA})",
+                        f.Cell, f.Type,
+                        f.ExcelLeft, f.ExcelTop, f.ExcelWidthPt, f.ExcelHeightPt,
+                        offsetLeftPt, offsetTopPt,
+                        expectedLeft, expectedTop, expectedWidth, expectedHeight,
+                        f.Left, f.Top, f.Width, f.Height,
+                        Math.Abs(f.Left - expectedLeft) < 0.5 ? "OK" : $"OFF({f.Left - expectedLeft:F2})",
+                        Math.Abs(f.Top - expectedTop) < 0.5 ? "OK" : $"OFF({f.Top - expectedTop:F2})",
+                        Math.Abs(f.Width - expectedWidth) < 0.5 ? "OK" : $"OFF({f.Width - expectedWidth:F2})",
+                        Math.Abs(f.Height - expectedHeight) < 0.5 ? "OK" : $"OFF({f.Height - expectedHeight:F2})",
+                        f.IsMerged ? "Yes" : "No", f.MergeAddress ?? "N/A");
                 }
 
                 // ================================================================
@@ -924,6 +1043,158 @@ namespace ExcelAPI.Services
                     }
                 }
 
+                // ================================================================
+                // Phase 11.11 — All-Field Debug Overlay on PNG
+                // Draws colored rectangles + labels for EVERY field on the preview
+                // PNG, saved as a separate debug_{fileId}.png for analysis.
+                // ================================================================
+                try
+                {
+                    if (fields.Count > 0 && System.IO.File.Exists(previewPath))
+                    {
+                        byte[] previewBytes = System.IO.File.ReadAllBytes(previewPath);
+                        using var srcBmp = SkiaSharp.SKBitmap.Decode(previewBytes);
+                        if (srcBmp != null)
+                        {
+                            using var debugBmp = new SkiaSharp.SKBitmap(srcBmp.Width, srcBmp.Height);
+                            using var srcPix = srcBmp.PeekPixels();
+                            using var dstPix = debugBmp.PeekPixels();
+                            srcPix.ReadPixels(dstPix.Info, dstPix.GetPixels(), dstPix.RowBytes, 0, 0);
+
+                            using var canvas = new SkiaSharp.SKCanvas(debugBmp);
+                            var colorPalette = new[]
+                            {
+                                new SkiaSharp.SKColor(255, 0, 0, 180),    // Red
+                                new SkiaSharp.SKColor(0, 0, 255, 180),    // Blue
+                                new SkiaSharp.SKColor(0, 180, 0, 180),    // Green
+                                new SkiaSharp.SKColor(255, 165, 0, 180),  // Orange
+                                new SkiaSharp.SKColor(128, 0, 128, 180),  // Purple
+                                new SkiaSharp.SKColor(0, 200, 200, 180),  // Cyan
+                                new SkiaSharp.SKColor(255, 20, 147, 180), // DeepPink
+                                new SkiaSharp.SKColor(139, 69, 19, 180),  // Brown
+                            };
+
+                            for (int fi = 0; fi < fields.Count; fi++)
+                            {
+                                var f = fields[fi];
+                                var color = colorPalette[fi % colorPalette.Length];
+
+                                using var rectPen = new SkiaSharp.SKPaint
+                                {
+                                    Color = color,
+                                    Style = SkiaSharp.SKPaintStyle.Stroke,
+                                    StrokeWidth = 3
+                                };
+                                using var crossPen = new SkiaSharp.SKPaint
+                                {
+                                    Color = color.WithAlpha(220),
+                                    Style = SkiaSharp.SKPaintStyle.Stroke,
+                                    StrokeWidth = 1
+                                };
+                                using var fill = new SkiaSharp.SKPaint
+                                {
+                                    Color = color.WithAlpha(40),
+                                    Style = SkiaSharp.SKPaintStyle.Fill
+                                };
+
+                                float x0 = (float)f.Left;
+                                float y0 = (float)f.Top;
+                                float ww = (float)f.Width;
+                                float hh = (float)f.Height;
+
+                                // Fill rect
+                                canvas.DrawRect(x0, y0, ww, hh, fill);
+                                // Border
+                                canvas.DrawRect(x0, y0, ww, hh, rectPen);
+                                // Cross at top-left corner
+                                canvas.DrawLine(x0 - 6, y0, x0 + 6, y0, crossPen);
+                                canvas.DrawLine(x0, y0 - 6, x0, y0 + 6, crossPen);
+                                // Cross at bottom-right corner
+                                canvas.DrawLine(x0 + ww - 6, y0 + hh, x0 + ww + 6, y0 + hh, crossPen);
+                                canvas.DrawLine(x0 + ww, y0 + hh - 6, x0 + ww, y0 + hh + 6, crossPen);
+
+                                // Label with cell address and dimensions
+                                using var labelPaint = new SkiaSharp.SKPaint
+                                {
+                                    Color = color.WithAlpha(255),
+                                    Style = SkiaSharp.SKPaintStyle.Fill,
+                                    TextSize = 14,
+                                    IsAntialias = true
+                                };
+                                string label = $"{f.Cell} ({f.Width:F0}x{f.Height:F0})";
+                                canvas.DrawText(label, x0 + 4, y0 - 4, labelPaint);
+                            }
+
+                            string debugPngPath = Path.Combine(previewFolder, $"debug_{localFileId}.png");
+                            using var debugImg = SkiaSharp.SKImage.FromBitmap(debugBmp);
+                            using var debugData = debugImg.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+                            System.IO.File.WriteAllBytes(debugPngPath, debugData.ToArray());
+
+                            _logger.LogInformation(
+                                "[AUDIT:OVERLAY] Debug overlay PNG saved: {Path}\n" +
+                                "  {Count} fields drawn with colored rectangles.\n" +
+                                "  Open this file in an image editor and measure:\n" +
+                                "  - If colored rects ALIGN with cell gridlines -> COM coords are CORRECT\n" +
+                                "  - If colored rects are OFFSET from gridlines -> COM coords are WRONG\n" +
+                                "  Measure the gap (in pixels) to determine the exact offset.",
+                                debugPngPath, fields.Count);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[AUDIT:OVERLAY] Failed to generate debug overlay: {Msg}", ex.Message);
+                }
+
+                // ================================================================
+                // Phase 11.11 — Final Stage Comparison Table
+                // Summarizes the coordinate journey across all stages.
+                // The first row where values diverge identifies the real bug source.
+                // ================================================================
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] === STAGE COMPARISON TABLE ===");
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] Stage | PageW | PageH | OrgX | OrgY | ScaleX | ScaleY | Notes");
+
+                // Stage 1: Excel worksheet (COM Range)
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] Excel  | {W:F2}pt | {H:F2}pt | {OX:F2}pt | {OY:F2}pt | {SX:F6} | {SY:F6} | COM Range, PrintArea",
+                    printAreaWidth, printAreaHeight,
+                    printedOriginXPts, printedOriginYPts,
+                    scaleX, scaleY);
+
+                // Stage 2: PDF document (MediaBox)
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] PDF    | {W:F2}pt | {H:F2}pt | {OX:F2}pt | {OY:F2}pt | {SX:F6} | {SY:F6} | pageWidthPt/pageHeightPt",
+                    pageWidthPt, pageHeightPt,
+                    printedOriginXPts, printedOriginYPts,
+                    scaleX, scaleY);
+
+                // Stage 3: Rendered PNG (after PDFium rasterization)
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] PNG    | {W}px | {H}px | {OX:F2}px | {OY:F2}px | {SX:F6} | {SY:F6} | actual rendered size, delta W={DW:F1}px H={DH:F1}px",
+                    pngWidth, pngHeight,
+                    actualPrintedOriginX, actualPrintedOriginY,
+                    scaleX, scaleY,
+                    pngWidth - (pageWidthPt * dpi / 72.0),
+                    pngHeight - (pageHeightPt * dpi / 72.0));
+
+                // Stage 4: runtime.json fields (rounded output)
+                if (fields.Count > 0)
+                {
+                    var f0 = fields[0];
+                    _logger.LogInformation(
+                        "[AUDIT:TABLE] Field0 | L={L:F1} | T={T:F1} | W={W:F1} | H={H:F1} | \"{Cell}\"",
+                        f0.Left, f0.Top, f0.Width, f0.Height, f0.Cell);
+                    _logger.LogInformation(
+                        "[AUDIT:TABLE] COM raw| L={L:F4}pt | T={T:F4}pt | W={W:F4}pt | H={H:F4}pt | ExcelLeft/Top/WidthPt/HeightPt",
+                        f0.ExcelLeft, f0.ExcelTop, f0.ExcelWidthPt, f0.ExcelHeightPt);
+                }
+
+                _logger.LogInformation(
+                    "[AUDIT:TABLE] === END TABLE — Compare each row. " +
+                    "First row where actual ≠ expected identifies the bug source. ===");
+
                 // Build and return the complete capture result
                 return new CaptureResult
                 {
@@ -990,6 +1261,26 @@ namespace ExcelAPI.Services
                 {
                     if (pdfPath != null && System.IO.File.Exists(pdfPath))
                     {
+                        // Keep PDF for measurement when AUDIT_KEEP_PDF=true env var is set
+                        string? keepPdf = System.Environment.GetEnvironmentVariable("AUDIT_KEEP_PDF");
+                        if (!string.IsNullOrEmpty(keepPdf) && keepPdf.Equals("true", StringComparison.OrdinalIgnoreCase))
+                        {
+                            string pdfDebugDir = Path.Combine(Path.GetDirectoryName(pdfPath) ?? ".", "pdf_debug");
+                            System.IO.Directory.CreateDirectory(pdfDebugDir);
+                            // Extract file ID from pdfPath (format: ...\page_{id}.pdf)
+                            string pdfNameOnly = Path.GetFileNameWithoutExtension(pdfPath) ?? "unknown";
+                            string pdfId = pdfNameOnly.StartsWith("page_") ? pdfNameOnly.Substring(5) : pdfNameOnly;
+                            string pdfCopyPath = Path.Combine(pdfDebugDir, $"{pdfId}.pdf");
+                            System.IO.File.Copy(pdfPath, pdfCopyPath, overwrite: true);
+                            _logger.LogInformation(
+                                "[AUDIT:PDF] Preserved PDF for measurement: {PdfCopy}\n" +
+                                "  Open in Acrobat Reader at 100% zoom and measure:\n" +
+                                "  - Cell left/right edges from page left edge\n" +
+                                "  - Cell top/bottom edges from page top edge\n" +
+                                "  - Compare with COM Range.Left/Top/Width/Height values above",
+                                pdfCopyPath);
+                        }
+
                         System.IO.File.Delete(pdfPath);
                         _logger.LogDebug("Deleted intermediate PDF: {PdfPath}", pdfPath);
                     }
@@ -2135,6 +2426,258 @@ namespace ExcelAPI.Services
             firstCol = ColumnLetterToIndex(match.Groups[1].Value);
             lastCol = ColumnLetterToIndex(match.Groups[2].Value);
             return true;
+        }
+
+        // ================================================================
+        // Phase 11J.11 — PNG Content Boundary Detection & Coordinate Correction
+        // Measures actual content edges in the rendered PNG and adjusts field
+        // coordinates to match, compensating for Excel's internal content
+        // scaling (FitToPages, DPI mismatch, etc.) that the simple page-level
+        // scale calculation doesn't account for.
+        // ================================================================
+
+        /// <summary>
+        /// Scans the rendered PNG to find actual content boundaries, then adjusts
+        /// all field coordinates to match. Returns false if no correction is needed
+        /// (i.e., COM coordinates already match the PNG within 2px tolerance).
+        /// </summary>
+        private static bool AdjustCoordinatesFromPng(
+            string pngPath,
+            List<ExcelField> fields,
+            double scaleX,
+            double scaleY,
+            ref double correctedOriginX,
+            ref double correctedOriginY,
+            ref double correctedScaleX,
+            ref double correctedScaleY)
+        {
+            byte[] pngBytes = System.IO.File.ReadAllBytes(pngPath);
+            using var bitmap = SkiaSharp.SKBitmap.Decode(pngBytes);
+            if (bitmap == null) return false;
+
+            int w = bitmap.Width;
+            int h = bitmap.Height;
+            if (w == 0 || h == 0) return false;
+
+            // --- Sample rows at 1/4, 1/2, and 3/4 of the page height ---
+            // to find the average left and right content edges.
+            int[] sampleRows = [
+                Math.Clamp((int)(h * 0.25), 0, h - 1),
+                Math.Clamp((int)(h * 0.50), 0, h - 1),
+                Math.Clamp((int)(h * 0.75), 0, h - 1)
+            ];
+
+            const byte threshold = 248; // R/G/B > 248 → "white enough" = background
+
+            double totalLeftEdge = 0, totalRightEdge = 0;
+            int validRows = 0;
+
+            foreach (int rowY in sampleRows)
+            {
+                // Scan left-to-right: find first non-white run (≥3 consecutive)
+                int firstNonWhite = -1;
+                int consecutive = 0;
+                for (int x = 0; x < w; x++)
+                {
+                    var px = bitmap.GetPixel(x, rowY);
+                    bool isWhite = px.Red > threshold && px.Green > threshold && px.Blue > threshold;
+                    if (!isWhite)
+                    {
+                        consecutive++;
+                        if (consecutive >= 3)
+                        {
+                            firstNonWhite = x - 2; // start of the run
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutive = 0;
+                    }
+                }
+                if (firstNonWhite < 0) continue;
+
+                // Scan right-to-left: find last non-white run (≥3 consecutive)
+                int lastNonWhite = -1;
+                consecutive = 0;
+                for (int x = w - 1; x >= 0; x--)
+                {
+                    var px = bitmap.GetPixel(x, rowY);
+                    bool isWhite = px.Red > threshold && px.Green > threshold && px.Blue > threshold;
+                    if (!isWhite)
+                    {
+                        consecutive++;
+                        if (consecutive >= 3)
+                        {
+                            lastNonWhite = x + 2; // end of the run
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutive = 0;
+                    }
+                }
+                if (lastNonWhite < 0) continue;
+
+                totalLeftEdge += firstNonWhite;
+                totalRightEdge += lastNonWhite;
+                validRows++;
+            }
+
+            if (validRows == 0) return false;
+
+            double avgLeft = totalLeftEdge / validRows;
+            double avgRight = totalRightEdge / validRows;
+            double actualContentWidth = avgRight - avgLeft;
+
+            // --- Sample columns at 1/4, 1/2, and 3/4 of page width ---
+            int[] sampleCols = [
+                Math.Clamp((int)(w * 0.25), 0, w - 1),
+                Math.Clamp((int)(w * 0.50), 0, w - 1),
+                Math.Clamp((int)(w * 0.75), 0, w - 1)
+            ];
+
+            double totalTopEdge = 0, totalBottomEdge = 0;
+            int validCols = 0;
+
+            foreach (int colX in sampleCols)
+            {
+                // Scan top-to-bottom
+                int firstNonWhite = -1;
+                int consecutive = 0;
+                for (int y = 0; y < h; y++)
+                {
+                    var px = bitmap.GetPixel(colX, y);
+                    bool isWhite = px.Red > threshold && px.Green > threshold && px.Blue > threshold;
+                    if (!isWhite)
+                    {
+                        consecutive++;
+                        if (consecutive >= 3)
+                        {
+                            firstNonWhite = y - 2;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutive = 0;
+                    }
+                }
+                if (firstNonWhite < 0) continue;
+
+                // Scan bottom-to-top
+                int lastNonWhite = -1;
+                consecutive = 0;
+                for (int y = h - 1; y >= 0; y--)
+                {
+                    var px = bitmap.GetPixel(colX, y);
+                    bool isWhite = px.Red > threshold && px.Green > threshold && px.Blue > threshold;
+                    if (!isWhite)
+                    {
+                        consecutive++;
+                        if (consecutive >= 3)
+                        {
+                            lastNonWhite = y + 2;
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        consecutive = 0;
+                    }
+                }
+                if (lastNonWhite < 0) continue;
+
+                totalTopEdge += firstNonWhite;
+                totalBottomEdge += lastNonWhite;
+                validCols++;
+            }
+
+            if (validCols == 0) return false;
+
+            double avgTop = totalTopEdge / validCols;
+            double avgBottom = totalBottomEdge / validCols;
+            double actualContentHeight = avgBottom - avgTop;
+
+            // --- Compute expected content extent from actual field data ---
+            // Using max field right/bottom edge minus min field left/top edge
+            // relative to the PrintArea origin. This is more accurate than
+            // using printAreaWidth (which may be the full page width).
+            double minFieldLeftPt = double.MaxValue, maxFieldRightPt = double.MinValue;
+            double minFieldTopPt = double.MaxValue, maxFieldBottomPt = double.MinValue;
+
+            foreach (var f in fields)
+            {
+                double ol = f.ExcelLeft - f.PrintAreaLeft;
+                double ot = f.ExcelTop - f.PrintAreaTop;
+                minFieldLeftPt = Math.Min(minFieldLeftPt, ol);
+                maxFieldRightPt = Math.Max(maxFieldRightPt, ol + f.ExcelWidthPt);
+                minFieldTopPt = Math.Min(minFieldTopPt, ot);
+                maxFieldBottomPt = Math.Max(maxFieldBottomPt, ot + f.ExcelHeightPt);
+            }
+
+            double comContentWidthPt = maxFieldRightPt - minFieldLeftPt;
+            double comContentHeightPt = maxFieldBottomPt - minFieldTopPt;
+            double expectedContentWidthPx = comContentWidthPt * scaleX;
+            double expectedContentHeightPx = comContentHeightPt * scaleY;
+
+            // Only apply correction if content boundaries are meaningfully different
+            // from the calculated origin (tolerance = 2px)
+            double originDx = avgLeft - correctedOriginX;
+            double originDy = avgTop - correctedOriginY;
+
+            if (Math.Abs(originDx) < 2 && Math.Abs(originDy) < 2)
+                return false; // Already aligned
+
+            double contentScaleX = expectedContentWidthPx > 0
+                ? actualContentWidth / expectedContentWidthPx
+                : 1.0;
+            double contentScaleY = expectedContentHeightPx > 0
+                ? actualContentHeight / expectedContentHeightPx
+                : 1.0;
+
+            // Clamp to reasonable range (0.5..2.0) to avoid garbage corrections
+            contentScaleX = Math.Clamp(contentScaleX, 0.5, 2.0);
+            contentScaleY = Math.Clamp(contentScaleY, 0.5, 2.0);
+
+            correctedOriginX = avgLeft;
+            correctedOriginY = avgTop;
+
+            // The corrected scale accounts for both the page→pixel conversion
+            // AND the internal content scaling applied by Excel's PDF export.
+            correctedScaleX = scaleX * contentScaleX;
+            correctedScaleY = scaleY * contentScaleY;
+
+            // --- Apply corrections to all fields ---
+            int adjustedCount = 0;
+            foreach (var f in fields)
+            {
+                double offsetPtX = f.ExcelLeft - f.PrintAreaLeft;
+                double offsetPtY = f.ExcelTop - f.PrintAreaTop;
+
+                double newLeft = correctedOriginX + offsetPtX * correctedScaleX;
+                double newTop = correctedOriginY + offsetPtY * correctedScaleY;
+                double newWidth = f.ExcelWidthPt * correctedScaleX;
+                double newHeight = f.ExcelHeightPt * correctedScaleY;
+
+                // Only apply if meaningfully different
+                bool changed = Math.Abs(f.Left - newLeft) > 0.5 ||
+                               Math.Abs(f.Top - newTop) > 0.5 ||
+                               Math.Abs(f.Width - newWidth) > 0.5 ||
+                               Math.Abs(f.Height - newHeight) > 0.5;
+
+                if (changed)
+                {
+                    f.Left = Math.Round(newLeft, 1);
+                    f.Top = Math.Round(newTop, 1);
+                    f.Width = Math.Round(newWidth, 1);
+                    f.Height = Math.Round(newHeight, 1);
+                    adjustedCount++;
+                }
+            }
+
+            return adjustedCount > 0;
         }
 
         #endregion
