@@ -1,0 +1,19 @@
+{
+  "Name": "_Fields",
+  "SheetId": 2,
+  "Visible": "hidden",
+  "PageSetup": {
+    "all_attributes": {}
+  },
+  "PageMargins": {
+    "top": 0.75,
+    "bottom": 0.75,
+    "left": 0.7,
+    "right": 0.7,
+    "header": 0.3,
+    "footer": 0.3
+  },
+  "SheetFormatProperties": {
+    "default_row_height": 14.4
+  }
+}

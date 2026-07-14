@@ -1,0 +1,20 @@
+{
+  "DefTopId": 132,
+  "DefTopName": "Condominium preview check sheet",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 304,
+  "ComClusters": 304,
+  "LeftMatchPct": 0.3289473684210526,
+  "TopMatchPct": 0.3289473684210526,
+  "CoordMatchPct": 0.3289473684210526,
+  "DefaultFontName": "\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 18,
+  "ContentWidth": 1790.4288256227762,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=0% Top=0%, PrintScale, Font=\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=18.0",
+  "ErrorMessage": null
+}

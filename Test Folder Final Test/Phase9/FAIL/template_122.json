@@ -1,0 +1,20 @@
+{
+  "DefTopId": 122,
+  "DefTopName": "\u3010\u5EFA\u7BC9\u3011\u5DE5\u4E8B\u691C\u67FB\u8A18\u9332\u8868",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 35,
+  "ComClusters": 35,
+  "LeftMatchPct": 11.428571428571429,
+  "TopMatchPct": 8.571428571428571,
+  "CoordMatchPct": 2.857142857142857,
+  "DefaultFontName": "\u6E38\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 18.75,
+  "ContentWidth": 1152.8195017793591,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=11% Top=9%, PrintScale, Font=\u6E38\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=18.8",
+  "ErrorMessage": null
+}

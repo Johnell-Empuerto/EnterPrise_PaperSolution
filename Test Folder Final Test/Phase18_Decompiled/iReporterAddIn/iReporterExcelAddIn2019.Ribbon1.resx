@@ -1,0 +1,172 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><data name="&gt;&gt;tableSettingButton.Parent" xml:space="preserve"><value>group1</value></data>
+  <data name="&gt;&gt;checkSheetNameButton.Parent" xml:space="preserve"><value>group1</value></data>
+  <data name="&gt;&gt;colorSettingButton.Parent" xml:space="preserve"><value>group1</value></data>
+  <data name="autoJudgeButton.Image" mimetype="application/x-microsoft.net.object.binary.base64"><value>AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBD
+dWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0
+ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAAUwEAAAKJUE5HDQoaCgAA
+AA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAAEZ0FNQQAAsY8L/GEFAAAACXBIWXMAAAsSAAALEgHS
+3X78AAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAAM1JREFUWEftl1sK
+wyAQRbOGLqLLylrULeimCq5GkHxOmRBL8DGtQzL2wwsX5A4yx0cCLgCwjHQRSPszsNZuSimQsHNu
+KwC01hBjhLuFPYwxOCwBUN77qne9nnyvj6MdwNFLGCBBDAVAT4C/B5AQCZCv/LIdmJ9h8gT4BiAh
+EiBf+XkH8oybTwASQEI0QH5rT3+wq/I+gDS5VmPm/QDoVo2R0wACogFy4h/OtDfvA0iTazVm3g+A
+btUYeRNA4mESQqgDSD7NsFcBMMpFIO03Uwi2HIPFr5AAAAAASUVORK5CYIIL</value></data><data name="autoJudgeButton.Label" xml:space="preserve"><value>Cluster extraction</value></data>
+  <data name="&gt;&gt;checkSheetNameButton.ZOrder" xml:space="preserve"><value>4</value></data>
+  <data name="&gt;&gt;tableSettingButton.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.ButtonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;tableSettingButton.Name" xml:space="preserve"><value>tableSettingButton</value></data>
+  <data name="&gt;&gt;tableSettingButton.ZOrder" xml:space="preserve"><value>3</value></data>
+  <data name="&gt;&gt;colorSettingButton.ZOrder" xml:space="preserve"><value>2</value></data>
+  <data name="&gt;&gt;autoJudgeButton.Name" xml:space="preserve"><value>autoJudgeButton</value></data>
+  <data name="&gt;&gt;autoJudgeButton.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.ButtonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="colorSettingButton.Label" xml:space="preserve"><value>Judgement setting</value></data>
+  <data name="colorSettingButton.Image" mimetype="application/x-microsoft.net.object.binary.base64"><value>AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBD
+dWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0
+ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAAawEAAAKJUE5HDQoaCgAA
+AA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAAEZ0FNQQAAsY8L/GEFAAAACXBIWXMAAAsSAAALEgHS
+3X78AAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAAOVJREFUWEftl7EK
+wjAQhvNUPl/jKAi+RO4FuuhU3AsOTr6AJEM7dHH85Vp0aO31OqRxSOCj4Tj+fMMlUAPApGRS2Jrv
+5nA8vYqiQGz4nJ8C1lpssazd82de4Hp/RmMQ6M/JAlngjwViL1GgLMvoiAIgApzTQdQHIhDgnY5A
+CwIczCUNzg0CHFwZHd5lgQWB1DMwntgYiALUXeC6swru5cCmaVYhCnCweexUcO9HoK5rFVlgUSD5
+DIwnNgaiwMor3QeiDUDrlQRZgIPHj9cc3DsIeOBW6Wh9FpAFks5A8l+zVEwKW/MG52GEAJIQzSIA
+AAAASUVORK5CYIIL</value></data><data name="&gt;&gt;tab1.Name" xml:space="preserve"><value>tab1</value></data>
+  <data name="&gt;&gt;tab1.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.TabView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;colorSettingButton.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.ButtonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;colorSettingButton.Name" xml:space="preserve"><value>colorSettingButton</value></data>
+  <data name="tab1.Label" xml:space="preserve"><value>TabAddIns</value></data>
+  <data name="&gt;&gt;autoJudgeButton.ZOrder" xml:space="preserve"><value>0</value></data>
+  <data name="&gt;&gt;group1.Name" xml:space="preserve"><value>group1</value></data>
+  <data name="&gt;&gt;group1.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.GroupView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;checkSheetNameButton.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.ButtonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;checkSheetNameButton.Name" xml:space="preserve"><value>checkSheetNameButton</value></data>
+  <data name="&gt;&gt;autoJudgeButton.Parent" xml:space="preserve"><value>group1</value></data>
+  <data name="&gt;&gt;group1.Parent" xml:space="preserve"><value>tab1</value></data>
+  <data name="&gt;&gt;group1.ZOrder" xml:space="preserve"><value>0</value></data>
+  <data name="clusterSettingButton.Image" mimetype="application/x-microsoft.net.object.binary.base64"><value>AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBD
+dWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0
+ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAAUQEAAAKJUE5HDQoaCgAA
+AA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAAEZ0FNQQAAsY8L/GEFAAAACXBIWXMAAAsSAAALEgHS
+3X78AAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAAMtJREFUWEftl8EJ
+AyEQAK90tQWtwlpswSYEuadhH3ds1ltvDagEHBgIkrgj4iNHKeVYabUw2/uDtfZUSpUZOufOKkBr
+XX1xlMaYsjQAZu2Ax4BZNANijEMVBbxBN+0REAeEEL68uDbz3t/i33F0B3DQU+HTtRgeIBEQB+wr
+4KCDewTEAfsKOOjgHgFxwL4CDjq4R0Ac8HYFvwiIAzjopj0C/xMguQL8EvCLoGv4pYgDOIYHjLQZ
+kHNG5xxDSuk5YOZfM5hVBayyWpjtBzOKOXnyNiIIAAAAAElFTkSuQmCCCw==</value></data><data name="clusterSettingButton.Label" xml:space="preserve"><value>Select kind of cluster</value></data>
+  <data name="&gt;&gt;clusterSettingButton.Name" xml:space="preserve"><value>clusterSettingButton</value></data>
+  <data name="&gt;&gt;clusterSettingButton.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.ButtonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;clusterSettingButton.Parent" xml:space="preserve"><value>group1</value></data>
+  <data name="&gt;&gt;clusterSettingButton.ZOrder" xml:space="preserve"><value>1</value></data>
+  <data name="&gt;&gt;$this.Name" xml:space="preserve"><value>Ribbon1</value></data>
+  <data name="&gt;&gt;$this.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.GenericRibbonView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;Ribbon1.OfficeMenu.ZOrder" xml:space="preserve"><value>0</value></data>
+  <data name="&gt;&gt;Ribbon1.OfficeMenu.Parent" xml:space="preserve"><value>$this</value></data>
+  <data name="&gt;&gt;Ribbon1.OfficeMenu.Type" xml:space="preserve"><value>Microsoft.VisualStudio.Tools.Office.Ribbon.View.OfficeMenuView, Microsoft.VisualStudio.Tools.Office.Designer, Version=15.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value></data>
+  <data name="&gt;&gt;Ribbon1.OfficeMenu.Name" xml:space="preserve"><value>Ribbon1.OfficeMenu</value></data>
+  <data name="group1.Label" xml:space="preserve"><value>ConMas i-Reporter</value></data>
+  <data name="tableSettingButton.Label" xml:space="preserve"><value>Table Setting</value></data>
+  <data name="checkSheetNameButton.Image" mimetype="application/x-microsoft.net.object.binary.base64"><value>AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBD
+dWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0
+ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAASAIAAAKJUE5HDQoaCgAA
+AA1JSERSAAAAIAAAACAIBgAAAHN6evQAAAAEZ0FNQQAAsY8L/GEFAAAACXBIWXMAAAsSAAALEgHS
+3X78AAAAHHRFWHRTb2Z0d2FyZQBBZG9iZSBGaXJld29ya3MgQ1M26LyyjAAAAcJJREFUWEftl7Fr
+wkAUxm901E0EcXERB/8E7ejm7uIo+C90MIUuwYKUDi0txIKgVQouXWyhi+LqIJVShAxtNwcnETWv
+vKOnyeWiicaaoR986B337vvluDwIAQByTJsm/tqrP/JFeVosFuHQxhwhgCRJIJKqqvyUbYlqJekM
+f44JQHM8CoAFh/ZGAJGwaFeJav8BvA3AX5hDeCOASFi0q0S1/wDeBmg0GitbiRBCbSX9HiJvBBiN
+RtT7ArB9RN4LQB9sBeEZAPlVhthtDEiJrIzjzHkGlzkHYEfPm5dSV0zBAvdJifgdA/ASzUUuI3yY
+lfuuAygDhQ8xOPWQguF4qF+Xsw1gR4n7hCmUOa7EYTKb0HVttc3m+1sB/KcntoxiYcl6ErJPWQjf
+hOk4dB2C3ncPNNAoRPQuuoYTAfAQdsU2rQ1rMFvMoPnepOPWRwuW2hLG0zGkH9PG07ECYBBOzDbN
+P+dhvpzT0O5Xlz75QltA4aVgDN8G4NT6168yqFAAFAJU36rgK/t4APEd2NXYfNjmgasAvWz45J3P
+Dh/MvH4L3Po0C8pBPsTKxj7glrHD/XY6PtAQbuqEbpserxkExzn9uh8CpcI5Sbd+9QAAAABJRU5E
+rkJgggs=</value></data><data name="checkSheetNameButton.Label" xml:space="preserve"><value>Check sheet names</value></data>
+  <data name="tableSettingButton.Image" mimetype="application/x-microsoft.net.object.binary.base64"><value>AAEAAAD/////AQAAAAAAAAAMAgAAAFFTeXN0ZW0uRHJhd2luZywgVmVyc2lvbj00LjAuMC4wLCBD
+dWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPWIwM2Y1ZjdmMTFkNTBhM2EFAQAAABVTeXN0
+ZW0uRHJhd2luZy5CaXRtYXABAAAABERhdGEHAgIAAAAJAwAAAA8DAAAA8w0AAAL/2P/gABBKRklG
+AAEBAQAAAAAAAP/hAEJFeGlmAABNTQAqAAAACAABh2kABAAAAAEAAAAaAAAAAAACoAIABAAAAAEA
+AACAoAMABAAAAAEAAACAAAAAAAAA/9sAQwAGBgYGBgYKBgYKDgoKCg4SDg4ODhIXEhISEhIXHBcX
+FxcXFxwcHBwcHBwcIiIiIiIiJycnJycsLCwsLCwsLCws/9sAQwEHBwcLCgsTCgoTLh8aHy4uLi4u
+Li4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4uLi4u/8AAEQgAgACAAwEi
+AAIRAQMRAf/EAB8AAAEFAQEBAQEBAAAAAAAAAAABAgMEBQYHCAkKC//EALUQAAIBAwMCBAMFBQQE
+AAABfQECAwAEEQUSITFBBhNRYQcicRQygZGhCCNCscEVUtHwJDNicoIJChYXGBkaJSYnKCkqNDU2
+Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6g4SFhoeIiYqSk5SVlpeYmZqio6Sl
+pqeoqaqys7S1tre4ubrCw8TFxsfIycrS09TV1tfY2drh4uPk5ebn6Onq8fLz9PX29/j5+v/EAB8B
+AAMBAQEBAQEBAQEAAAAAAAABAgMEBQYHCAkKC//EALURAAIBAgQEAwQHBQQEAAECdwABAgMRBAUh
+MQYSQVEHYXETIjKBCBRCkaGxwQkjM1LwFWJy0QoWJDThJfEXGBkaJicoKSo1Njc4OTpDREVGR0hJ
+SlNUVVZXWFlaY2RlZmdoaWpzdHV2d3h5eoKDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2
+t7i5usLDxMXGx8jJytLT1NXW19jZ2uLj5OXm5+jp6vLz9PX29/j5+v/dAAQACP/aAAwDAQACEQMR
+AD8A+qax9S1aLTlzJWxXmvjgkRcUAaf/AAmVn60f8JlZ+tb0skvmuAxxk96QSS/32/M0AYX/AAmV
+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
+WQwxwIEQYAqRUVBhRgU6gAooooAKKKKAP//ZCw==</value></data></root>

@@ -1,0 +1,20 @@
+{
+  "DefTopId": 158,
+  "DefTopName": "Room101 Inspection Sheet",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 369,
+  "ComClusters": 313,
+  "LeftMatchPct": 0.3194888178913738,
+  "TopMatchPct": 0.3194888178913738,
+  "CoordMatchPct": 0.3194888178913738,
+  "DefaultFontName": "\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 20.1,
+  "ContentWidth": 1177.9137010676154,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=0% Top=0%, PrintScale, Font=\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=20.1",
+  "ErrorMessage": null
+}

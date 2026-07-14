@@ -1,0 +1,20 @@
+{
+  "DefTopId": 175,
+  "DefTopName": "ACTUAL PARAMETERS FOR TAPPING",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 377,
+  "ComClusters": 377,
+  "LeftMatchPct": 6.36604774535809,
+  "TopMatchPct": 1.0610079575596816,
+  "CoordMatchPct": 0.2652519893899204,
+  "DefaultFontName": "Calibri",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 15.75,
+  "ContentWidth": 1715.278858985765,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=6% Top=1%, PrintScale, Fit=1x1, RowHt=15.8",
+  "ErrorMessage": null
+}

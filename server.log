@@ -1,0 +1,373 @@
+Using launch settings from C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Properties\launchSettings.json...
+Building...
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Logs
+info: ExcelAPI[0]
+      PaperLess Excel Capture API started. Version: 1.3, Preview directory: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview, Max upload: 25MB
+info: ExcelAPI.Services.PreviewCleanupService[0]
+      Preview cleanup service started. Interval: 60min, Retention: 24h
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\wwwroot. Static files may be unavailable.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5090
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\24d5d0d02177491b9aa0e6772df8e99f.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2886ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 3592ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$D$12" on worksheet "Simple Table"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:D12" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=302.4pt, Height=172.8pt | Grid: 4col x 12row | FirstColWidth=43.2pt, FirstRowHeight=14.4pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\24d5d0d02177491b9aa0e6772df8e99f.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=302.40pt (4 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=54.0 R=54.0 T=72.0 B=72.0pt | Printable: 504.0x648.0pt | CenterH=False, CenterV=False | Zoom=100, FitToPages=1x1 | PrintAreaContent: 302.4x172.8pt | PrintedOrigin: (54.0,72.0)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (225.0,300.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 4981ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_24d5d0d02177491b9aa0e6772df8e99f.pdf, Size: 106983 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_24d5d0d02177491b9aa0e6772df8e99f.png (Size: 169719 bytes, conversion: 5616ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (54.0,72.0)pt -> (225.0,299.9)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      No commented cells found in worksheet "Simple Table". To create form fields, add a comment to each cell with the desired field type (Text, Date, Checkbox, etc.).
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\24d5d0d02177491b9aa0e6772df8e99f.xlsx - Total: 6121ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\24d5d0d02177491b9aa0e6772df8e99f.runtime.json (0 field(s), 2550x3299px)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\890caafbc83449db9018c01e7b24a465.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2341ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 2468ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$D$12" on worksheet "Sheet1"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:D12" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=192.0pt, Height=172.8pt | Grid: 4col x 12row | FirstColWidth=48.0pt, FirstRowHeight=14.4pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\890caafbc83449db9018c01e7b24a465.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=192.00pt (4 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=51.0 R=51.0 T=53.9 B=53.9pt | Printable: 510.0x684.3pt | CenterH=True, CenterV=True | Zoom=100, FitToPages=1x1 | PrintAreaContent: 192.0x172.8pt | PrintedOrigin: (210.0,309.6)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (875.0,1290.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 3017ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_890caafbc83449db9018c01e7b24a465.pdf, Size: 5838 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_890caafbc83449db9018c01e7b24a465.png (Size: 41407 bytes, conversion: 3329ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (210.0,309.6)pt -> (875.0,1289.6)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      No commented cells found in worksheet "Sheet1". To create form fields, add a comment to each cell with the desired field type (Text, Date, Checkbox, etc.).
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\890caafbc83449db9018c01e7b24a465.xlsx - Total: 3595ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\890caafbc83449db9018c01e7b24a465.runtime.json (0 field(s), 2550x3299px)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\3c81363f96704a44bc7889d5b267b27d.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2291ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 2425ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$D$12" on worksheet "Sheet1"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:D12" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=192.0pt, Height=172.8pt | Grid: 4col x 12row | FirstColWidth=48.0pt, FirstRowHeight=14.4pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\3c81363f96704a44bc7889d5b267b27d.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=192.00pt (4 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=51.0 R=51.0 T=53.9 B=53.9pt | Printable: 510.0x684.3pt | CenterH=True, CenterV=True | Zoom=100, FitToPages=1x1 | PrintAreaContent: 192.0x172.8pt | PrintedOrigin: (210.0,309.6)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (875.0,1290.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 2961ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_3c81363f96704a44bc7889d5b267b27d.pdf, Size: 5838 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_3c81363f96704a44bc7889d5b267b27d.png (Size: 41407 bytes, conversion: 3365ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (210.0,309.6)pt -> (875.0,1289.6)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      No commented cells found in worksheet "Sheet1". To create form fields, add a comment to each cell with the desired field type (Text, Date, Checkbox, etc.).
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\3c81363f96704a44bc7889d5b267b27d.xlsx - Total: 3622ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\3c81363f96704a44bc7889d5b267b27d.runtime.json (0 field(s), 2550x3299px)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=24d5d0
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Finding template file for ID=24d5d0
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Parsing workbook at C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\24d5d0d02177491b9aa0e6772df8e99f.xlsx
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Parsed 1 sheet(s)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Loading runtime metadata for coordinate alignment
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] No metadata file found at C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\24d5d0.meta.json, using defaults
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Using origin=(0.0,0.0)pt scale=(0.000000,0.000000)px/pt
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Fallback: Runtime built — 1 sheet(s), 0 field(s)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\d8b0699faaeb41a48bbdc4953468e85b.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2186ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 2297ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PrintArea:Method1] Failed. Worksheet="No Print Area", UsedRange=$A$1:$A$2
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PrintArea:Method4] Still empty after page refresh.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\d8b0699faaeb41a48bbdc4953468e85b.xlsx - Total: 2433ms
+fail: ExcelAPI.Controllers.FormController[0]
+      Failed to process Excel file for form definition
+      ExcelAPI.Models.PrintAreaNotConfiguredException: No print area is configured in this worksheet. Please set a print area (Page Layout > Print Area > Set Print Area) in the Excel file before uploading.
+         at ExcelAPI.Services.ExcelCaptureService.CapturePrintAreaAsync(String excelFilePath, String fileId, CancellationToken cancellationToken) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 293
+         at ExcelAPI.Controllers.FormController.FromExcel(IFormFile file) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Controllers\FormController.cs:line 135
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\8eee6672492e4a72b765db9daaa489f4.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2155ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 2333ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$D$10" on worksheet "Merged Cells"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:D10" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=475.2pt, Height=210.0pt | Grid: 4col x 10row | FirstColWidth=118.8pt, FirstRowHeight=34.8pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\8eee6672492e4a72b765db9daaa489f4.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=475.20pt (4 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=54.0 R=54.0 T=72.0 B=72.0pt | Printable: 504.0x648.0pt | CenterH=False, CenterV=False | Zoom=100, FitToPages=1x1 | PrintAreaContent: 475.2x210.0pt | PrintedOrigin: (54.0,72.0)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (225.0,300.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 3066ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_8eee6672492e4a72b765db9daaa489f4.pdf, Size: 164852 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_8eee6672492e4a72b765db9daaa489f4.png (Size: 120936 bytes, conversion: 3613ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (54.0,72.0)pt -> (225.0,299.9)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      No commented cells found in worksheet "Merged Cells". To create form fields, add a comment to each cell with the desired field type (Text, Date, Checkbox, etc.).
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\8eee6672492e4a72b765db9daaa489f4.xlsx - Total: 6310ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\8eee6672492e4a72b765db9daaa489f4.runtime.json (0 field(s), 2550x3299px)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\32efad83e3b648de8ae2e09831f63982.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 2173ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 2314ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$K$15" on worksheet "Landscape"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:K15" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=831.6pt, Height=216.0pt | Grid: 11col x 15row | FirstColWidth=75.6pt, FirstRowHeight=14.4pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\32efad83e3b648de8ae2e09831f63982.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=831.60pt (11 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=54.0 R=54.0 T=72.0 B=72.0pt | Printable: 504.0x648.0pt | CenterH=False, CenterV=False | Zoom=100, FitToPages=1x1 | PrintAreaContent: 831.6x216.0pt | PrintedOrigin: (54.0,72.0)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (225.0,300.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 2904ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_32efad83e3b648de8ae2e09831f63982.pdf, Size: 179770 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_32efad83e3b648de8ae2e09831f63982.png (Size: 212194 bytes, conversion: 3360ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (54.0,72.0)pt -> (225.0,299.9)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      No commented cells found in worksheet "Landscape". To create form fields, add a comment to each cell with the desired field type (Text, Date, Checkbox, etc.).
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\32efad83e3b648de8ae2e09831f63982.xlsx - Total: 3630ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\32efad83e3b648de8ae2e09831f63982.runtime.json (0 field(s), 2550x3299px)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\468a53031c2f438b892e2ffa827e8b75.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Excel started in 3461ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Workbook opened in 4260ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Print area detected via Method#1: "$A$1:$D$12" on worksheet "Sheet1"
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] PrintArea Range: Address="A1:D12" | Origin: Left=0.0pt, Top=0.0pt | Content: Width=192.0pt, Height=172.8pt | Grid: 4col x 12row | FirstColWidth=48.0pt, FirstRowHeight=14.4pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Failed to read XLSX column widths, falling back to Range.Width
+      System.IO.IOException: The process cannot access the file 'C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\468a53031c2f438b892e2ffa827e8b75.xlsx' because it is being used by another process.
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.CreateFile(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options)
+         at Microsoft.Win32.SafeHandles.SafeFileHandle.Open(String fullPath, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.OSFileStreamStrategy..ctor(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.Strategies.FileStreamHelpers.ChooseStrategyCore(String path, FileMode mode, FileAccess access, FileShare share, FileOptions options, Int64 preallocationSize, Nullable`1 unixCreateMode)
+         at System.IO.File.OpenRead(String path)
+         at ExcelAPI.Services.ExcelCaptureService.ComputeContentWidthFromXlsx(String excelFilePath, String worksheetName, Int32 worksheetIndex, String printArea, Int32 printAreaCols) in C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Services\ExcelCaptureService.cs:line 841
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [COLS] Using Range.Width=192.00pt (4 cols) — no XLSX column data available
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Setup: Paper=1xxlPortrait (612.0x792.0pt) | Margins: L=51.0 R=51.0 T=53.9 B=53.9pt | Printable: 510.0x684.3pt | CenterH=True, CenterV=True | Zoom=100, FitToPages=1x1 | PrintAreaContent: 192.0x172.8pt | PrintedOrigin: (210.0,309.6)pt
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] FitToPages is active (1x1) — Excel will scale the print area content to fit the page. The DPI/72 pixel scale assumes 100% zoom and the rendered cell dimensions may differ from cellWidth * DPI/72. Field overlay accuracy may be reduced for this workbook.
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PAGE] Printed origin in pixels: (875.0,1290.0)px (at 300 DPI)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PDF exported in 5858ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_468a53031c2f438b892e2ffa827e8b75.pdf, Size: 5838 bytes
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG saved to: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_468a53031c2f438b892e2ffa827e8b75.png (Size: 41407 bytes, conversion: 7176ms)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [SCALE] Actual X=4.166667 Y=4.165404 theoretical=4.166667 ratio X=1.000000 Y=0.999697 | png=2550x3299px page=612.0x792.0pt
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PDF2PNG] PDF page: 612.00x792.00pt (MediaBox)
+  Expected PNG at 300DPI: 2550.00x3300.00px
+  Actual PNG:              2550x3299px
+  Delta:                   0.00x-1.00px
+  ScaleX=4.166667 ScaleY=4.165404 (raw 4.166667x4.165404)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [AUDIT] Final coordinate system:
+  Printed origin: (210.0,309.6)pt -> (875.0,1289.6)px
+  Scale: 4.166667 px/pt (theoretical 4.166667)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Found 33 cell(s) with comments in worksheet "Sheet1".
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      First field "A1": (875.0,1289.6)px (400.0x120.0)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\468a53031c2f438b892e2ffa827e8b75.xlsx - Total: 12905ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\468a53031c2f438b892e2ffa827e8b75.runtime.json (33 field(s), 2550x3299px)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=468a53031c2f438b892e2ffa827e8b75
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=468a53031c2f438b892e2ffa827e8b75
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] COM metadata loaded — 1 sheet(s), 33 field(s)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] COM metadata loaded — 1 sheet(s), 33 field(s)

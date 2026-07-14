@@ -1,0 +1,20 @@
+{
+  "DefTopId": 176,
+  "DefTopName": "ACTUAL PARAMETERS HISTORY",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 424,
+  "ComClusters": 424,
+  "LeftMatchPct": 5.660377358490567,
+  "TopMatchPct": 0.7075471698113208,
+  "CoordMatchPct": 0.2358490566037736,
+  "DefaultFontName": "Calibri",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 15.75,
+  "ContentWidth": 1425.1828291814943,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=6% Top=1%, PrintScale, Fit=1x1, RowHt=15.8",
+  "ErrorMessage": null
+}

@@ -1,0 +1,20 @@
+{
+  "DefTopId": 146,
+  "DefTopName": "\u4F5C\u696D\u5B9F\u7E3E\u65E5\u5831",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 156,
+  "ComClusters": 156,
+  "LeftMatchPct": 1.282051282051282,
+  "TopMatchPct": 1.9230769230769231,
+  "CoordMatchPct": 0.641025641025641,
+  "DefaultFontName": "Arial",
+  "DefaultFontSize": 10,
+  "DefaultRowHeight": 12,
+  "ContentWidth": 896.5824621886115,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=1% Top=2%, PrintScale, Fit=1x1, RowHt=12.0",
+  "ErrorMessage": null
+}

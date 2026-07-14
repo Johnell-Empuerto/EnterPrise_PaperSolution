@@ -1,0 +1,84 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+<resheader name="resmimetype"><value>text/microsoft-resx</value></resheader><resheader name="version"><value>1.3</value></resheader><resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value></resheader><data name="ACTION_KIND_BTL" xml:space="preserve"><value>Back to main screen</value></data>
+  <data name="TABLE_COL_OVERLAP" xml:space="preserve"><value>Clumn is duplicated</value></data>
+  <data name="NO_TABLE" xml:space="preserve"><value>Table is not selected</value></data>
+  <data name="DELETE" xml:space="preserve"><value>Delete</value></data>
+  <data name="TABLE_INVALID" xml:space="preserve"><value>Table is invalid. Delete and reselect cluster</value></data>
+  <data name="CLUSTER_KIND" xml:space="preserve"><value>kind of cluseter</value></data>
+  <data name="ACTION_KIND_RUN_COMMAND" xml:space="preserve"><value>Execute external application</value></data>
+  <data name="NOT_FOUND_CLUSTERS" xml:space="preserve"><value>There is no clusters found</value></data>
+  <data name="ACTION_KIND_AUTO_INPUT_CLUSTER" xml:space="preserve"><value>Automatic input</value></data>
+  <data name="TABLE_COL_NAME_EMPTY" xml:space="preserve"><value>Please enter a column name</value></data>
+  <data name="ACTION_KIND_START_TIMER" xml:space="preserve"><value>Start timer</value></data>
+  <data name="TABLE_ROW_OVERLAP" xml:space="preserve"><value>Row is duplicated</value></data>
+  <data name="CLUSTER_TYPE_NUM" xml:space="preserve"><value>Number</value></data>
+  <data name="ACTION_KIND_MENU" xml:space="preserve"><value>Server connecting menu</value></data>
+  <data name="ACTION_KIND_OPEN_URL" xml:space="preserve"><value>Open URL</value></data>
+  <data name="CLUSTER_TYPE_ACTION" xml:space="preserve"><value>Excluded from output</value></data>
+  <data name="NOT_FOUND_CLUSTER" xml:space="preserve"><value>Cluster type is unknown</value></data>
+  <data name="ACTION_KIND_OUTPUT_TEXT" xml:space="preserve"><value>Export data （Text）</value></data>
+  <data name="FAILED_FILE_LOAD" xml:space="preserve"><value>Failed to load the file</value></data>
+  <data name="FAILED_FILE_SAVE" xml:space="preserve"><value>Faild to save the file</value></data>
+  <data name="CLUSTER_TYPE_TEXT" xml:space="preserve"><value>Text</value></data>
+  <data name="CLUSTER_TYPE_TIME" xml:space="preserve"><value>Time</value></data>
+  <data name="CLUSTER_TYPE_DATE" xml:space="preserve"><value>Date</value></data>
+  <data name="ACTION_KIND_SHEET_COPY" xml:space="preserve"><value>Sheet copy</value></data>
+  <data name="ACTION_KIND_SHEET_JUMP" xml:space="preserve"><value>Sheet Jump</value></data>
+  <data name="TYPE_NAME_INTERVAL" xml:space="preserve"><value>Time</value></data>
+  <data name="ACTION_KIND_BATCHCLEAR" xml:space="preserve"><value>Batch clear</value></data>
+  <data name="ACTION_KIND_NO_NTFO" xml:space="preserve"><value>Display non-required mark</value></data>
+  <data name="MULTI_CALC_FORMATS" xml:space="preserve"><value>Time and numeric expressions are mixed.</value></data>
+  <data name="TABLE_NO_CLUSTERS" xml:space="preserve"><value>Clster is not selected</value></data>
+  <data name="ACTION_KIND_QR_CODE" xml:space="preserve"><value>QR code generation</value></data>
+  <data name="TABLE_COL_KEY_OVERLAP" xml:space="preserve"><value>Clumn key is duplicated</value></data>
+  <data name="TABLE_NO_INVALID" xml:space="preserve"><value>Please enter an integer of 1 or more for the table number</value></data>
+  <data name="ACTION_KIND_BIOMETRICS" xml:space="preserve"><value>Biometric authentication</value></data>
+  <data name="SHEET_NAME_INVALID" xml:space="preserve"><value>Not available to configure due to the characters can not be used for sheet name.</value></data>
+  <data name="TYPE_NAME_TEXT" xml:space="preserve"><value>Text</value></data>
+  <data name="TYPE_NAME_DATE" xml:space="preserve"><value>Date</value></data>
+  <data name="TABLE_COL_KEY_EMPTY" xml:space="preserve"><value>Please enter a column key</value></data>
+  <data name="ACTION_KIND" xml:space="preserve"><value>Action type</value></data>
+  <data name="CLUSTER_CAPTION" xml:space="preserve"><value>Character string recognized as a cluster</value></data>
+  <data name="NOT_SAME_CLUSTER_COL" xml:space="preserve"><value>The cluster types in the column must be the same</value></data>
+  <data name="TABLE_NO_OVERLAP" xml:space="preserve"><value>Table number is duplicated</value></data>
+  <data name="ACTION_KIND_CIOTG" xml:space="preserve"><value>Gateway linkage</value></data>
+  <data name="SHEET_NAME_EMPTY" xml:space="preserve"><value>Sheet name can not be blank.</value></data>
+  <data name="NOT_FOUND_SHEET" xml:space="preserve"><value>Sheet [{0}] not found.</value></data>
+  <data name="ACTION_KIND_DOCUMENT" xml:space="preserve"><value>Jump to Reference document</value></data>
+  <data name="NOT_OUTPUT_TYPE" xml:space="preserve"><value>Excluded from output</value></data>
+  <data name="CLUSTER_HAS_TABLE" xml:space="preserve"><value>Cannot change cluster type because it is set in table.
+Please delete and change the table once </value></data>
+  <data name="TABLE_SAVED" xml:space="preserve"><value>Saved</value></data>
+  <data name="TYPE_NAME_NUMERIC" xml:space="preserve"><value>Number</value></data>
+  <data name="TABLE_NAME_EMPTY" xml:space="preserve"><value>Please enter a table name</value></data>
+  <data name="INVALID_COL_TYPE" xml:space="preserve"><value>Cluster type that cannot be set in table format</value></data>
+  <data name="TABLE_COL_KEY_INVALID" xml:space="preserve"><value>Only half-width alphanumeric characters and '_' can be used for the column key</value></data>
+  </root>

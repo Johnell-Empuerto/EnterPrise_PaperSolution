@@ -1,0 +1,20 @@
+{
+  "DefTopId": 135,
+  "DefTopName": "Incident report",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 93,
+  "ComClusters": 93,
+  "LeftMatchPct": 13.978494623655912,
+  "TopMatchPct": 1.0752688172043012,
+  "CoordMatchPct": 1.0752688172043012,
+  "DefaultFontName": "Arial",
+  "DefaultFontSize": 10,
+  "DefaultRowHeight": 15,
+  "ContentWidth": 746.1434052491104,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=14% Top=1%, PrintScale, Fit=1x0, RowHt=15.0",
+  "ErrorMessage": null
+}

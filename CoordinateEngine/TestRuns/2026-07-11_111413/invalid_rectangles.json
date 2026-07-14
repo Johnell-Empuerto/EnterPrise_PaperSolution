@@ -1,0 +1,128 @@
+[
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679696000",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679737472",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679737600",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679738688",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679738944",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679739136",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679739520",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679740096",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679740672",
+    "reason": "Zero or negative width (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679741248",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679741824",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679742400",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679742976",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679743552",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679744128",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679744704",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679745280",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  },
+  {
+    "field": "pdf_drawing",
+    "worksheet": "Sheet1",
+    "cellReference": "drawing_2692679795072",
+    "reason": "Zero or negative height (0.0)",
+    "geometry": {}
+  }
+]

@@ -35,6 +35,20 @@ namespace ExcelAPI.Runtime
         /// <summary>Height in pixels.</summary>
         public double HeightPx { get; set; }
 
+        // ── Ratio-Based Coordinates (legacy ConMas compatibility) ──────
+
+        /// <summary>Left edge as ratio of page width (0-1).</summary>
+        public double LeftRatio { get; set; }
+
+        /// <summary>Top edge as ratio of page height (0-1).</summary>
+        public double TopRatio { get; set; }
+
+        /// <summary>Width as ratio of page width (0-1).</summary>
+        public double WidthRatio { get; set; }
+
+        /// <summary>Height as ratio of page height (0-1).</summary>
+        public double HeightRatio { get; set; }
+
         // ── Merged Cell Info ──────────────────────────────────────────
 
         /// <summary>Merge range reference (e.g., "A1:C3"), empty if not merged.</summary>

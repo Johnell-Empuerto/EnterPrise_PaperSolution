@@ -2,6 +2,10 @@
  * TypeScript type definitions for the FormLess Runtime Engine (Phase 11I/11J).
  * Mirrors the C# RuntimeForm/RuntimeField/RuntimeSheet models from the backend.
  *
+ * Phase 14: Added ratio-based coordinates (leftRatio, topRatio, widthRatio, heightRatio)
+ * for legacy ConMas compatibility. Frontend falls back to ratio-based rendering when
+ * pixel coordinates are missing or zero.
+ *
  * Consumed by GET /api/runtime/{templateId}
  */
 
@@ -25,6 +29,14 @@ export interface RuntimeSheet {
   printArea: RuntimePrintArea | null;
   pageWidthPx: number;
   pageHeightPx: number;
+  /**
+   * Background image URL (relative, e.g., "/forms/bg_xxx.png").
+   * This is the PNG rendered from Excel — the exact same image used during
+   * coordinate computation. The frontend MUST use this to ensure the
+   * background image matches the field coordinates.
+   * Falls back to constructing from template ID if not provided.
+   */
+  backgroundImage?: string | null;
 }
 
 export interface RuntimeField {
@@ -36,6 +48,14 @@ export interface RuntimeField {
   topPx: number;
   widthPx: number;
   heightPx: number;
+  /** Left edge as ratio of page width (0-1) — for legacy ConMas compatibility. */
+  leftRatio: number;
+  /** Top edge as ratio of page height (0-1) — for legacy ConMas compatibility. */
+  topRatio: number;
+  /** Width as ratio of page width (0-1) — for legacy ConMas compatibility. */
+  widthRatio: number;
+  /** Height as ratio of page height (0-1) — for legacy ConMas compatibility. */
+  heightRatio: number;
   mergeRange: string | null;
   isMerged: boolean;
   dataType: "text" | "number" | "date" | "checkbox" | "signature" | "dropdown" | "calculated";
@@ -92,4 +112,25 @@ export interface FieldErrors {
 
 export interface DirtyState {
   [fieldId: string]: boolean;
+}
+
+/**
+ * Phase 29 — Interactive Form Runtime
+ * Runtime value model for storing and exporting form field values.
+ */
+export interface RuntimeValueModel {
+  overlayId: string;
+  value: string | boolean | null;
+}
+
+/**
+ * The complete runtime state for a form session.
+ */
+export interface RuntimeSessionState {
+  /** Values keyed by overlay id */
+  values: FieldValues;
+  /** Track which fields have been modified */
+  dirty: DirtyState;
+  /** ISO timestamp of last update */
+  lastUpdated: string | null;
 }

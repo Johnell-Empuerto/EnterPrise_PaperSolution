@@ -1,0 +1,20 @@
+{
+  "DefTopId": 170,
+  "DefTopName": "Process_Inspection",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 134,
+  "ComClusters": 134,
+  "LeftMatchPct": 8.955223880597014,
+  "TopMatchPct": 2.2388059701492535,
+  "CoordMatchPct": 0.7462686567164178,
+  "DefaultFontName": "Arial",
+  "DefaultFontSize": 10,
+  "DefaultRowHeight": 12,
+  "ContentWidth": 981.4942726868323,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=9% Top=2%, PrintScale, Fit=1x1, RowHt=12.0",
+  "ErrorMessage": null
+}

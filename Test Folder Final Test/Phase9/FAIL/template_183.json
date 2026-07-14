@@ -1,0 +1,20 @@
+{
+  "DefTopId": 183,
+  "DefTopName": "CE Online QC Quality Report(Upgrade Version)",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 395,
+  "ComClusters": 395,
+  "LeftMatchPct": 6.582278481012659,
+  "TopMatchPct": 1.0126582278481013,
+  "CoordMatchPct": 0.25316455696202533,
+  "DefaultFontName": "Calibri",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 15,
+  "ContentWidth": 1492.6847041814942,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=7% Top=1%, PrintScale, Fit=1x1, RowHt=15.0",
+  "ErrorMessage": null
+}

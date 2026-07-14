@@ -1,0 +1,20 @@
+{
+  "DefTopId": 47,
+  "DefTopName": "[Sample006]iPhone\u7528\u30AB\u30B9\u30BF\u30E0\u30E1\u30CB\u30E5\u30FC\u30B5\u30F3\u30D7\u30EB",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 7,
+  "ComClusters": 6,
+  "LeftMatchPct": 83.33333333333334,
+  "TopMatchPct": 16.666666666666664,
+  "CoordMatchPct": 16.666666666666664,
+  "DefaultFontName": "\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 13.5,
+  "ContentWidth": 704.3886832740213,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=83% Top=17%, PrintScale, Font=\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=13.5",
+  "ErrorMessage": null
+}

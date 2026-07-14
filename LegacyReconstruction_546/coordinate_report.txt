@@ -1,0 +1,60 @@
+Phase 11J.14 — Legacy Reconstruction Report (def_top_id=546)
+================================================================================
+Designer: 8.2.26020
+Page: 2550x3299px (612x792pt @300 DPI)
+Fields: 6
+
+--- FIELD COMPARISON: Legacy vs COM ---
+Cell               Metric         Legacy        COM          Δ       Δ%
+------------------------------------------------------------------
+A1:B2              Left            858.0      875.0      -17.0   -1.94%
+A1:B2              Top            1268.6     1289.6      -21.0   -1.63%
+A1:B2              Width           412.5      400.0      +12.5   +3.12%
+A1:B2              Height          123.0      120.0       +3.0   +2.47%
+C1:D2              Left           1275.0     1275.0       +0.0   +0.00%
+C1:D2              Top            1268.6     1289.6      -21.0   -1.63%
+C1:D2              Width           417.0      400.0      +17.0   +4.25%
+C1:D2              Height          123.0      120.0       +3.0   +2.47%
+A3:D4              Left            858.0      875.0      -17.0   -1.94%
+A3:D4              Top            1396.1     1409.6      -13.5   -0.96%
+A3:D4              Width           834.0      800.0      +34.0   +4.25%
+A3:D4              Height          123.0      120.0       +3.0   +2.47%
+A6:D7              Left            858.0      875.0      -17.0   -1.94%
+A6:D7              Top            1586.5     1589.5       -3.0   -0.19%
+A6:D7              Width           834.0      800.0      +34.0   +4.25%
+A6:D7              Height          123.0      120.0       +3.0   +2.47%
+A9:D10             Left            858.0      875.0      -17.0   -1.94%
+A9:D10             Top            1777.0     1769.5       +7.5   +0.42%
+A9:D10             Width           834.0      800.0      +34.0   +4.25%
+A9:D10             Height          123.0      120.0       +3.0   +2.47%
+A12                Left            858.0      875.0      -17.0   -1.94%
+A12                Top            1967.4     1949.4      +18.0   +0.92%
+A12                Width           204.0      200.0       +4.0   +2.00%
+A12                Height           61.5       60.0       +1.5   +2.47%
+
+--- RAW DATABASE RATIOS ---
+  $A$1:$B$2    left=0.3364706 top=0.3845454 right=0.4982353 bottom=0.4218182
+  $C$1:$D$2    left=0.5000000 top=0.3845454 right=0.6635294 bottom=0.4218182
+  $A$3:$D$4    left=0.3364706 top=0.4231818 right=0.6635294 bottom=0.4604546
+  $A$6:$D$7    left=0.3364706 top=0.4809091 right=0.6635294 bottom=0.5181818
+  $A$9:$D$10   left=0.3364706 top=0.5386364 right=0.6635294 bottom=0.5759091
+  $A$12        left=0.3364706 top=0.5963637 right=0.4164706 bottom=0.6150000
+
+--- COORDINATE FORMULA ---
+Legacy: L_px = left_ratio x 2550, T_px = top_ratio x 3299
+COM:    L_px = (topMargin + centerOffset + (Range.Left - PrintArea.Left)) x scale
+
+--- KEY OBSERVATIONS ---
+  Average ΔLeft:   -14.17 px
+  Average ΔTop:    -5.50 px
+  Average ΔWidth:  +22.58 px
+  Average ΔHeight: +2.72 px
+
+  If ΔLeft and ΔTop are ~CONSTANT across fields:
+    -> Legacy origin differs by a FIXED TRANSLATION
+  If ΔWidth and ΔHeight are ~CONSTANT across fields:
+    -> Legacy origin differs by a CONSTANT OFFSET (unlikely)
+  If ΔWidth and ΔHeight are ~PROPORTIONAL:
+    -> Legacy uses a DIFFERENT SCALE
+  If all Δs are ZERO:
+    -> Legacy == COM (coordinate systems match)

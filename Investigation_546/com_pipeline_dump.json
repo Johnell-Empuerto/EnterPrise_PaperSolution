@@ -1,0 +1,265 @@
+{
+  "page_dimensions_pt": {
+    "width": 612.0,
+    "height": 792.0,
+    "printable_w": 509.952,
+    "printable_h": 684.2840000000001
+  },
+  "margins_pt": {
+    "left": 51.024,
+    "right": 51.024,
+    "top": 53.858,
+    "bottom": 53.858
+  },
+  "print_area_addr": "$A$1:$D$12",
+  "print_area_pt": {
+    "width": 200.3757,
+    "height": 180.0
+  },
+  "effective_dimensions_pt": {
+    "width": 200.16,
+    "height": 182.8801
+  },
+  "comparisons": [
+    {
+      "cluster_id": 0,
+      "cell_addr": "$A$1:$B$2",
+      "worksheet_pt": {
+        "Range.Left": 0,
+        "Range.Top": 0,
+        "Range.Width": 100.1878,
+        "Range.Height": 30.0
+      },
+      "database_pt": {
+        "left": 205.92,
+        "top": 304.56,
+        "width": 99.0,
+        "height": 29.5201
+      },
+      "com_simple_pt": {
+        "left": 51.024,
+        "top": 53.858,
+        "width": 100.1878,
+        "height": 30.0
+      },
+      "conmas_formula_pt": {
+        "left": 205.92,
+        "top": 304.56,
+        "width": 100.08,
+        "height": 30.48
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": 0.0,
+        "width": 1.08,
+        "height": 0.96
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    },
+    {
+      "cluster_id": 1,
+      "cell_addr": "$C$1:$D$2",
+      "worksheet_pt": {
+        "Range.Left": 100.1878,
+        "Range.Top": 0,
+        "Range.Width": 100.1878,
+        "Range.Height": 30.0
+      },
+      "database_pt": {
+        "left": 306.0,
+        "top": 304.56,
+        "width": 100.08,
+        "height": 29.5201
+      },
+      "com_simple_pt": {
+        "left": 151.2118,
+        "top": 53.858,
+        "width": 100.1878,
+        "height": 30.0
+      },
+      "conmas_formula_pt": {
+        "left": 306.0,
+        "top": 304.56,
+        "width": 100.08,
+        "height": 30.48
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": 0.0,
+        "width": -0.0,
+        "height": 0.96
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    },
+    {
+      "cluster_id": 2,
+      "cell_addr": "$A$3:$D$4",
+      "worksheet_pt": {
+        "Range.Left": 0,
+        "Range.Top": 30.0,
+        "Range.Width": 200.3757,
+        "Range.Height": 30.0
+      },
+      "database_pt": {
+        "left": 205.92,
+        "top": 335.16,
+        "width": 200.16,
+        "height": 29.5201
+      },
+      "com_simple_pt": {
+        "left": 51.024,
+        "top": 83.858,
+        "width": 200.3757,
+        "height": 30.0
+      },
+      "conmas_formula_pt": {
+        "left": 205.92,
+        "top": 335.04,
+        "width": 200.16,
+        "height": 30.48
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": -0.12,
+        "width": -0.0,
+        "height": 0.96
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    },
+    {
+      "cluster_id": 3,
+      "cell_addr": "$A$6:$D$7",
+      "worksheet_pt": {
+        "Range.Left": 0,
+        "Range.Top": 75.0,
+        "Range.Width": 200.3757,
+        "Range.Height": 30.0
+      },
+      "database_pt": {
+        "left": 205.92,
+        "top": 380.88,
+        "width": 200.16,
+        "height": 29.52
+      },
+      "com_simple_pt": {
+        "left": 51.024,
+        "top": 128.858,
+        "width": 200.3757,
+        "height": 30.0
+      },
+      "conmas_formula_pt": {
+        "left": 205.92,
+        "top": 380.76,
+        "width": 200.16,
+        "height": 30.48
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": -0.12,
+        "width": -0.0,
+        "height": 0.96
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    },
+    {
+      "cluster_id": 4,
+      "cell_addr": "$A$9:$D$10",
+      "worksheet_pt": {
+        "Range.Left": 0,
+        "Range.Top": 120.0,
+        "Range.Width": 200.3757,
+        "Range.Height": 30.0
+      },
+      "database_pt": {
+        "left": 205.92,
+        "top": 426.6,
+        "width": 200.16,
+        "height": 29.52
+      },
+      "com_simple_pt": {
+        "left": 51.024,
+        "top": 173.858,
+        "width": 200.3757,
+        "height": 30.0
+      },
+      "conmas_formula_pt": {
+        "left": 205.92,
+        "top": 426.48,
+        "width": 200.16,
+        "height": 30.48
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": -0.12,
+        "width": -0.0,
+        "height": 0.96
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    },
+    {
+      "cluster_id": 5,
+      "cell_addr": "$A$12",
+      "worksheet_pt": {
+        "Range.Left": 0,
+        "Range.Top": 165.0,
+        "Range.Width": 50.0939,
+        "Range.Height": 15.0
+      },
+      "database_pt": {
+        "left": 205.92,
+        "top": 472.3201,
+        "width": 48.96,
+        "height": 14.7599
+      },
+      "com_simple_pt": {
+        "left": 51.024,
+        "top": 218.858,
+        "width": 50.0939,
+        "height": 15.0
+      },
+      "conmas_formula_pt": {
+        "left": 205.92,
+        "top": 472.2,
+        "width": 50.04,
+        "height": 15.24
+      },
+      "error_conmas_vs_db": {
+        "left": 0.0,
+        "top": -0.12,
+        "width": 1.08,
+        "height": 0.4801
+      },
+      "scaling": {
+        "effW": 200.16,
+        "effH": 182.8801,
+        "scaleW": 0.998923,
+        "scaleH": 1.016
+      }
+    }
+  ]
+}

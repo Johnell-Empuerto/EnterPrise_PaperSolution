@@ -1,0 +1,20 @@
+{
+  "DefTopId": 180,
+  "DefTopName": "OUTPUT MONITORING (ITEM)",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 1939,
+  "ComClusters": 1939,
+  "LeftMatchPct": 2.9912325941206808,
+  "TopMatchPct": 0.15471892728210418,
+  "CoordMatchPct": 0.0515729757607014,
+  "DefaultFontName": "Calibri",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 15,
+  "ContentWidth": 1784.3305716192162,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=3% Top=0%, PrintScale, Fit=1x1, RowHt=15.0",
+  "ErrorMessage": null
+}

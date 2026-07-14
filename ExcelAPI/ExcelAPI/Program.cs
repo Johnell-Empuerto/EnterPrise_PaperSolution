@@ -1,3 +1,4 @@
+﻿using ExcelAPI.LegacyEngine;
 using ExcelAPI.Models;
 using ExcelAPI.Services;
 using ExcelAPI.Services.Interfaces;
@@ -20,12 +21,16 @@ builder.Services.Configure<ExcelCaptureOptions>(
 
 // Register application services
 builder.Services.AddScoped<IExcelCaptureService, ExcelCaptureService>();
+builder.Services.AddScoped<ExcelCaptureService>();
 builder.Services.AddScoped<IFormSaveService, FormSaveService>();
 builder.Services.AddScoped<XmlGenerator>();
 builder.Services.AddScoped<DatabaseGenerator>();
 builder.Services.AddScoped<WorkbookGenerator>();
 builder.Services.AddScoped<PreviewGenerator>();
 builder.Services.AddScoped<PdfGenerator>();
+
+// Register Phase 19 Legacy Engine (rebuild of original PaperLess publishing pipeline)
+builder.Services.AddLegacyEngine(debugEnabled: true);
 
 // Register FormLess rendering core
 builder.Services.AddSingleton<OpenXmlParser>();
@@ -79,10 +84,20 @@ builder.Services.AddSingleton<FieldDetector>();
 builder.Services.AddSingleton<FormRuntimeBuilder>();
 builder.Services.AddSingleton<RuntimeSerializer>();
 
-// Register COM Runtime Metadata Service (Phase 11J.8)
-// Replaces CoordinateEngine + GeometryBuilder in the Runtime GET path
-// by persisting and loading Excel COM field rectangles directly.
-builder.Services.AddSingleton<RuntimeMetadataService>();
+// Register CoordinateTransformer for printed page origin calculation (Phase 36)
+builder.Services.AddSingleton<CoordinateTransformer>();
+
+// Register COM Runtime Coordinate Generator (Phase 12)
+// Persists and loads Excel COM field rectangles as the single source of truth.
+// Eliminates OpenXML coordinate recalculation on every Runtime GET request.
+builder.Services.AddSingleton<RuntimeCoordinateGenerator>();
+
+// Register Python Rendering Service (Phase 47)
+builder.Services.AddHttpClient<PythonRenderService>(client =>
+{
+    client.Timeout = TimeSpan.FromMinutes(5);
+});
+builder.Services.AddSingleton<PythonRenderService>();
 
 // RendererCoordinator depends on IEnumerable<IRenderLayer>
 builder.Services.AddSingleton<RendererCoordinator>();
@@ -165,3 +180,5 @@ app.Logger.LogInformation(
     excelCaptureOptions.MaxUploadSizeMB);
 
 app.Run();
+
+

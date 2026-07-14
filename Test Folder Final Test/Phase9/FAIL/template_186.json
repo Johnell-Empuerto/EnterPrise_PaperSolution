@@ -1,0 +1,20 @@
+{
+  "DefTopId": 186,
+  "DefTopName": "CA Summary Form ",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 6,
+  "ComClusters": 6,
+  "LeftMatchPct": 16.666666666666664,
+  "TopMatchPct": 33.33333333333333,
+  "CoordMatchPct": 16.666666666666664,
+  "DefaultFontName": "Calibri",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 15,
+  "ContentWidth": 774.1768238434162,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=17% Top=33%, PrintScale, Fit=1x1, RowHt=15.0",
+  "ErrorMessage": null
+}

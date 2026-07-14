@@ -1,0 +1,20 @@
+{
+  "DefTopId": 153,
+  "DefTopName": "IoTSampleReport(graph)",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 54,
+  "ComClusters": 54,
+  "LeftMatchPct": 12.962962962962962,
+  "TopMatchPct": 14.814814814814813,
+  "CoordMatchPct": 1.8518518518518516,
+  "DefaultFontName": "\u6E38\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 18.75,
+  "ContentWidth": 854.0338078291816,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=13% Top=15%, PrintScale, Font=\u6E38\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=18.8",
+  "ErrorMessage": null
+}

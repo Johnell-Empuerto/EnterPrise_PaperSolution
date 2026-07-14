@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <AssemblyName>iReporterExcelAddIn</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net45</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>15.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <Reference Include="Microsoft.Office.Tools.Common.v4.0.Utilities" />
+    <Reference Include="Microsoft.Office.Tools.Common" />
+    <Reference Include="Microsoft.VisualStudio.Tools.Applications.Runtime" />
+    <Reference Include="iReporterExcelAddInCommon">
+      <HintPath>..\..\..\iReporterExcelAddInCommon.dll</HintPath>
+    </Reference>
+    <Reference Include="Cimtops.R2Cluster">
+      <HintPath>..\..\..\Cimtops.R2Cluster.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Office.Tools.Excel" />
+    <Reference Include="System.Core" />
+    <Reference Include="Cimtops.Excel">
+      <HintPath>..\..\..\Cimtops.Excel.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.Office.Tools" />
+  </ItemGroup>
+</Project>

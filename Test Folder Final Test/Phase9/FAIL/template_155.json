@@ -1,0 +1,20 @@
+{
+  "DefTopId": 155,
+  "DefTopName": "Material Check Sheet",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 44,
+  "ComClusters": 44,
+  "LeftMatchPct": 6.8181818181818175,
+  "TopMatchPct": 4.545454545454546,
+  "CoordMatchPct": 2.272727272727273,
+  "DefaultFontName": "\u6E38\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 18.75,
+  "ContentWidth": 430.355871886121,
+  "HasPrintArea": true,
+  "UsedPrintScaling": false,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=7% Top=5%, Font=\u6E38\u30B4\u30B7\u30C3\u30AF, Fit=1x1, RowHt=18.8",
+  "ErrorMessage": null
+}

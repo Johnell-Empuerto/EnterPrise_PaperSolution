@@ -28,5 +28,8 @@ namespace ExcelAPI.Models
 
         /// <summary>Cleanup interval in minutes for the background file cleanup service.</summary>
         public int CleanupIntervalMinutes { get; set; } = 60;
+
+        // Note: Python Coordinate Engine has been removed (Phase 31A).
+        // All field coordinates now come from COM Range.Left/Top/Width/Height directly.
     }
 }

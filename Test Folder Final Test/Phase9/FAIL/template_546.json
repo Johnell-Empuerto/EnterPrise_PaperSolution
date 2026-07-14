@@ -1,0 +1,20 @@
+{
+  "DefTopId": 546,
+  "DefTopName": "FormTest - Copy",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 6,
+  "ComClusters": 6,
+  "LeftMatchPct": 83.33333333333334,
+  "TopMatchPct": 33.33333333333333,
+  "CoordMatchPct": 16.666666666666664,
+  "DefaultFontName": "Aptos Narrow",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 14.4,
+  "ContentWidth": 200.16,
+  "HasPrintArea": true,
+  "UsedPrintScaling": false,
+  "UsedFontCorrection": true,
+  "FailureType": "Left=83% Top=33%, Font=Aptos Narrow, Fit=1x1",
+  "ErrorMessage": null
+}

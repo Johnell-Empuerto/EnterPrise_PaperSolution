@@ -1,0 +1,64 @@
+Using launch settings from C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Properties\launchSettings.json...
+Building...
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Logs
+info: ExcelAPI[0]
+      PaperLess Excel Capture API started. Version: 1.3, Preview directory: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview, Max upload: 25MB
+info: ExcelAPI.Services.PreviewCleanupService[0]
+      Preview cleanup service started. Interval: 60min, Retention: 24h
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\wwwroot. Static files may be unavailable.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5090
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 1/8] Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\1c4ded2beba542bc8d0a5bca1c12d098.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 1/8] Excel started in 2274ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 2/8] Workbook opened in 2427ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 3/8] Worksheet "Sheet1" selected in 2491ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 4/8] Print area detected: "$A$1:$D$12" on "Sheet1" in 2497ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 5/8] PDF exported in 2946ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_1c4ded2beba542bc8d0a5bca1c12d098.pdf (5838 bytes)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 6/8] PNG saved in 3470ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_1c4ded2beba542bc8d0a5bca1c12d098.png (41407 bytes)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 7/8] PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 8/8] Reading comments and measuring field geometry via COM...
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      Page width not available from COM, assuming Letter (612pt)
+warn: ExcelAPI.Services.ExcelCaptureService[0]
+      Page height not available from COM, assuming Letter (792pt)
+info: ExcelAPI.Services.CoordinateTransformer[0]
+      [COORDS] Origin: (210.00,309.60)pt | page=612.0x792.0 margin=(51.0,51.0,53.9,53.9) printable=510.0x684.3 content=192.0x172.8 centerH=True centerV=True
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PHASE36] Printed page origin: (210.00,309.60)pt | page=612.0x792.0 content=192.0x172.8
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 8/8] COM field measurement complete: 6 fields, page=2550x3299px in 4625ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\1c4ded2beba542bc8d0a5bca1c12d098.xlsx - Total: 7366ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\1c4ded2beba542bc8d0a5bca1c12d098.runtime.json (6 field(s), 2550x3299px)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=1c4ded2beba542bc8d0a5bca1c12d098
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] COM metadata loaded — 1 sheet(s), 6 field(s)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=1c4ded2beba542bc8d0a5bca1c12d098
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] COM metadata loaded — 1 sheet(s), 6 field(s)

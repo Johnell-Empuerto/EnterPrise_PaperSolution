@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+  <PropertyGroup>
+    <AssemblyName>iReporterExcelAddInCommon</AssemblyName>
+    <GenerateAssemblyInfo>False</GenerateAssemblyInfo>
+    <UseWindowsForms>True</UseWindowsForms>
+    <TargetFramework>net45</TargetFramework>
+  </PropertyGroup>
+  <PropertyGroup>
+    <LangVersion>15.0</LangVersion>
+    <AllowUnsafeBlocks>True</AllowUnsafeBlocks>
+    <CheckForOverflowUnderflow>False</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <PropertyGroup>
+    <RootNamespace />
+  </PropertyGroup>
+  <ItemGroup>
+    <None Remove="views\messagegrid.baml" />
+    <None Remove="iReporterExcelAddInCommon.ApplicationConfig.xml" />
+    <None Remove="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters.xml" />
+    <None Remove="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_ja.xml" />
+    <None Remove="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-CN.xml" />
+    <None Remove="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-TW.xml" />
+    <EmbeddedResource Include="views\messagegrid.baml" LogicalName="views/messagegrid.baml" />
+    <EmbeddedResource Include="iReporterExcelAddInCommon.ApplicationConfig.xml" LogicalName="iReporterExcelAddInCommon.ApplicationConfig.xml" />
+    <EmbeddedResource Include="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters.xml" LogicalName="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters.xml" />
+    <EmbeddedResource Include="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_ja.xml" LogicalName="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_ja.xml" />
+    <EmbeddedResource Include="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-CN.xml" LogicalName="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-CN.xml" />
+    <EmbeddedResource Include="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-TW.xml" LogicalName="iReporterExcelAddInCommon.Domain.Resources.SheetNameInvalidCharacters_zh-TW.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Cimtops.Excel">
+      <HintPath>..\..\..\Cimtops.Excel.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="Cimtops.R2Cluster">
+      <HintPath>..\..\..\Cimtops.R2Cluster.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Core" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="PresentationCore" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.VisualBasic" />
+  </ItemGroup>
+</Project>

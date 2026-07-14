@@ -1,0 +1,67 @@
+{
+  "[Content_Types].xml": {
+    "dump_file": "[Content_Types].xml",
+    "size": 1644,
+    "crc": "027bede9"
+  },
+  "_rels/.rels": {
+    "dump_file": "_rels_.rels",
+    "size": 588,
+    "crc": "233055b5"
+  },
+  "xl/workbook.xml": {
+    "dump_file": "xl_workbook.xml",
+    "size": 2650,
+    "crc": "33e5b23c"
+  },
+  "xl/_rels/workbook.xml.rels": {
+    "dump_file": "xl__rels_workbook.xml.rels",
+    "size": 839,
+    "crc": "61a6a94a"
+  },
+  "xl/worksheets/sheet1.xml": {
+    "dump_file": "xl_worksheets_sheet1.xml",
+    "size": 2620,
+    "crc": "3045e301"
+  },
+  "xl/worksheets/sheet2.xml": {
+    "dump_file": "xl_worksheets_sheet2.xml",
+    "size": 2551,
+    "crc": "e598bf4e"
+  },
+  "xl/theme/theme1.xml": {
+    "dump_file": "xl_theme_theme1.xml",
+    "size": 8721,
+    "crc": "41b460f6"
+  },
+  "xl/styles.xml": {
+    "dump_file": "xl_styles.xml",
+    "size": 2368,
+    "crc": "45e719a1"
+  },
+  "xl/sharedStrings.xml": {
+    "dump_file": "xl_sharedStrings.xml",
+    "size": 691,
+    "crc": "b27ceb27"
+  },
+  "xl/worksheets/_rels/sheet2.xml.rels": {
+    "dump_file": "xl_worksheets__rels_sheet2.xml.rels",
+    "size": 605,
+    "crc": "3d3b38d5"
+  },
+  "xl/comments1.xml": {
+    "dump_file": "xl_comments1.xml",
+    "size": 1849,
+    "crc": "efcd073e"
+  },
+  "docProps/core.xml": {
+    "dump_file": "docProps_core.xml",
+    "size": 696,
+    "crc": "20a2dffc"
+  },
+  "docProps/app.xml": {
+    "dump_file": "docProps_app.xml",
+    "size": 950,
+    "crc": "258a6874"
+  }
+}

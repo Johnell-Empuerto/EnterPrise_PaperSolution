@@ -1,0 +1,20 @@
+{
+  "DefTopId": 134,
+  "DefTopName": "Defect report(Thailand)",
+  "Status": "FAIL",
+  "IsUnknownPattern": false,
+  "TotalClusters": 43,
+  "ComClusters": 43,
+  "LeftMatchPct": 18.6046511627907,
+  "TopMatchPct": 6.976744186046512,
+  "CoordMatchPct": 2.3255813953488373,
+  "DefaultFontName": "Arial",
+  "DefaultFontSize": 10,
+  "DefaultRowHeight": 15,
+  "ContentWidth": 586.7772464412811,
+  "HasPrintArea": true,
+  "UsedPrintScaling": false,
+  "UsedFontCorrection": false,
+  "FailureType": "Left=19% Top=7%, Fit=1x0, RowHt=15.0",
+  "ErrorMessage": null
+}

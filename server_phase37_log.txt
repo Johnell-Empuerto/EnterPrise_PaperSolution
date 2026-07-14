@@ -1,0 +1,89 @@
+Using launch settings from C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Properties\launchSettings.json...
+Building...
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj : warning NU1903: Package 'Microsoft.OpenApi' 2.0.0 has a known high severity vulnerability, https://github.com/advisories/GHSA-v5pm-xwqc-g5wc
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\ClusterEngine\ClusterBuilder.cs(38,27): warning CS8601: Possible null reference assignment. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\ExcelEngine\WorksheetLoader.cs(66,83): warning CS8600: Converting null literal or possible null value to non-nullable type. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\CellDataReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\CellDataReader.cs(24,20): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Generators\PreviewGenerator.cs(152,17): warning CS0618: 'SKPaint.TextSize' is obsolete: 'Use SKFont.Size instead.' [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Generators\PreviewGenerator.cs(155,13): warning CS0618: 'SKCanvas.DrawText(string, float, float, SKPaint)' is obsolete: 'Use DrawText(string text, float x, float y, SKTextAlign textAlign, SKFont font, SKPaint paint) instead.' [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\RowHeightReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(84,40): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\CommentReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(124,36): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(146,21): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\PrintAreaReader.cs(14,28): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(222,17): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\ExcelEngine\WorkbookLoader.cs(52,69): warning CS8604: Possible null reference argument for parameter 'o' in 'int Marshal.ReleaseComObject(object o)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\ExcelEngine\WorkbookLoader.cs(54,69): warning CS8604: Possible null reference argument for parameter 'o' in 'int Marshal.ReleaseComObject(object o)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\ImageEngine.cs(124,17): warning CS0618: 'SKPaint.FilterQuality' is obsolete: 'Use SKSamplingOptions instead.' [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\ImageEngine.cs(124,33): warning CS0618: 'SKFilterQuality' is obsolete: 'Use SKSamplingOptions instead.' [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\ImageReader.cs(15,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\MergeCellReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(415,32): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\OpenXmlParser.cs(431,17): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\ColumnWidthReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Controllers\FormController.cs(429,35): warning CS8600: Converting null literal or possible null value to non-nullable type. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\PageSetupReader.cs(14,21): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\OpenXmlWorksheetLoader.cs(54,31): warning CS8602: Dereference of a possibly null reference. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\OpenXmlWorksheetLoader.cs(67,28): warning CS8600: Converting null literal or possible null value to non-nullable type. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\LegacyEngine\OpenXml\OpenXmlWorksheetLoader.cs(94,34): warning CS8601: Possible null reference assignment. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\StyleResolver.cs(42,51): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\StyleResolver.cs(50,42): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\StyleResolver.cs(69,42): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\StyleResolver.cs(87,44): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\StyleResolver.cs(162,33): warning CS8604: Possible null reference argument for parameter 'value' in 'UInt32Value.implicit operator uint(UInt32Value value)'. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Rendering\ShapeResolver.cs(182,34): warning CS8601: Possible null reference assignment. [C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\ExcelAPI.csproj]
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview
+info: ExcelAPI[0]
+      Ensured directory exists: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Logs
+info: ExcelAPI[0]
+      PaperLess Excel Capture API started. Version: 1.3, Preview directory: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview, Max upload: 25MB
+info: ExcelAPI.Services.PreviewCleanupService[0]
+      Preview cleanup service started. Interval: 60min, Retention: 24h
+warn: Microsoft.AspNetCore.StaticFiles.StaticFileMiddleware[16]
+      The WebRootPath was not found: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\wwwroot. Static files may be unavailable.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://localhost:5090
+info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Development
+info: Microsoft.Hosting.Lifetime[0]
+      Content root path: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 1/8] Capture started for file: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\5034360772c541e29293a586ad35d404.xlsx
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 1/8] Excel started in 2727ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 2/8] Workbook opened in 3199ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 3/8] Worksheet "Sheet1" selected in 3326ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 4/8] Print area detected: "$A$1:$D$12" on "Sheet1" in 3337ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 5/8] PDF exported in 3903ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_5034360772c541e29293a586ad35d404.pdf (5838 bytes)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 6/8] PNG saved in 4484ms: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Preview\page_5034360772c541e29293a586ad35d404.png (41407 bytes)
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 7/8] PNG dimensions: 2550x3299
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 8/8] Reading comments and measuring field geometry via COM...
+info: ExcelAPI.Services.CoordinateTransformer[0]
+      [COORDS] Origin: (51.02,53.86)pt | page=0.0x0.0 margin=(51.0,51.0,53.9,53.9) printable=-102.0x-107.7 content=192.0x172.8 centerH=True centerV=True
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [PHASE36] Printed page origin: (51.02,53.86)pt | page=0.0x0.0 content=192.0x172.8
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      [Stage 8/8] COM field measurement complete: 6 fields, page=2550x3299px in 6151ms
+info: ExcelAPI.Services.ExcelCaptureService[0]
+      Capture completed for C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Uploads\5034360772c541e29293a586ad35d404.xlsx - Total: 9193ms
+info: ExcelAPI.Services.RuntimeCoordinateGenerator[0]
+      [RUNTIME] Metadata saved: C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\ExcelAPI\ExcelAPI\Forms\5034360772c541e29293a586ad35d404.runtime.json (6 field(s), 2550x3299px)
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] Stage 1: Looking for COM metadata for ID=5034360772c541e29293a586ad35d404
+info: ExcelAPI.Controllers.FormController[0]
+      [RUNTIME] COM metadata loaded — 1 sheet(s), 6 field(s)

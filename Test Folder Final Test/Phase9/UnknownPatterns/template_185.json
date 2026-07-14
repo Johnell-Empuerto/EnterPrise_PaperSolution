@@ -1,0 +1,20 @@
+{
+  "DefTopId": 185,
+  "DefTopName": "50V Screening Standard Sample Unit Test Result Monitoring Record",
+  "Status": "FAIL",
+  "IsUnknownPattern": true,
+  "TotalClusters": 1379,
+  "ComClusters": 0,
+  "LeftMatchPct": 0,
+  "TopMatchPct": 0,
+  "CoordMatchPct": 0,
+  "DefaultFontName": null,
+  "DefaultFontSize": 0,
+  "DefaultRowHeight": 0,
+  "ContentWidth": 0,
+  "HasPrintArea": false,
+  "UsedPrintScaling": false,
+  "UsedFontCorrection": false,
+  "FailureType": "Exception: Value was either too large or too small for an Int32.",
+  "ErrorMessage": "Value was either too large or too small for an Int32."
+}

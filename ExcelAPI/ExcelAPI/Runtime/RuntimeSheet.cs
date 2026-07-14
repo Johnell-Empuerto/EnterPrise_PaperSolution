@@ -29,6 +29,14 @@ namespace ExcelAPI.Runtime
 
         /// <summary>Page height in pixels (at rendering DPI).</summary>
         public int PageHeightPx { get; set; }
+
+        /// <summary>
+        /// Background image URL (relative, e.g., "/forms/bg_xxx.png").
+        /// This is the PNG rendered from Excel — the exact same image used during
+        /// coordinate computation. The frontend MUST use this URL to ensure the
+        /// background image matches the field coordinates.
+        /// </summary>
+        public string? BackgroundImage { get; set; }
     }
 
     /// <summary>

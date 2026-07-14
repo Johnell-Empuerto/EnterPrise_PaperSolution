@@ -1,0 +1,20 @@
+{
+  "DefTopId": 113,
+  "DefTopName": "\u3010Sample\u3011\u5DE5\u4E8B\u9032\u6357\u72B6\u6CC1\u4E00\u89A7",
+  "Status": "FAIL",
+  "IsUnknownPattern": true,
+  "TotalClusters": 300,
+  "ComClusters": 0,
+  "LeftMatchPct": 0,
+  "TopMatchPct": 0,
+  "CoordMatchPct": 0,
+  "DefaultFontName": null,
+  "DefaultFontSize": 0,
+  "DefaultRowHeight": 0,
+  "ContentWidth": 0,
+  "HasPrintArea": false,
+  "UsedPrintScaling": false,
+  "UsedFontCorrection": false,
+  "FailureType": "Exception: Encrypted packages are not supported.",
+  "ErrorMessage": "Encrypted packages are not supported."
+}

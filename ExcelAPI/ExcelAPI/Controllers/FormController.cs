@@ -19,7 +19,7 @@ namespace ExcelAPI.Controllers
         private readonly OpenXmlParser _xmlParser;
         private readonly FormRuntimeBuilder _runtimeBuilder;
         private readonly RuntimeSerializer _runtimeSerializer;
-        private readonly RuntimeMetadataService _runtimeMetadata;
+        private readonly RuntimeCoordinateGenerator _runtimeGenerator;
 
         public FormController(
             IFormSaveService formSaveService,
@@ -29,7 +29,7 @@ namespace ExcelAPI.Controllers
             OpenXmlParser xmlParser,
             FormRuntimeBuilder runtimeBuilder,
             RuntimeSerializer runtimeSerializer,
-            RuntimeMetadataService runtimeMetadata)
+            RuntimeCoordinateGenerator runtimeGenerator)
         {
             _formSaveService = formSaveService;
             _env = env;
@@ -38,7 +38,7 @@ namespace ExcelAPI.Controllers
             _xmlParser = xmlParser;
             _runtimeBuilder = runtimeBuilder;
             _runtimeSerializer = runtimeSerializer;
-            _runtimeMetadata = runtimeMetadata;
+            _runtimeGenerator = runtimeGenerator;
         }
 
         [HttpPost("save")]
@@ -150,15 +150,16 @@ namespace ExcelAPI.Controllers
                 // Because we passed templateId as fileId, this is now /preview/page_{templateId}.png.
                 string previewUrl = captureResult.ImageUrl ?? $"/preview/page_{templateId}.png";
 
-                // Persist page setup metadata for Runtime coordinate alignment
-                if (captureResult.PageSetup != null)
-                {
-                    PersistRuntimeMetadata(templateId, captureResult.PageSetup);
-                }
+                // Determine the persistent background image URL
+                // Priority: Forms copy (persistent) > preview (temporary)
+                string bgUrl = formDefinition?.Sheets?.FirstOrDefault()?.BackgroundImage
+                    ?? previewUrl;
 
                 // Persist COM field rectangles as the single source of truth for Runtime overlay.
                 // This eliminates OpenXML coordinate recalculation on every GET /api/form/runtime/{id}.
-                _runtimeMetadata.Save(captureResult, templateId, formsDir, file.FileName);
+                // Pass the background image URL so the frontend can load the exact image used
+                // during coordinate computation.
+                _runtimeGenerator.SaveMetadata(captureResult, templateId, formsDir, file.FileName, bgUrl);
 
                 return Ok(new
                 {
@@ -385,22 +386,6 @@ namespace ExcelAPI.Controllers
                 }
             };
 
-            // Store calibration data for frontend debug use
-            if (capture.PageSetup != null)
-            {
-                var debugMeta = form.Metadata;
-                debugMeta["printedOriginX"] = capture.PageSetup.PrintedOriginX.ToString("F2");
-                debugMeta["printedOriginY"] = capture.PageSetup.PrintedOriginY.ToString("F2");
-                debugMeta["actualScaleX"] = capture.PageSetup.ActualScaleX.ToString("F6");
-                debugMeta["actualScaleY"] = capture.PageSetup.ActualScaleY.ToString("F6");
-                debugMeta["theoreticalScale"] = capture.PageSetup.Scale.ToString("F6");
-                debugMeta["pageWidthPt"] = capture.PageSetup.PageWidthPt.ToString("F1");
-                debugMeta["pageHeightPt"] = capture.PageSetup.PageHeightPt.ToString("F1");
-            }
-
-            // Generate debug overlay image
-            GenerateDebugOverlay(form, bgWidth, bgHeight, capture);
-
             return form;
         }
 
@@ -423,7 +408,7 @@ namespace ExcelAPI.Controllers
                 string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
 
                 // Try COM metadata first — single source of truth for field coordinates
-                var comRuntime = _runtimeMetadata.Load(templateId, formsDir);
+                var comRuntime = _runtimeGenerator.LoadMetadata(templateId, formsDir);
                 if (comRuntime != null)
                 {
                     _logger.LogInformation(
@@ -542,50 +527,7 @@ namespace ExcelAPI.Controllers
         }
 
         /// <summary>
-        /// Persists the page setup metadata as a JSON file alongside the template XLSX.
-        /// This data is consumed by GetRuntime() to align Runtime overlays with the PNG background.
-        /// </summary>
-        private void PersistRuntimeMetadata(string templateId, PageSetupDebug pageSetup)
-        {
-            try
-            {
-                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-                Directory.CreateDirectory(formsDir);
-                string metaPath = Path.Combine(formsDir, $"{templateId}.meta.json");
-
-                var metadata = new
-                {
-                    pageSetup.PrintedOriginX,
-                    pageSetup.PrintedOriginY,
-                    pageSetup.LeftMargin,
-                    pageSetup.TopMargin,
-                    pageSetup.CenterHorizontally,
-                    pageSetup.CenterVertically,
-                    pageSetup.PageWidthPt,
-                    pageSetup.PageHeightPt,
-                    pageSetup.PrintAreaWidthPt,
-                    pageSetup.PrintAreaHeightPt,
-                    pageSetup.ActualScaleX,
-                    pageSetup.ActualScaleY,
-                    pageSetup.Scale,
-                    pageSetup.Zoom,
-                    pageSetup.FitToPagesWide,
-                    pageSetup.FitToPagesTall
-                };
-
-                string json = System.Text.Json.JsonSerializer.Serialize(metadata,
-                    new System.Text.Json.JsonSerializerOptions { WriteIndented = false });
-                System.IO.File.WriteAllText(metaPath, json);
-                _logger.LogInformation("[RUNTIME] Metadata saved: {Path}", metaPath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "[RUNTIME] Failed to persist runtime metadata");
-            }
-        }
-
-        /// <summary>
-        /// Loads runtime metadata saved during upload.
+        /// Loads runtime metadata using the legacy coordinate algorithm.
         /// Returns origin offsets in points and actual pixel scales.
         /// Falls back to (0,0,0,0) if no metadata file exists (legacy templates).
         /// </summary>
@@ -611,114 +553,14 @@ namespace ExcelAPI.Controllers
                 double actualScaleX = root.TryGetProperty("actualScaleX", out var sx) ? sx.GetDouble() : 0;
                 double actualScaleY = root.TryGetProperty("actualScaleY", out var sy) ? sy.GetDouble() : 0;
 
-                // Convert pixel origin back to points using actual scale
                 double originXPt = actualScaleX > 0 ? printedOriginX / actualScaleX : 0;
                 double originYPt = actualScaleY > 0 ? printedOriginY / actualScaleY : 0;
 
-                _logger.LogInformation(
-                    "[RUNTIME] Loaded metadata: printedOrigin=({OX:F1},{OY:F1})px scale=({SX:F6},{SY:F6}) -> originPt=({XP:F1},{YP:F1})",
-                    printedOriginX, printedOriginY, actualScaleX, actualScaleY, originXPt, originYPt);
-
                 return (originXPt, originYPt, actualScaleX, actualScaleY);
             }
-            catch (Exception ex)
+            catch
             {
-                _logger.LogWarning(ex, "[RUNTIME] Failed to load runtime metadata, using defaults");
                 return (0, 0, 0, 0);
-            }
-        }
-
-        /// <summary>
-        /// Generates a debug PNG with overlay annotations to visually verify coordinate alignment.
-        /// Red = computed cluster rectangle, green = detected cell boundary from pixel scan,
-        /// blue dot = printed origin. Saved alongside the form background.
-        /// </summary>
-        private void GenerateDebugOverlay(FormDefinition form, int bgWidth, int bgHeight, Models.CaptureResult capture)
-        {
-            if (form.Sheets.Count == 0) return;
-            var sheet = form.Sheets[0];
-            if (string.IsNullOrEmpty(sheet.BackgroundImage)) return;
-
-            try
-            {
-                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-                string bgFile = Path.GetFileName(sheet.BackgroundImage.TrimStart('/'));
-                string bgPath = Path.Combine(formsDir, bgFile);
-                if (!System.IO.File.Exists(bgPath)) return;
-
-                byte[] imageBytes = System.IO.File.ReadAllBytes(bgPath);
-                using var bitmap = SkiaSharp.SKBitmap.Decode(imageBytes);
-                if (bitmap == null) return;
-
-                using var canvas = new SkiaSharp.SKCanvas(bitmap);
-
-                using var redPen = new SkiaSharp.SKPaint
-                {
-                    Color = new SkiaSharp.SKColor(255, 0, 0, 180),
-                    Style = SkiaSharp.SKPaintStyle.Stroke,
-                    StrokeWidth = 2
-                };
-                using var greenPen = new SkiaSharp.SKPaint
-                {
-                    Color = new SkiaSharp.SKColor(0, 200, 0, 180),
-                    Style = SkiaSharp.SKPaintStyle.Stroke,
-                    StrokeWidth = 2
-                };
-                using var blueDot = new SkiaSharp.SKPaint
-                {
-                    Color = new SkiaSharp.SKColor(0, 100, 255, 200),
-                    Style = SkiaSharp.SKPaintStyle.Fill
-                };
-                using var labelFont = new SkiaSharp.SKFont(SkiaSharp.SKTypeface.Default, 14);
-                using var labelPaint = new SkiaSharp.SKPaint
-                {
-                    Color = new SkiaSharp.SKColor(255, 0, 0, 220),
-                    IsAntialias = true
-                };
-
-                // Draw printed origin (blue dot)
-                double ox = capture.PageSetup?.PrintedOriginX ?? 0;
-                double oy = capture.PageSetup?.PrintedOriginY ?? 0;
-                canvas.DrawCircle((float)ox, (float)oy, 6, blueDot);
-
-                // Draw each cluster
-                foreach (var cluster in form.Clusters)
-                {
-                    float x = (float)cluster.Left;
-                    float y = (float)cluster.Top;
-                    float w = (float)(cluster.Right - cluster.Left);
-                    float h = (float)(cluster.Bottom - cluster.Top);
-
-                    // Red: computed rectangle
-                    canvas.DrawRect(x, y, w, h, redPen);
-
-                    // Label
-                    string label = $"{cluster.CellAddress} ({cluster.Left:F0},{cluster.Top:F0}) {w:F0}x{h:F0}";
-                    canvas.DrawText(label, x, y - 4, SkiaSharp.SKTextAlign.Left, labelFont, labelPaint);
-
-                    // Log per-cluster diagnostic
-                    _logger.LogInformation(
-                        "[DEBUG] Cluster \"{Cell}\": computed=({L:F1},{T:F1},{W:F1},{H:F1}) " +
-                        "origin=({OX:F1},{OY:F1}) " +
-                        "cellPt=({CL:F1},{CT:F1}) wPt={WPt:F1} hPt={HPt:F1}",
-                        cluster.CellAddress,
-                        cluster.Left, cluster.Top, w, h,
-                        ox, oy,
-                        cluster.LeftPt, cluster.TopPt,
-                        cluster.WidthPt, cluster.HeightPt);
-                }
-
-                // Save debug overlay
-                string debugFile = $"debug_{bgFile}";
-                string debugPath = Path.Combine(formsDir, debugFile);
-                using var debugImage = SkiaSharp.SKImage.FromBitmap(bitmap);
-                using var debugData = debugImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 95);
-                System.IO.File.WriteAllBytes(debugPath, debugData.ToArray());
-                _logger.LogInformation("[DEBUG] Overlay saved: {Path}", debugPath);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "[DEBUG] Failed to generate debug overlay");
             }
         }
     }

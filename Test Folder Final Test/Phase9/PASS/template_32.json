@@ -1,0 +1,20 @@
+{
+  "DefTopId": 32,
+  "DefTopName": "[sample]FreeDraw",
+  "Status": "PASS",
+  "IsUnknownPattern": false,
+  "TotalClusters": 1,
+  "ComClusters": 1,
+  "LeftMatchPct": 100,
+  "TopMatchPct": 100,
+  "CoordMatchPct": 100,
+  "DefaultFontName": "\uFF2D\uFF33 \uFF30\u30B4\u30B7\u30C3\u30AF",
+  "DefaultFontSize": 11,
+  "DefaultRowHeight": 13.5,
+  "ContentWidth": 803.5782918149469,
+  "HasPrintArea": true,
+  "UsedPrintScaling": true,
+  "UsedFontCorrection": true,
+  "FailureType": null,
+  "ErrorMessage": null
+}

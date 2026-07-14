@@ -1,0 +1,19 @@
+{
+  "pdf_path": "C:\\Users\\MCF-JOHNELLEEMPUERTO\\Documents\\Johnell\\PaperLess Enterprise\\CoordinateEngine\\TestRuns\\2026-07-11_111413\\background.pdf",
+  "png_path": "C:\\Users\\MCF-JOHNELLEEMPUERTO\\Documents\\Johnell\\PaperLess Enterprise\\CoordinateEngine\\TestRuns\\2026-07-11_111413\\background.png",
+  "pdf_page_pt": [
+    612.0,
+    792.0
+  ],
+  "pdf_mediabox": [
+    0,
+    0,
+    612,
+    792
+  ],
+  "dpi": 300,
+  "png_width_px": 2550,
+  "png_height_px": 3300,
+  "png_file_size_bytes": 35879,
+  "png_sha256": "53deab6fa6bb68b3f89c49b9569aa751be004866bc81d798adaa3f74a9a4487d"
+}

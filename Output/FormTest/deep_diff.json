@@ -1,0 +1,90 @@
+{
+  "def_top_id": 546,
+  "generated_at": "2026-07-12T00:38:39.043938Z",
+  "total_diffs": 11,
+  "equal_count": 0,
+  "modified_count": 2,
+  "added_count": 3,
+  "removed_count": 6,
+  "differences": [
+    {
+      "diff_type": "REMOVED",
+      "path": "$.def_top",
+      "database_value": "{object}",
+      "reason": "Property \u0027def_top\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "REMOVED",
+      "path": "$.def_sheets",
+      "database_value": "[array]",
+      "reason": "Property \u0027def_sheets\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "REMOVED",
+      "path": "$.def_top_options",
+      "database_value": "[array]",
+      "reason": "Property \u0027def_top_options\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "REMOVED",
+      "path": "$.def_cluster_refers",
+      "database_value": "[array]",
+      "reason": "Property \u0027def_cluster_refers\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "REMOVED",
+      "path": "$.def_labels",
+      "database_value": "[array]",
+      "reason": "Property \u0027def_labels\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "REMOVED",
+      "path": "$.all_related_tables",
+      "database_value": "{object}",
+      "reason": "Property \u0027all_related_tables\u0027 exists in database but not in generated output",
+      "children": []
+    },
+    {
+      "diff_type": "MODIFIED",
+      "path": "$.extracted_at",
+      "database_value": "2026-07-12T00:38:37.9502771Z",
+      "generated_value": "2026-07-12T00:38:38.6056573Z",
+      "reason": "String value differs",
+      "children": []
+    },
+    {
+      "diff_type": "MODIFIED",
+      "path": "$.source",
+      "database_value": "database",
+      "generated_value": "generated",
+      "reason": "String value differs",
+      "children": []
+    },
+    {
+      "diff_type": "ADDED",
+      "path": "$.workbook",
+      "generated_value": "{object}",
+      "reason": "Property \u0027workbook\u0027 exists in generated output but not in database",
+      "children": []
+    },
+    {
+      "diff_type": "ADDED",
+      "path": "$.styles",
+      "generated_value": "[array]",
+      "reason": "Property \u0027styles\u0027 exists in generated output but not in database",
+      "children": []
+    },
+    {
+      "diff_type": "ADDED",
+      "path": "$.source_file",
+      "generated_value": "C:\\Users\\MCF-JOHNELLEEMPUERTO\\Documents\\FormTest - Copy.xlsx",
+      "reason": "Property \u0027source_file\u0027 exists in generated output but not in database",
+      "children": []
+    }
+  ]
+}

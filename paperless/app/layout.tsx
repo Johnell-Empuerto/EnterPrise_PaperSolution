@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "PaperLess Enterprise - Excel Print Area Capture",
+  title: "PaperLess Enterprise — Intelligent Form Engine",
   description:
-    "Upload Excel files and capture configured Print Areas as PNG images using Microsoft Excel COM Interop.",
+    "Upload Excel templates and fill interactive forms. PaperLess reproduces Excel Print Areas in the browser using OpenXML, with no Microsoft Excel required.",
 };
 
 export default function RootLayout({

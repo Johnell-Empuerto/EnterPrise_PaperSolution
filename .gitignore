@@ -17,6 +17,11 @@ ExcelAPI/ExcelAPI/Logs/
 .env.local
 paperless/.env.local
 
+# Windows reserved names
+nul
+NUL
+Nul
+
 # IDE
 .vs/
 .vscode/
