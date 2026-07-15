@@ -224,12 +224,29 @@ namespace ExcelAPI.Controllers
                     return StatusCode(502, new { success = false, message = "Python preview service returned an error or is unavailable." });
                 }
 
-                var fields = pythonResult.Fields != null
-                    ? pythonResult.Fields.Select(f => (object)new { id = f.Name, name = f.Name, type = f.Type, cellAddr = f.CellAddr, left_ratio = f.LeftRatio, top_ratio = f.TopRatio, right_ratio = f.RightRatio, bottom_ratio = f.BottomRatio }).ToList()
-                    : new List<object>();
-                var response = new { success = true, backgroundImage = $"/preview/{pythonResult.BackgroundImage}", page = new { width = pythonResult.Page?.Width ?? 2550, height = pythonResult.Page?.Height ?? 3300 }, fields };
+                // Map multi-page response
+                var pageResults = (pythonResult.Pages ?? new List<PythonPreviewPageResult>())
+                    .Select(p => new
+                    {
+                        sheetName = p.SheetName,
+                        backgroundImage = $"/preview/{p.BackgroundImage}",
+                        page = new { width = p.Page?.Width ?? 2550, height = p.Page?.Height ?? 3300 },
+                        fields = (p.Fields ?? new List<PythonPreviewField>())
+                            .Select(f => (object)new
+                            {
+                                id = f.Name,
+                                name = f.Name,
+                                type = f.Type,
+                                cellAddr = f.CellAddr,
+                                left_ratio = f.LeftRatio,
+                                top_ratio = f.TopRatio,
+                                right_ratio = f.RightRatio,
+                                bottom_ratio = f.BottomRatio,
+                            }).ToList()
+                    })
+                    .ToList();
 
-                return Ok(response);
+                return Ok(new { success = true, pages = pageResults });
             }
             catch (Exception ex)
             {

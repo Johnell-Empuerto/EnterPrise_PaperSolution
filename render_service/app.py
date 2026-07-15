@@ -228,17 +228,16 @@ async def upload_preview(
             xlsx_path, output_dir=out_dir, output_id=output_id
         )
 
-        if not result.get("fields"):
-            print(f"[upload/preview] No fields detected in: {file.filename}")
-
-        print(f"[upload/preview] Complete: page={result['page']['width']}x{result['page']['height']}, "
-              f"fields={len(result.get('fields', []))}, bg={result.get('backgroundImage')}")
+        pages = result.get("pages", [])
+        total_fields = sum(len(p.get("fields", [])) for p in pages)
+        print(f"[upload/preview] Complete: {len(pages)} page(s), {total_fields} field(s)")
+        for p in pages:
+            print(f"  {p['sheetName']}: {p['page']['width']}x{p['page']['height']}, "
+                  f"{len(p.get('fields', []))} field(s), bg={p.get('backgroundImage')}")
 
         return {
             "success": True,
-            "backgroundImage": result["backgroundImage"],
-            "page": result["page"],
-            "fields": result["fields"],
+            "pages": pages,
         }
 
     except Exception as e:

@@ -77,30 +77,32 @@ export default function Home() {
 
       setTemplateName(uploadFile.name);
 
-      // Convert preview response to RuntimeForm format
-      const pageW = result.page?.width ?? 2550;
-      const pageH = result.page?.height ?? 3300;
-      const bgUrl = result.backgroundImage ?? "";
+      // Convert preview response to RuntimeForm format (multi-page)
+      const pageList = result.pages ?? [];
 
       const runtimeForm: RuntimeForm = {
         workbookName: uploadFile.name,
         title: uploadFile.name,
-        pageWidth: pageW,
-        pageHeight: pageH,
+        pageWidth: pageList[0]?.page?.width ?? 2550,
+        pageHeight: pageList[0]?.page?.height ?? 3300,
         scale: 1,
         dpi: 300,
         version: "1.0",
-        sheets: [
-          {
-            name: "Sheet1",
-            index: 0,
+        sheets: pageList.map((p: any, sheetIdx: number) => {
+          const pageW = p.page?.width ?? 2550;
+          const pageH = p.page?.height ?? 3300;
+          const bgUrl = p.backgroundImage ?? "";
+
+          return {
+            name: p.sheetName ?? `Page ${sheetIdx + 1}`,
+            index: sheetIdx,
             pageWidthPx: pageW,
             pageHeightPx: pageH,
             backgroundImage: bgUrl,
             images: [],
             shapes: [],
             printArea: null,
-            fields: (result.fields ?? []).map((f: any, i: number) => {
+            fields: (p.fields ?? []).map((f: any, i: number) => {
               const leftRatio = f.left_ratio ?? 0;
               const topRatio = f.top_ratio ?? 0;
               const rightRatio = f.right_ratio ?? 0;
@@ -136,8 +138,8 @@ export default function Home() {
                 tabIndex: i,
               };
             }),
-          },
-        ],
+          };
+        }),
       };
 
       setRuntimeForm(runtimeForm);

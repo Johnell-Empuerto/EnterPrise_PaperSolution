@@ -1,0 +1,6 @@
+INFO:     Will watch for changes in these directories: ['C:\\Users\\MCF-JOHNELLEEMPUERTO\\Documents\\Johnell\\PaperLess Enterprise\\render_service']
+INFO:     Uvicorn running on http://127.0.0.1:5091 (Press CTRL+C to quit)
+INFO:     Started reloader process [25968] using StatReload
+INFO:     Started server process [16652]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.

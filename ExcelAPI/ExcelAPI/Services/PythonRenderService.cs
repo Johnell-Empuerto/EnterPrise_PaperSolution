@@ -7,6 +7,13 @@ namespace ExcelAPI.Services;
 public class PythonPreviewResponse
 {
     [JsonPropertyName("success")] public bool Success { get; set; }
+    /// <summary>Multi-page result — one entry per visible worksheet.</summary>
+    [JsonPropertyName("pages")] public List<PythonPreviewPageResult>? Pages { get; set; }
+}
+
+public class PythonPreviewPageResult
+{
+    [JsonPropertyName("sheetName")] public string SheetName { get; set; } = "";
     [JsonPropertyName("backgroundImage")] public string BackgroundImage { get; set; } = "";
     [JsonPropertyName("page")] public PythonPreviewPage? Page { get; set; }
     [JsonPropertyName("fields")] public List<PythonPreviewField>? Fields { get; set; }

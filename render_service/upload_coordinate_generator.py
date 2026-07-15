@@ -434,8 +434,13 @@ def export_sanitized_pdf(sanitized_path: str) -> str:
 # Phase C — Render PDF to image at 300 DPI
 # ──────────────────────────────────────────────────────────────────────────────
 
-def render_pdf_to_image(pdf_path: str, dpi: int = DPI):
-    """Render PDF page 0 at 300 DPI to numpy array.
+def render_pdf_to_image(pdf_path: str, dpi: int = DPI, page_index: int = 0):
+    """Render a PDF page at 300 DPI to numpy array.
+
+    Args:
+        pdf_path: Path to the PDF file.
+        dpi: Rendering resolution (default 300).
+        page_index: Zero-based page index to render (default 0).
 
     Returns (numpy_array_HWC, width_px, height_px) in RGB uint8.
     """
@@ -445,7 +450,11 @@ def render_pdf_to_image(pdf_path: str, dpi: int = DPI):
 
     doc = fitz.open(pdf_path)
     try:
-        page = doc[0]
+        if page_index >= len(doc):
+            raise IndexError(
+                f"PDF has {len(doc)} pages, requested page {page_index}"
+            )
+        page = doc[page_index]
         zoom = dpi / 72.0
         mat = fitz.Matrix(zoom, zoom)
         pix = page.get_pixmap(matrix=mat, alpha=False)
@@ -893,32 +902,41 @@ def generate_coordinates_and_preview(
     output_dir: str,
     output_id: str,
 ) -> dict:
-    """Generate coordinates AND background PNG in a SINGLE COM session.            Architecture matches original ConMas:
+    """Generate coordinates AND background PNG in a SINGLE COM session.
+
+    Multi‑worksheet support (Phase UI.3):
+      - Exports ALL visible worksheets as separate PDF pages
+      - Processes each worksheet independently (comment scan, sanitize,
+        pixel scan, background render)
+      - Returns a `pages[]` array so the frontend can render one page
+        per worksheet
+
+    Architecture matches original ConMas:
       1. Open Excel (one Application, one COM lifecycle)
       2. Open original workbook
       3. Export original PDF (background) — BEFORE sanitization
-      4a. Read comments (READ-ONLY pass) — must be separate from sanitize
-          because reading cell.Comment THEN modifying cell.Interior.Color
-          in the same iteration corrupts COM proxy state
-      4b. Sanitize workbook (WRITE-ONLY pass) — uses addresses from step 4a
-      5. Delete metadata sheets & export sanitized PDF DIRECTLY (no SaveAs/Close/Reopen)
-         Phase X.19 proved direct export produces IDENTICAL output to the
-         original SaveAs+Close+Reopen pipeline.
+      4a. Read comments (READ-ONLY pass) — track sheet names
+      4b. Sanitize workbook per-sheet (WRITE-ONLY pass)
+      5. Delete metadata sheets & export sanitized PDF (ALL worksheets)
       6. Quit Excel (single cleanup)
-      7. Render sanitized PDF → pixel scan → normalize ratios
-      8. Render background PNG from original PDF
-      9. Return JSON (identical schema to generate_preview)
+      7. For each visible worksheet:
+           Render sanitized PDF page → pixel scan → normalize ratios
+           Render background PNG from original PDF → collect fields
+      8. Return JSON with pages[] array
 
     Args:
         xlsx_path: Path to uploaded XLSX.
-        output_dir: Directory to save the background PNG.
+        output_dir: Directory to save the background PNGs.
         output_id: Unique ID for naming (e.g. GUID).
 
     Returns:
         dict with:
-          backgroundImage: filename of saved PNG
-          page: { width, height } in pixels
-          fields: list of field dicts with ratios
+          pages: list of {
+              sheetName: str,
+              backgroundImage: str,
+              page: {width, height},
+              fields: [...]
+          }
     """
     import pythoncom
     import win32com.client
@@ -954,36 +972,47 @@ def generate_coordinates_and_preview(
                 wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
                 _stage_mark("Workbook Open")
 
-                # ── Step 1: Export original PDF (background) ──
+                # ── Step 1: Collect visible worksheet order ──
+                # NOTE: We store BOTH the COM proxy (visible_sheets) for sanitization
+                # AND plain string names (visible_sheet_names) for the NC phase after
+                # Excel.Quit(). COM proxies become stale after CoUninitialize().
+                visible_sheets = []
+                visible_sheet_names = []
+                for ws in wb.Worksheets:
+                    try:
+                        if ws.Visible != -1:  # -1 = xlSheetVisible
+                            continue
+                    except Exception:
+                        pass
+                    visible_sheets.append(ws)
+                    visible_sheet_names.append(ws.Name)
+                _stage_mark("Collect Visible Sheets")
+
+                # ── Step 2: Export original PDF (background) ──
                 # MUST be before sanitization because sanitization
                 # destroys cell values and fill colors.
+                # Export ALL visible worksheets as one multi-page PDF.
                 orig_pdf_dir = tempfile.mkdtemp(prefix="ple_orig_pdf_")
                 tmp_dirs.append(orig_pdf_dir)
                 orig_pdf_path = os.path.join(orig_pdf_dir, "original.pdf")
                 wb.ExportAsFixedFormat(0, os.path.abspath(orig_pdf_path))
                 _stage_mark("Export Original PDF")
 
-                # ── Step 2a: Read comments using Worksheet.Comments collection ──
+                # ── Step 3a: Read comments per-sheet ──
                 # Phase X.16 proved ws.Comments returns the exact same comment set
-                # as per-cell cell.Comment scan, but 2.8x faster (avoids scanning
-                # every cell in UsedRange).
+                # as per-cell cell.Comment scan, but 2.8x faster.
                 #
                 # IMPORTANT: This must be a separate pass from sanitization.
                 # Reading cell.Comment and then modifying cell.Interior.Color
-                # in the same iteration corrupts COM proxy state, causing
-                # subsequent cell.Comment calls to return None.
-                # (Proven in Phase X.10 diagnostic: pure read found 6 comments,
-                #  combined read+write found 0.)
+                # in the same iteration corrupts COM proxy state.
                 #
-                # This logic mirrors _identify_clusters_from_comments() but
-                # operates within the single COM session context. Keep both
-                # in sync when changing comment-scanning behavior.
-                cluster_meta = []
-                cluster_addrs = set()
+                # Key addition: track sheetName so we can group fields by sheet.
+                cluster_meta = []  # each entry includes "sheetName"
+                cluster_addrs_by_sheet = {}  # sheetName -> set of addresses
 
-                for ws in wb.Worksheets:
+                for ws in visible_sheets:
+                    sheet_name = ws.Name
                     try:
-                        # Fast skip: check Comments.Count before enumeration
                         if ws.Comments.Count == 0:
                             continue
                     except Exception:
@@ -1008,6 +1037,7 @@ def generate_coordinates_and_preview(
                         lines = text.replace("\r\n", "\n").split("\n")
                         cluster_meta.append({
                             "cellAddr": addr,
+                            "sheetName": sheet_name,
                             "name": lines[0].strip() if lines else "",
                             "type": lines[1].strip() if len(lines) > 1 else "Text",
                             "input_parameter": (
@@ -1015,28 +1045,27 @@ def generate_coordinates_and_preview(
                                 if len(lines) > 2 else ""
                             ),
                         })
-                        cluster_addrs.add(addr)
+                        cluster_addrs_by_sheet.setdefault(sheet_name, set()).add(addr)
 
                 _stage_mark("Comment Scan")
 
+                # Early exit if no comments found anywhere
                 if not cluster_meta:
                     wb.Close(False)
-                    return {
-                        "backgroundImage": "",
-                        "page": {"width": 0, "height": 0},
-                        "fields": [],
-                    }
+                    return {"pages": []}
 
-                # ── Step 2b: Sanitize workbook (BATCH operations) ──
+                # ── Step 3b: Sanitize workbook per-sheet ──
                 # Phase X.15 optimizations (validated in Phase X.14):
-                #   C: Skip PageSetup header/footer clearing (no visual effect on PDF)
+                #   C: Skip PageSetup header/footer clearing
                 #   D: Only enumerate shapes if count > 0
                 #   B: Batch fill entire UsedRange white via Range.Interior.Color
                 #   A: Batch clear values via UsedRange.ClearContents
-                #   Then fill only cluster cells black (one Range call per cluster)
                 xlNone = -4142
 
-                for ws in wb.Worksheets:
+                for ws in visible_sheets:
+                    sheet_name = ws.Name
+                    sheet_addrs = cluster_addrs_by_sheet.get(sheet_name, set())
+
                     # Optimization D: Only delete shapes when shapes exist
                     try:
                         if ws.Shapes.Count > 0:
@@ -1044,9 +1073,6 @@ def generate_coordinates_and_preview(
                                 shape.Delete()
                     except Exception:
                         pass
-
-                    # Optimization C: Skip PageSetup clearing
-                    # (headers/footers don't affect cell fill positions in PDF)
 
                     used = ws.UsedRange
                     if used is None:
@@ -1067,16 +1093,16 @@ def generate_coordinates_and_preview(
                     except Exception:
                         pass
 
-                    # Fill only cluster cells black (one Range call per cluster)
-                    for addr in cluster_addrs:
+                    # Fill only THIS sheet's cluster cells black
+                    for addr in sheet_addrs:
                         try:
                             rng = ws.Range(addr)
                             rng.Interior.Color = 1  # Black
-                            rng.Value = ""  # Clear value (merged cells may need explicit clear)
+                            rng.Value = ""
                         except Exception:
-                            pass  # Address not on this worksheet
+                            pass
 
-                    # Clear borders across the full range
+                    # Clear borders
                     try:
                         clear_range = ws.Range(
                             ws.Cells(1, 1),
@@ -1088,18 +1114,8 @@ def generate_coordinates_and_preview(
 
                 _stage_mark("Workbook Sanitization")
 
-                # ── Step 3: Delete metadata sheets & export sanitized PDF DIRECTLY ──
-                # Phase X.19 proved direct export produces IDENTICAL output to
-                # SaveAs+Close+Reopen (validated on FormTest and Japanese workbook).
-                #
-                # Key insight: The original SaveAs+Close+Reopen was introduced in
-                # Phase X.10 due to COM proxy corruption when reading cell.Comment
-                # and writing cell.Interior.Color in the same iteration. Since
-                # Phase X.17 replaced per-cell comment scan with ws.Comments
-                # collection (read pass is fully separate from write pass), the
-                # proxy corruption no longer applies, and direct export works.
-
-                # Delete metadata sheets to avoid multi-page PDF
+                # ── Step 4: Delete metadata sheets & export sanitized PDF ──
+                # Export ALL worksheets so the PDF has one page per visible sheet.
                 for i in range(wb.Sheets.Count, 0, -1):
                     try:
                         name = wb.Sheets(i).Name
@@ -1112,14 +1128,13 @@ def generate_coordinates_and_preview(
                 tmp_dirs.append(pdf_dir)
                 pdf_path = os.path.join(pdf_dir, "sanitized.pdf")
 
-                # Export sanitized PDF DIRECTLY from current workbook
-                # IgnorePrintAreas=False matches ConMas default behavior
-                ws_active = wb.ActiveSheet
-                ws_active.ExportAsFixedFormat(
+                # Export ALL worksheets (workbook-level export)
+                # IgnorePrintAreas=False matches ConMas default
+                wb.ExportAsFixedFormat(
                     0, os.path.abspath(pdf_path),
-                    0, 0, False,  # IgnorePrintAreas=False = ConMas default
+                    0, 0, False,
                 )
-                _stage_mark("Export Sanitized PDF (direct)")
+                _stage_mark("Export Sanitized PDF (all sheets)")
 
             finally:
                 # Always quit Excel to prevent orphaned processes
@@ -1133,56 +1148,89 @@ def generate_coordinates_and_preview(
             _stage_mark("COM: CoUninitialize")
 
         # ════════════════════════════════════════════════════
-        # PHASE B: NON-COM OPERATIONS (pixel scan, render, normalize)
+        # PHASE B: NON-COM OPERATIONS (pixel scan per-page)
         # ════════════════════════════════════════════════════
 
-        # ── Step 6: Render sanitized PDF → pixel scan → normalize ──
-        os.makedirs(output_dir, exist_ok=True)
-
-        img, img_w, img_h = render_pdf_to_image(pdf_path)
-        _stage_mark("Render PDF")
-
-        rects = scan_black_rectangles(img)
-        _stage_mark("Pixel Scan")
-
-        if len(rects) < len(cluster_meta):
-            rects = split_merged_rects(rects, cluster_meta)
-        _stage_mark("Split Rectangles")
-
-        rects = normalize_rects(rects, img_w, img_h)
-        _stage_mark("Normalize Rectangles")
-
-        # Sort by position for matching
-        cluster_meta.sort(key=_sort_key_meta)
-        rects.sort(key=lambda r: (r["Top"], r["Left"]))
-
-        # Merge metadata with ratios
-        fields = []
-        for meta, rect in zip(cluster_meta, rects):
-            fields.append({
-                "name": meta["name"],
-                "type": meta["type"],
-                "cellAddr": meta["cellAddr"],
-                "input_parameter": meta.get("input_parameter", ""),
-                "left_ratio": round(rect["left_ratio"], 7),
-                "top_ratio": round(rect["top_ratio"], 7),
-                "right_ratio": round(rect["right_ratio"], 7),
-                "bottom_ratio": round(rect["bottom_ratio"], 7),
-            })
-
-        # ── Step 7: Render background PNG from original PDF ──
         from render_service.background_renderer import (
             pdf_page_to_png,
             get_page_dimensions,
         )
+        os.makedirs(output_dir, exist_ok=True)
 
-        png_filename = f"preview_{output_id}.png"
-        png_path = os.path.join(output_dir, png_filename)
-        pdf_page_to_png(orig_pdf_path, png_path, dpi=DPI)
-        page_w, page_h = get_page_dimensions(orig_pdf_path, dpi=DPI)
-        _stage_mark("Render Background PNG")
+        # Count available PDF pages in sanitized PDF
+        import fitz
+        san_doc = fitz.open(pdf_path)
+        total_pdf_pages = len(san_doc)
+        san_doc.close()
 
-        # ── Step 8: Cleanup ──
+        pages_result = []
+
+        # Use plain string names — COM proxies are stale after Excel.Quit()
+        for i, sheet_name in enumerate(visible_sheet_names):
+            sheet_clusters = [m for m in cluster_meta if m["sheetName"] == sheet_name]
+
+            if not sheet_clusters:
+                # No fields on this sheet — still include as a page with empty fields
+                # (the background PNG is still useful)
+                png_filename = f"preview_{output_id}_page{i}.png"
+                png_path = os.path.join(output_dir, png_filename)
+                pdf_page_to_png(orig_pdf_path, png_path, dpi=DPI, page_index=min(i, total_pdf_pages - 1))
+                page_w, page_h = get_page_dimensions(orig_pdf_path, dpi=DPI, page_index=min(i, total_pdf_pages - 1))
+                pages_result.append({
+                    "sheetName": sheet_name,
+                    "backgroundImage": png_filename,
+                    "page": {"width": page_w, "height": page_h},
+                    "fields": [],
+                })
+                continue
+
+            # Render this page of the sanitized PDF
+            page_idx = min(i, total_pdf_pages - 1)
+            img, img_w, img_h = render_pdf_to_image(pdf_path, page_index=page_idx)
+            _stage_mark("Render PDF page %d" % i)
+
+            rects = scan_black_rectangles(img)
+            _stage_mark("Pixel Scan page %d" % i)
+
+            if len(rects) < len(sheet_clusters):
+                rects = split_merged_rects(rects, sheet_clusters)
+            _stage_mark("Split Rectangles page %d" % i)
+
+            rects = normalize_rects(rects, img_w, img_h)
+            _stage_mark("Normalize page %d" % i)
+
+            # Sort both by position for matching
+            sheet_clusters_sorted = sorted(sheet_clusters, key=_sort_key_meta)
+            rects.sort(key=lambda r: (r["Top"], r["Left"]))
+
+            # Merge metadata with ratios
+            fields = []
+            for meta, rect in zip(sheet_clusters_sorted, rects):
+                fields.append({
+                    "name": meta["name"],
+                    "type": meta["type"],
+                    "cellAddr": meta["cellAddr"],
+                    "input_parameter": meta.get("input_parameter", ""),
+                    "left_ratio": round(rect["left_ratio"], 7),
+                    "top_ratio": round(rect["top_ratio"], 7),
+                    "right_ratio": round(rect["right_ratio"], 7),
+                    "bottom_ratio": round(rect["bottom_ratio"], 7),
+                })
+
+            # Render background PNG for this sheet from original PDF
+            png_filename = f"preview_{output_id}_page{i}.png"
+            png_path = os.path.join(output_dir, png_filename)
+            pdf_page_to_png(orig_pdf_path, png_path, dpi=DPI, page_index=page_idx)
+            page_w, page_h = get_page_dimensions(orig_pdf_path, dpi=DPI, page_index=page_idx)
+            _stage_mark("Render Bg PNG page %d" % i)
+
+            pages_result.append({
+                "sheetName": sheet_name,
+                "backgroundImage": png_filename,
+                "page": {"width": page_w, "height": page_h},
+                "fields": fields,
+            })
+
         _stage_mark("Cleanup")
 
         # Compute durations and print report
@@ -1194,11 +1242,7 @@ def generate_coordinates_and_preview(
                 durations.append((label, elapsed))
             _print_perf_report(durations)
 
-        return {
-            "backgroundImage": png_filename,
-            "page": {"width": page_w, "height": page_h},
-            "fields": fields,
-        }
+        return {"pages": pages_result}
 
     finally:
         # Cleanup all temporary directories
