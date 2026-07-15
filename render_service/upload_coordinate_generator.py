@@ -862,13 +862,14 @@ def generate_coordinates_and_preview(
     output_dir: str,
     output_id: str,
 ) -> dict:
-    """Generate coordinates AND background PNG in a SINGLE COM session.
-
-    Architecture matches original ConMas:
+    """Generate coordinates AND background PNG in a SINGLE COM session.            Architecture matches original ConMas:
       1. Open Excel (one Application, one COM lifecycle)
       2. Open original workbook
       3. Export original PDF (background) — BEFORE sanitization
-      4. Read comments + sanitize workbook in ONE pass
+      4a. Read comments (READ-ONLY pass) — must be separate from sanitize
+          because reading cell.Comment THEN modifying cell.Interior.Color
+          in the same iteration corrupts COM proxy state
+      4b. Sanitize workbook (WRITE-ONLY pass) — uses addresses from step 4a
       5. Save sanitized copy
       6. Reopen sanitized copy
       7. Export sanitized PDF (with IgnorePrintAreas=False, matching ConMas default)
@@ -896,21 +897,7 @@ def generate_coordinates_and_preview(
 
     try:
         # ════════════════════════════════════════════════════
-        # PHASE 0: Identify clusters (uses proven old function)
-        # Uses its OWN COM session — this is a separate scan
-        # that matches ConMas MakeCluster() reading comments
-        # via Infragistics or COM per-cell.
-        # ════════════════════════════════════════════════════
-        cluster_meta = _identify_clusters(xlsx_path)
-        if not cluster_meta:
-            return {
-                "backgroundImage": "",
-                "page": {"width": 0, "height": 0},
-                "fields": [],
-            }
-
-        # ════════════════════════════════════════════════════
-        # PHASE A: SINGLE COM SESSION (export PDFs + sanitize)
+        # PHASE A: SINGLE COM SESSION (everything)
         # ════════════════════════════════════════════════════
         pythoncom.CoInitialize()
         try:
@@ -928,14 +915,72 @@ def generate_coordinates_and_preview(
                 orig_pdf_path = os.path.join(orig_pdf_dir, "original.pdf")
                 wb.ExportAsFixedFormat(0, os.path.abspath(orig_pdf_path))
 
-                # ── Step 2: Sanitize workbook (uses known cluster addresses) ──
+                # ── Step 2a: Read comments (READ-ONLY pass) ──
+                # IMPORTANT: This must be a separate pass from sanitization.
+                # Reading cell.Comment and then modifying cell.Interior.Color
+                # in the same iteration corrupts COM proxy state, causing
+                # subsequent cell.Comment calls to return None.
+                # (Proven in Phase X.10 diagnostic: pure read found 6 comments,
+                #  combined read+write found 0.)
+                #
+                # This logic mirrors _identify_clusters_from_comments() but
+                # operates within the single COM session context. Keep both
+                # in sync when changing comment-scanning behavior.
+                cluster_meta = []
                 cluster_addrs = set()
-                for c in cluster_meta:
-                    cluster_addrs.add(c["cellAddr"].upper().replace(" ", ""))
+
+                for ws in wb.Worksheets:
+                    used = ws.UsedRange
+                    if used is None:
+                        continue
+                    lr = used.Row + used.Rows.Count - 1
+                    lc = used.Column + used.Columns.Count - 1
+                    for row in range(1, lr + 1):
+                        for col in range(1, lc + 1):
+                            cell = ws.Cells(row, col)
+                            try:
+                                comment = cell.Comment
+                            except Exception:
+                                comment = None
+                            if comment is None:
+                                continue
+                            try:
+                                ma = cell.MergeArea
+                            except Exception:
+                                ma = cell
+                            try:
+                                addr = str(ma.Address).upper()
+                            except Exception:
+                                addr = str(cell.Address).upper()
+                            try:
+                                text = str(comment.Text())
+                            except Exception:
+                                text = ""
+                            lines = text.replace("\r\n", "\n").split("\n")
+                            cluster_meta.append({
+                                "cellAddr": addr,
+                                "name": lines[0].strip() if lines else "",
+                                "type": lines[1].strip() if len(lines) > 1 else "Text",
+                                "input_parameter": (
+                                    "\n".join(lines[2:]).strip()
+                                    if len(lines) > 2 else ""
+                                ),
+                            })
+                            cluster_addrs.add(addr)
+
+                if not cluster_meta:
+                    wb.Close(False)
+                    return {
+                        "backgroundImage": "",
+                        "page": {"width": 0, "height": 0},
+                        "fields": [],
+                    }
+
+                # ── Step 2b: Sanitize workbook (WRITE-ONLY pass) ──
                 xlNone = -4142
 
                 for ws in wb.Worksheets:
-                    # Clear shapes (interference prevention)
+                    # Delete shapes (interference prevention)
                     try:
                         for shape in list(ws.Shapes):
                             shape.Delete()
@@ -943,8 +988,11 @@ def generate_coordinates_and_preview(
                         pass
 
                     # Clear headers/footers
-                    ws.PageSetup.CenterHeader = ""
-                    ws.PageSetup.CenterFooter = ""
+                    try:
+                        ws.PageSetup.CenterHeader = ""
+                        ws.PageSetup.CenterFooter = ""
+                    except Exception:
+                        pass
 
                     used = ws.UsedRange
                     if used is None:
@@ -953,7 +1001,6 @@ def generate_coordinates_and_preview(
                     lr = used.Row + used.Rows.Count - 1
                     lc = used.Column + used.Columns.Count - 1
 
-                    # Sanitize cells: BLACK for cluster, WHITE for non-cluster
                     for row in range(1, lr + 1):
                         for col in range(1, lc + 1):
                             cell = ws.Cells(row, col)
@@ -988,7 +1035,7 @@ def generate_coordinates_and_preview(
                                     pass
                             else:
                                 try:
-                                    cell.Interior.Color = 0xFFFFFF  # White
+                                    cell.Interior.Color = 0xFFFFFF
                                 except Exception:
                                     pass
                                 try:
