@@ -3,7 +3,8 @@
 import { useState, useCallback, useRef } from "react";
 import type { RuntimeForm } from "@/types/runtime";
 import { useRuntime } from "@/hooks/useRuntime";
-import { RuntimeFormViewer, useRuntimeState } from "@/components/Runtime";
+import { useRuntimeState } from "@/components/Runtime";
+import { PaperlessDesigner } from "@/components/PaperlessDesigner";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
@@ -163,10 +164,17 @@ export default function Home() {
     setUploading(false);
     setUploadError(null);
     runtime.reset();
+    setRuntimeForm(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
+
+  // ── Upload button from designer toolbar → go to upload screen + open file dialog ──
+  const handleUploadClick = useCallback(() => {
+    handleReset();
+    setTimeout(() => fileInputRef.current?.click(), 100);
+  }, []);
 
   // ── Drag and drop handlers ──
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -415,54 +423,15 @@ export default function Home() {
             </div>
           </div>
         ) : (
-          /* ── Form View ──────────────────────────────────── */
-          <div>
-            {/* Template info bar */}
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-slate-500">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <span className="font-medium text-slate-700">{templateName}</span>
-                <span className="text-slate-300">|</span>
-                <span>{runtimeForm.sheets.length} sheet(s)</span>
-                <span className="text-slate-300">|</span>
-                <span>
-                  {runtimeForm.sheets.reduce((sum, s) => sum + s.fields.length, 0)} field(s)
-                </span>
-                <span className="text-slate-300">|</span>
-                <span>{runtimeForm.dpi} DPI</span>
-              </div>
-            </div>
-
-            {/* PageSurface viewport — scrollable container acting as WPF ScrollViewer
-                No padding, no flex, no justify-center — the PageSurface within is at
-                fixed native pixel dimensions (e.g., 2550×3299) and must not be
-                centered, scaled, or constrained. */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-auto">
-              <RuntimeFormViewer
-                runtimeForm={runtimeForm}
-                runtime={runtime}
-              />
-            </div>
-
-            {/* Dirty status indicator */}
-            {runtime.isDirty() && (
-              <div className="mt-3 flex items-center justify-between">
-                <p className="text-xs text-amber-600 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block" />
-                  Form has unsaved changes
-                </p>
-                <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(runtime.exportJson());
-                  }}
-                  className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors"
-                >
-                  Copy values as JSON
-                </button>
-              </div>
-            )}
+          /* ── Designer View ───────────────────────────────── */
+          <div className="h-[calc(100vh-0px)] flex flex-col -mx-4 sm:-mx-6 -mb-6 sm:-mb-10">
+            <PaperlessDesigner
+              runtimeForm={runtimeForm}
+              runtime={runtime}
+              templateName={templateName}
+              onReset={handleReset}
+              onUploadClick={handleUploadClick}
+            />
           </div>
         )}
       </main>

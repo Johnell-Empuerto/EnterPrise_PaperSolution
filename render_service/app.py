@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from render_service.models import RenderRequest, RenderResponse
 from render_service.renderer import render, render_with_fields
 from render_service.excel_cluster_reader import read_fields
-from render_service.upload_coordinate_generator import generate_coordinates, generate_preview
+from render_service.upload_coordinate_generator import generate_coordinates, generate_coordinates_and_preview
 
 app = FastAPI(title='PaperLess Render Service', version='1.0.0')
 
@@ -223,7 +223,10 @@ async def upload_preview(
 
         out_dir = output_dir or tmp_dir
         output_id = Path(file.filename or "upload").stem
-        result = generate_preview(xlsx_path, output_dir=out_dir, output_id=output_id)
+        # Single COM session: matches original ConMas architecture
+        result = generate_coordinates_and_preview(
+            xlsx_path, output_dir=out_dir, output_id=output_id
+        )
 
         if not result.get("fields"):
             print(f"[upload/preview] No fields detected in: {file.filename}")

@@ -93,11 +93,14 @@ builder.Services.AddSingleton<CoordinateTransformer>();
 builder.Services.AddSingleton<RuntimeCoordinateGenerator>();
 
 // Register Python Rendering Service (Phase 47)
+// NOTE: Use ONLY AddHttpClient, NOT AddSingleton.
+// AddSingleton would override the typed HttpClient registration from
+// AddHttpClient, causing the client to use the default 100-second timeout
+// instead of the configured 5-minute timeout.
 builder.Services.AddHttpClient<PythonRenderService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
 });
-builder.Services.AddSingleton<PythonRenderService>();
 
 // RendererCoordinator depends on IEnumerable<IRenderLayer>
 builder.Services.AddSingleton<RendererCoordinator>();
@@ -173,11 +176,35 @@ app.UseAuthorization();
 // Map controllers
 app.MapControllers();
 
+// Log DI configuration for PythonRenderService (verify HttpClient timeout fix)
 app.Logger.LogInformation(
     "PaperLess Excel Capture API started. Version: 1.3, " +
     "Preview directory: {PreviewDir}, Max upload: {MaxUpload}MB",
     previewPath,
     excelCaptureOptions.MaxUploadSizeMB);
+
+try
+{
+    var pythonService = app.Services.GetRequiredService<PythonRenderService>();
+    var httpClientField = typeof(PythonRenderService).GetField("_http",
+        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+    if (httpClientField != null)
+    {
+        var httpClient = httpClientField.GetValue(pythonService) as HttpClient;
+        if (httpClient != null)
+        {
+            app.Logger.LogInformation(
+                "PythonRenderService: DI registration = AddHttpClient (typed), " +
+                "HttpClient.Timeout = {TimeoutSeconds}s, " +
+                "Service URL = http://127.0.0.1:5091",
+                httpClient.Timeout.TotalSeconds);
+        }
+    }
+}
+catch (Exception ex)
+{
+    app.Logger.LogWarning("PythonRenderService: Could not verify DI config: {Message}", ex.Message);
+}
 
 app.Run();
 

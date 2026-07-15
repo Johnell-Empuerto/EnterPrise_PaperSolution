@@ -1,0 +1,98 @@
+{
+  "FormTest": {
+    "cluster_count": 6,
+    "original_pdf": {
+      "pages": 1,
+      "media_box_pt": "612.0x792.0",
+      "width_pt": 612.0,
+      "height_pt": 792.0
+    },
+    "sanitized_pdf": {
+      "pages": 1,
+      "media_box_pt": "612.0x792.0",
+      "width_pt": 612.0,
+      "height_pt": 792.0
+    },
+    "dimensions_match": true,
+    "orig_image": "2550x3300",
+    "san_image": "2550x3300",
+    "image_dimensions_match": true,
+    "pixel_diff_pct": 5.285,
+    "original_bbox": {
+      "t": 1265,
+      "b": 2031,
+      "l": 853,
+      "r": 1693
+    },
+    "sanitized_bbox": {
+      "t": 1269,
+      "b": 2029,
+      "l": 857,
+      "r": 1691
+    },
+    "content_offset_px": "(4, 4)",
+    "content_offset_pt": "(0.96, 0.96)",
+    "content_match": true,
+    "field_count": 6,
+    "fields": [
+      {
+        "name": "samples",
+        "cellAddr": "$A$1:$B$2",
+        "left_ratio": 0.3360784,
+        "top_ratio": 0.3845455,
+        "right_ratio": 0.4996078,
+        "bottom_ratio": 0.4225758
+      },
+      {
+        "name": "samples",
+        "cellAddr": "$C$1:$D$2",
+        "left_ratio": 0.4996078,
+        "top_ratio": 0.3845455,
+        "right_ratio": 0.6631373,
+        "bottom_ratio": 0.4225758
+      },
+      {
+        "name": "samples",
+        "cellAddr": "$A$3:$D$4",
+        "left_ratio": 0.3360784,
+        "top_ratio": 0.4225758,
+        "right_ratio": 0.6631373,
+        "bottom_ratio": 0.4606061
+      },
+      {
+        "name": "samples",
+        "cellAddr": "$A$6:$D$7",
+        "left_ratio": 0.3360784,
+        "top_ratio": 0.480303,
+        "right_ratio": 0.6631373,
+        "bottom_ratio": 0.5184848
+      },
+      {
+        "name": "samples",
+        "cellAddr": "$A$9:$D$10",
+        "left_ratio": 0.3360784,
+        "top_ratio": 0.5381818,
+        "right_ratio": 0.6631373,
+        "bottom_ratio": 0.5763636
+      },
+      {
+        "name": "samples",
+        "cellAddr": "$A$12",
+        "left_ratio": 0.3360784,
+        "top_ratio": 0.5957576,
+        "right_ratio": 0.4168627,
+        "bottom_ratio": 0.6148485
+      }
+    ]
+  },
+  "Japanese": {
+    "cluster_count": 5,
+    "original_pdf": {
+      "pages": 1,
+      "media_box_pt": "612.0x792.0",
+      "width_pt": 612.0,
+      "height_pt": 792.0
+    },
+    "error": "san_pdf: (-2147417848, 'The object invoked has disconnected from its clients.', None, None)"
+  }
+}

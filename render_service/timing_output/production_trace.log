@@ -1,0 +1,36 @@
+INFO:     Started server process [20008]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5092 (Press CTRL+C to quit)
+[       0ms] [T33492] REQUEST_RECEIVED: File: FormTest - Copy.xlsx
+[       1ms] [T33492] COM_INIT: CoInitialize() succeeded
+[       4ms] [T33492] FILE_SAVED: 12830 bytes
+[       4ms] [T33492] IDENTIFY_CLUSTERS_START: 
+[     693ms] [T33492] IDENTIFY_CLUSTERS_DONE: 6 clusters
+[     693ms] [T33492] SANITIZE_START: 
+[SANITIZE] Original UsedRange: lr=1, lc=7
+[SANITIZE] Extending bounds: cluster addr=$A$12 needs row=12 col=1 (current: lr=1 lc=7)
+[SANITIZE] Extended bounds: lr=12, lc=7
+[SANITIZE] Original UsedRange: lr=12, lc=4
+[SANITIZE] Extended bounds: lr=12, lc=4
+[    4756ms] [T33492] SANITIZE_DONE: 
+[    4756ms] [T33492] EXPORT_PDF_START: 
+[    5575ms] [T33492] EXPORT_PDF_DONE: 
+[    5575ms] [T33492] RENDER_PDF_START: 
+[    5609ms] [T33492] RENDER_PDF_DONE: 2550x3300
+[    5609ms] [T33492] SCAN_RECTS_START: 
+[   39808ms] [T33492] SCAN_RECTS_DONE: 4 rects
+[   39808ms] [T33492] SPLIT_START: 
+[   40134ms] [T33492] SPLIT_DONE: 6 after split
+[   40134ms] [T33492] NORMALIZE_START: 
+[   40134ms] [T33492] NORMALIZE_DONE: 6 fields
+[   40135ms] [T33492] ORIG_PDF_START: 
+[   40874ms] [T33492] ORIG_PDF_DONE: 
+[   40874ms] [T33492] RENDER_BG_START: 
+[   40993ms] [T33492] RENDER_BG_DONE: 2550x3300
+[   40994ms] [T33492] JSON_SERIALIZE: 
+[   40994ms] [T33492] SERIALIZE_DONE: 1300 bytes
+[   40995ms] [T33492] COM_UNINIT: CoUninitialize() succeeded
+[   40995ms] [T33492] RESPONSE_SENT: 
+INFO:     127.0.0.1:60757 - "POST /upload/preview HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61043 - "POST /upload/preview HTTP/1.1" 500 Internal Server Error

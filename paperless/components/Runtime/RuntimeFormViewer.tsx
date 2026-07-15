@@ -15,6 +15,8 @@ export interface RuntimeFormViewerProps {
   runtimeForm: RuntimeForm;
   /** The runtime state hook */
   runtime: RuntimeState;
+  /** Optional: ID of a field to highlight with a selection border */
+  selectedFieldId?: string | null;
 }
 
 /**
@@ -35,7 +37,7 @@ export interface RuntimeFormViewerProps {
  * - Only the viewport scrolls — the PageSurface never scales
  * - All layers share identical dimensions
  */
-export function RuntimeFormViewer({ runtimeForm, runtime }: RuntimeFormViewerProps) {
+export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId }: RuntimeFormViewerProps) {
   // Convert backend RuntimeField[] to OverlayModel[] for RuntimeCanvas compatibility
   const overlays = useMemo(() => {
     const result: OverlayModel[] = [];
@@ -122,6 +124,28 @@ export function RuntimeFormViewer({ runtimeForm, runtime }: RuntimeFormViewerPro
                 usePixelUnits
               />
             )}
+
+            {/* Layer 3: Selection highlight for the designer sidebar */}
+            {selectedFieldId && (() => {
+              const selOverlay = sheetCollection.byId[selectedFieldId];
+              if (!selOverlay) return null;
+              return (
+                <div
+                  style={{
+                    position: "absolute",
+                    left: selOverlay.leftPt,
+                    top: selOverlay.topPt,
+                    width: selOverlay.widthPt,
+                    height: selOverlay.heightPt,
+                    border: "2px solid #2196F3",
+                    backgroundColor: "rgba(33, 150, 243, 0.08)",
+                    pointerEvents: "none",
+                    zIndex: 30,
+                    boxSizing: "border-box",
+                  }}
+                />
+              );
+            })()}
           </PageSurface>
         );
       })}

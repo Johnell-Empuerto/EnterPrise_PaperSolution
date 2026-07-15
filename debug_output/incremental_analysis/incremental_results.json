@@ -1,0 +1,120 @@
+{
+  "A_Original": {
+    "label": "A_Original",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1088,
+      "b": 2198,
+      "l": 173,
+      "r": 2361
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_A_Original.pdf"
+  },
+  "B_RemoveComments": {
+    "label": "B_RemoveComments",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1088,
+      "b": 2198,
+      "l": 173,
+      "r": 2361
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_B_RemoveComments.pdf",
+    "pixel_diff_vs_original": 0.0
+  },
+  "C_RemoveShapes": {
+    "label": "C_RemoveShapes",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 328,
+      "b": 3234,
+      "l": 200,
+      "r": 2395
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_C_RemoveShapes.pdf",
+    "pixel_diff_vs_original": 16.33
+  },
+  "D_RemoveHeaders": {
+    "label": "D_RemoveHeaders",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1088,
+      "b": 2198,
+      "l": 173,
+      "r": 2361
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_D_RemoveHeaders.pdf",
+    "pixel_diff_vs_original": 0.0
+  },
+  "E_ClearValues": {
+    "label": "E_ClearValues",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1088,
+      "b": 2198,
+      "l": 173,
+      "r": 2361
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_E_ClearValues.pdf",
+    "pixel_diff_vs_original": 0.637
+  },
+  "F_PaintClusters": {
+    "label": "F_PaintClusters",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1088,
+      "b": 2198,
+      "l": 173,
+      "r": 2361
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_F_PaintClusters.pdf",
+    "pixel_diff_vs_original": 0.554
+  },
+  "G_FullSanitizer": {
+    "label": "G_FullSanitizer",
+    "pdf": {
+      "media_box_pt": "612.0x792.0",
+      "w_pt": 612.0,
+      "h_pt": 792.0
+    },
+    "img_dims": "2550x3300",
+    "bbox": {
+      "t": 1253,
+      "b": 1386,
+      "l": 581,
+      "r": 936
+    },
+    "saved_pdf": "C:\\Users\\MCF-JO~1\\Documents\\Johnell\\PaperLess Enterprise\\debug_output\\incremental_analysis\\stage_G_FullSanitizer.pdf",
+    "pixel_diff_vs_original": 2.819
+  }
+}

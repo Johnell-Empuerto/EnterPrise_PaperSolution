@@ -29,6 +29,7 @@ def xlsx_to_pdf(xlsx_path: str, output_dir: str | None = None) -> str:
         FileNotFoundError: If the PDF was not created.
     """
     try:
+        import pythoncom
         import win32com.client
     except ImportError:
         raise RuntimeError(
@@ -43,18 +44,22 @@ def xlsx_to_pdf(xlsx_path: str, output_dir: str | None = None) -> str:
     stem = Path(xlsx_path).stem
     pdf_path = os.path.join(output_dir, f"{stem}.pdf")
 
-    excel = win32com.client.Dispatch("Excel.Application")
-    excel.DisplayAlerts = False
-    excel.Visible = False
+    pythoncom.CoInitialize()
     try:
-        wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-        # xlTypePDF = 0, xlQualityStandard = 0
-        wb.ExportAsFixedFormat(0, os.path.abspath(pdf_path))
-        wb.Close(False)
-    except Exception as e:
-        raise RuntimeError(f"Excel COM PDF export failed: {e}") from e
+        excel = win32com.client.Dispatch("Excel.Application")
+        excel.DisplayAlerts = False
+        excel.Visible = False
+        try:
+            wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
+            # xlTypePDF = 0, xlQualityStandard = 0
+            wb.ExportAsFixedFormat(0, os.path.abspath(pdf_path))
+            wb.Close(False)
+        except Exception as e:
+            raise RuntimeError(f"Excel COM PDF export failed: {e}") from e
+        finally:
+            excel.Quit()
     finally:
-        excel.Quit()
+        pythoncom.CoUninitialize()
 
     if not os.path.isfile(pdf_path):
         # Try to find any PDF created in the output dir

@@ -1,0 +1,250 @@
+{
+  "FormTest": {
+    "cluster_addrs": [
+      "$A$1:$B$2",
+      "$C$1:$D$2",
+      "$A$3:$D$4",
+      "$A$6:$D$7",
+      "$A$9:$D$10",
+      "$A$12"
+    ],
+    "cell_positions": {
+      "$A$1:$B$2": {
+        "left_pt": 0.0,
+        "top_pt": 0.0,
+        "width_pt": 96.0,
+        "height_pt": 28.8
+      },
+      "$C$1:$D$2": {
+        "left_pt": 96.0,
+        "top_pt": 0.0,
+        "width_pt": 96.0,
+        "height_pt": 28.8
+      },
+      "$A$3:$D$4": {
+        "left_pt": 0.0,
+        "top_pt": 28.8,
+        "width_pt": 192.0,
+        "height_pt": 28.8
+      },
+      "$A$6:$D$7": {
+        "left_pt": 0.0,
+        "top_pt": 72.0,
+        "width_pt": 192.0,
+        "height_pt": 28.8
+      },
+      "$A$9:$D$10": {
+        "left_pt": 0.0,
+        "top_pt": 115.2,
+        "width_pt": 192.0,
+        "height_pt": 28.8
+      },
+      "$A$12": {
+        "left_pt": 0.0,
+        "top_pt": 158.4,
+        "width_pt": 48.0,
+        "height_pt": 14.4
+      }
+    },
+    "pagesetup": {
+      "Zoom": "100",
+      "FitToPagesWide": 1,
+      "FitToPagesTall": 1,
+      "PaperSize": 1,
+      "LeftMargin": 51.02,
+      "TopMargin": 53.86,
+      "RightMargin": 51.02,
+      "BottomMargin": 53.86,
+      "CenterHorizontally": true,
+      "CenterVertically": true,
+      "Order": 1
+    },
+    "generate_error": "Open.Worksheets"
+  },
+  "Japanese": {
+    "cluster_addrs": [
+      "$I$6:$M$6",
+      "$I$7:$M$7",
+      "$I$8:$M$8",
+      "$I$9:$M$9",
+      "$I$10:$M$10"
+    ],
+    "cell_positions": {
+      "$I$6:$M$6": {
+        "left_pt": 414.6,
+        "top_pt": 177.0,
+        "width_pt": 346.2,
+        "height_pt": 28.2
+      },
+      "$I$7:$M$7": {
+        "left_pt": 414.6,
+        "top_pt": 205.2,
+        "width_pt": 346.2,
+        "height_pt": 28.2
+      },
+      "$I$8:$M$8": {
+        "left_pt": 414.6,
+        "top_pt": 233.4,
+        "width_pt": 346.2,
+        "height_pt": 28.2
+      },
+      "$I$9:$M$9": {
+        "left_pt": 414.6,
+        "top_pt": 261.6,
+        "width_pt": 346.2,
+        "height_pt": 28.2
+      },
+      "$I$10:$M$10": {
+        "left_pt": 414.6,
+        "top_pt": 289.8,
+        "width_pt": 346.2,
+        "height_pt": 28.2
+      }
+    },
+    "pagesetup": {
+      "Zoom": "False",
+      "FitToPagesWide": 1,
+      "FitToPagesTall": 1,
+      "PaperSize": 9,
+      "LeftMargin": 28.35,
+      "TopMargin": 14.17,
+      "RightMargin": 28.35,
+      "BottomMargin": 14.17,
+      "CenterHorizontally": true,
+      "CenterVertically": true,
+      "Order": 1
+    },
+    "coord_positions": {
+      "$I$6:$M$6": {
+        "left_ratio": 0.2282353,
+        "top_ratio": 0.38,
+        "right_ratio": 0.3666667,
+        "bottom_ratio": 0.3879394,
+        "left_px_2550": 582.0,
+        "top_px_3300": 1254.0,
+        "right_px_2550": 935.0,
+        "bottom_px_3300": 1280.2
+      },
+      "$I$7:$M$7": {
+        "left_ratio": 0.2282353,
+        "top_ratio": 0.3879394,
+        "right_ratio": 0.3666667,
+        "bottom_ratio": 0.3958788,
+        "left_px_2550": 582.0,
+        "top_px_3300": 1280.2,
+        "right_px_2550": 935.0,
+        "bottom_px_3300": 1306.4
+      },
+      "$I$8:$M$8": {
+        "left_ratio": 0.2282353,
+        "top_ratio": 0.3958788,
+        "right_ratio": 0.3666667,
+        "bottom_ratio": 0.4038182,
+        "left_px_2550": 582.0,
+        "top_px_3300": 1306.4,
+        "right_px_2550": 935.0,
+        "bottom_px_3300": 1332.6
+      },
+      "$I$9:$M$9": {
+        "left_ratio": 0.2282353,
+        "top_ratio": 0.4038182,
+        "right_ratio": 0.3666667,
+        "bottom_ratio": 0.4117576,
+        "left_px_2550": 582.0,
+        "top_px_3300": 1332.6,
+        "right_px_2550": 935.0,
+        "bottom_px_3300": 1358.8
+      },
+      "$I$10:$M$10": {
+        "left_ratio": 0.2282353,
+        "top_ratio": 0.4117576,
+        "right_ratio": 0.3666667,
+        "bottom_ratio": 0.419697,
+        "left_px_2550": 582.0,
+        "top_px_3300": 1358.8,
+        "right_px_2550": 935.0,
+        "bottom_px_3300": 1385.0
+      }
+    },
+    "comparisons": [
+      {
+        "addr": "$I$6:$M$6",
+        "com_left_pt": 414.6,
+        "com_top_pt": 177.0,
+        "expected_left_pt": 132.9,
+        "expected_top_pt": 325.5,
+        "expected_left_px": 553.8,
+        "expected_top_px": 1356.3,
+        "coord_left_px": 582.0,
+        "coord_top_px": 1254.0,
+        "diff_px_x": 28.2,
+        "diff_px_y": -102.3,
+        "diff_pt_x": 6.78,
+        "diff_pt_y": -24.54
+      },
+      {
+        "addr": "$I$7:$M$7",
+        "com_left_pt": 414.6,
+        "com_top_pt": 205.2,
+        "expected_left_pt": 132.9,
+        "expected_top_pt": 353.7,
+        "expected_left_px": 553.8,
+        "expected_top_px": 1473.8,
+        "coord_left_px": 582.0,
+        "coord_top_px": 1280.2,
+        "diff_px_x": 28.2,
+        "diff_px_y": -193.6,
+        "diff_pt_x": 6.78,
+        "diff_pt_y": -46.45
+      },
+      {
+        "addr": "$I$8:$M$8",
+        "com_left_pt": 414.6,
+        "com_top_pt": 233.4,
+        "expected_left_pt": 132.9,
+        "expected_top_pt": 381.9,
+        "expected_left_px": 553.8,
+        "expected_top_px": 1591.3,
+        "coord_left_px": 582.0,
+        "coord_top_px": 1306.4,
+        "diff_px_x": 28.2,
+        "diff_px_y": -284.9,
+        "diff_pt_x": 6.78,
+        "diff_pt_y": -68.36
+      },
+      {
+        "addr": "$I$9:$M$9",
+        "com_left_pt": 414.6,
+        "com_top_pt": 261.6,
+        "expected_left_pt": 132.9,
+        "expected_top_pt": 410.1,
+        "expected_left_px": 553.8,
+        "expected_top_px": 1708.8,
+        "coord_left_px": 582.0,
+        "coord_top_px": 1332.6,
+        "diff_px_x": 28.2,
+        "diff_px_y": -376.2,
+        "diff_pt_x": 6.78,
+        "diff_pt_y": -90.28
+      },
+      {
+        "addr": "$I$10:$M$10",
+        "com_left_pt": 414.6,
+        "com_top_pt": 289.8,
+        "expected_left_pt": 132.9,
+        "expected_top_pt": 438.3,
+        "expected_left_px": 553.8,
+        "expected_top_px": 1826.3,
+        "coord_left_px": 582.0,
+        "coord_top_px": 1358.8,
+        "diff_px_x": 28.2,
+        "diff_px_y": -467.5,
+        "diff_pt_x": 6.78,
+        "diff_pt_y": -112.19
+      }
+    ],
+    "max_diff_px_x": 28.2,
+    "max_diff_px_y": 467.5,
+    "all_match": false
+  }
+}

@@ -1,0 +1,105 @@
+Phase X.5 — Production vs Benchmark Comparison
+======================================================================
+
+============================================================
+  Testing: Python Direct - FormTest
+  URL: http://127.0.0.1:5091/upload/preview
+  File: FormTest - Copy.xlsx
+============================================================
+  Read file:     0ms
+  Build request: 0ms
+  HTTP request:  1874ms (1.9s)
+  Total:         1874ms (1.9s)
+  Status:        500
+  Content:       122 bytes
+  Success:       False
+  Fields:        0
+
+============================================================
+  Testing: Python Direct - Japanese
+  URL: http://127.0.0.1:5091/upload/preview
+  File: [V3.1_Sample]アンケート用紙.xlsx
+============================================================
+  Read file:     0ms
+  Build request: 0ms
+  HTTP request:  2797ms (2.8s)
+  Total:         2797ms (2.8s)
+  Status:        500
+  Content:       89 bytes
+  Success:       False
+  Fields:        0
+
+============================================================
+  Testing: ASP.NET - FormTest
+  URL: http://127.0.0.1:5090/api/form/upload-preview
+  File: FormTest - Copy.xlsx
+============================================================
+  Read file:     1ms
+  Build request: 0ms
+  HTTP request:  53509ms (53.5s)
+  Total:         53510ms (53.5s)
+  Status:        200
+  Content:       1171 bytes
+  Success:       True
+  Fields:        6
+
+============================================================
+  Testing: ASP.NET - Japanese
+  URL: http://127.0.0.1:5090/api/form/upload-preview
+  File: [V3.1_Sample]アンケート用紙.xlsx
+============================================================
+  Read file:     0ms
+  Build request: 0ms
+  HTTP request:  100053ms (100.1s)
+  Total:         100053ms (100.1s)
+  Status:        500
+  Content:       136 bytes
+  Success:       False
+  Fields:        0
+  *** TOOK > 90s — DANGEROUSLY CLOSE TO 100s TIMEOUT ***
+
+
+======================================================================
+  SUMMARY TABLE
+======================================================================
+
+  Endpoint                                  Total (s)   HTTP (s)   Status   Fields
+  --------------------------------------------------------------------------------
+  ASP.NET - FormTest                             53.5       53.5      200        6
+  ASP.NET - Japanese                            100.1      100.1      500        0
+  Python Direct - FormTest                        1.9        1.9      500        0
+  Python Direct - Japanese                        2.8        2.8      500        0
+
+
+----------------------------------------------------------------------
+  TIMEOUT ANALYSIS
+----------------------------------------------------------------------
+
+  Python Direct - FormTest:
+    Benchmark:       34.5s
+    With HTTP:       1.9s
+    HTTP overhead:   -32.6s
+    OK - under 100s
+
+  Python Direct - Japanese:
+    Benchmark:       60.4s
+    With HTTP:       2.8s
+    HTTP overhead:   -57.6s
+    OK - under 100s
+
+
+----------------------------------------------------------------------
+  ASP.NET vs Python Direct (HTTP overhead comparison)
+----------------------------------------------------------------------
+
+  FormTest:
+    Python direct:  1.9s
+    ASP.NET proxy:  53.5s
+    ASP.NET overhead: 51.6s
+    *** SIGNIFICANT OVERHEAD - investigate ASP.NET timeout setting ***
+
+  Japanese:
+    Python direct:  2.8s
+    ASP.NET proxy:  100.1s
+    ASP.NET overhead: 97.3s
+    *** SIGNIFICANT OVERHEAD - investigate ASP.NET timeout setting ***

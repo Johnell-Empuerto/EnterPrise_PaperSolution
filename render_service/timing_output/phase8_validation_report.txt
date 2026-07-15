@@ -1,0 +1,132 @@
+======================================================================
+  Phase X.8 — Production Validation Report
+======================================================================
+
+--- PART 3: COM Lifecycle ---
+  EXCEL.EXE processes before: 1
+
+======================================================================
+  Workbook: FormTest
+======================================================================
+
+  [COM Range Coordinates]
+  COM Range FAILED: (-2147221008, 'CoInitialize has not been called.', None, None)
+
+  [Timed Pipeline]
+  [identify_clusters] 913ms -> 6 clusters
+[SANITIZE] Original UsedRange: lr=1, lc=7
+[SANITIZE] Extending bounds: cluster addr=$A$3:$D$4 needs row=4 col=4 (current: lr=1 lc=7)
+[SANITIZE] Extending bounds: cluster addr=$A$12 needs row=12 col=1 (current: lr=4 lc=7)
+[SANITIZE] Extended bounds: lr=12, lc=7
+[SANITIZE] Original UsedRange: lr=12, lc=4
+[SANITIZE] Extended bounds: lr=12, lc=4
+  [sanitize_workbook] 5217ms
+  [export_sanitized_pdf] 664ms
+  [render_sanitized_pdf] 59ms -> 2550x3300
+  [scan_black_rectangles] 18983ms -> 4 rects
+  [split_merged_rects] 172ms -> 6
+  [build_fields] -> 6 fields
+  [export_original_pdf] 699ms
+  [render_background_png] 136ms -> 2550x3300
+  Total: 26.8s
+  Fields: 6
+  Page: {'width': 2550, 'height': 3300}
+
+  [Coordinate Accuracy]
+  Average error: N/A px
+  Max error: N/A px
+  RMS error: N/A px
+  Passes <2px criteria: N/A
+
+  [Stage Timing]
+  Stage                           Time (ms)
+  ------------------------------------------
+  scan_black_rectangles             18983ms (  71%)
+  sanitize_workbook                  5217ms (  19%)
+  identify_clusters                   913ms (   3%)
+  export_original_pdf                 699ms (   3%)
+  export_sanitized_pdf                664ms (   2%)
+  split_merged_rects                  172ms (   1%)
+  render_background_png               136ms (   1%)
+  render_sanitized_pdf                 59ms (   0%)
+  normalize_rects                       0ms (   0%)
+  ------------------------------------------
+  TOTAL                             26843ms
+
+======================================================================
+  Workbook: Japanese
+======================================================================
+
+  [COM Range Coordinates]
+  Found 5 COM Range entries
+  Page info: {"page_w_pt": 612.0, "page_h_pt": 792, "center_h": true, "center_v": true, "zoom": false, "fit_w": 1, "fit_h": 1}
+
+  [Timed Pipeline]
+  [identify_clusters] 8580ms -> 5 clusters
+[SANITIZE] Original UsedRange: lr=5, lc=7
+[SANITIZE] Extending bounds: cluster addr=$I$10:$M$10 needs row=10 col=13 (current: lr=5 lc=7)
+[SANITIZE] Extended bounds: lr=10, lc=13
+[SANITIZE] Original UsedRange: lr=45, lc=43
+[SANITIZE] Extended bounds: lr=45, lc=43
+  [sanitize_workbook] 30856ms
+  [export_sanitized_pdf] 1772ms
+  [render_sanitized_pdf] 39ms -> 2550x3300
+  [scan_black_rectangles] 40090ms -> 1 rects
+  [split_merged_rects] 0ms -> 5
+  [build_fields] -> 5 fields
+  [export_original_pdf] 2073ms
+  [render_background_png] 400ms -> 2550x3300
+  Total: 83.8s
+  Fields: 5
+  Page: {'width': 2550, 'height': 3300}
+
+  [Coordinate Accuracy]
+  Average error: 1960.0 px
+  Max error: 1960.0 px
+  RMS error: 1960.0 px
+  Passes <2px criteria: False
+
+  Cell                    Pixel L      COM L     Diff    Pixel T      COM T     Diff
+  ----------------------------------------------------------------------
+  $I$6:$M$6               582.0px   1452.5px 870.50px   1254.0px    -60.0px 1314.00px
+  $I$7:$M$7               582.0px   1452.5px 870.50px   1280.2px     57.5px 1222.70px
+  $I$8:$M$8               582.0px   1452.5px 870.50px   1306.4px    175.0px 1131.40px
+  $I$9:$M$9               582.0px   1452.5px 870.50px   1332.6px    292.5px 1040.10px
+  $I$10:$M$10             582.0px   1452.5px 870.50px   1358.8px    410.0px 948.80px
+
+  [Stage Timing]
+  Stage                           Time (ms)
+  ------------------------------------------
+  scan_black_rectangles             40090ms (  48%)
+  sanitize_workbook                 30856ms (  37%)
+  identify_clusters                  8580ms (  10%)
+  export_original_pdf                2073ms (   2%)
+  export_sanitized_pdf               1772ms (   2%)
+  render_background_png               400ms (   0%)
+  render_sanitized_pdf                 39ms (   0%)
+  split_merged_rects                    0ms (   0%)
+  normalize_rects                       0ms (   0%)
+  ------------------------------------------
+  TOTAL                             83810ms
+
+  EXCEL.EXE processes before: 1
+  EXCEL.EXE processes after:  1
+  Orphaned: NO
+
+======================================================================
+  SUMMARY
+======================================================================
+
+  FormTest:
+    Total time: 26.8s
+    Fields: 0
+    Avg coordinate error: N/Apx
+    Max error: N/Apx
+    Passes <2px: N/A
+
+  Japanese:
+    Total time: 83.8s
+    Fields: 0
+    Avg coordinate error: 1960.0px
+    Max error: 1960.0px
+    Passes <2px: False

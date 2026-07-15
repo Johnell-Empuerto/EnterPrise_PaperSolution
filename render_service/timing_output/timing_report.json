@@ -1,0 +1,48 @@
+{
+  "formtest": {
+    "workbook": "FormTest",
+    "timings_ms": {
+      "identify_clusters": 621.8262999900617,
+      "sanitize_workbook": 5960.374499991303,
+      "export_sanitized_pdf": 922.9967000137549,
+      "render_sanitized_pdf": 53.70920000132173,
+      "scan_black_rectangles": 25949.83230001526,
+      "split_merged_rects": 215.90209999703802,
+      "normalize_rects": 0.0040000013541430235,
+      "export_original_pdf": 528.2178999914322,
+      "render_original_png": 199.12829998065718,
+      "get_page_dimensions": 1.5282999956980348
+    },
+    "total_ms": 34453.51959997788,
+    "total_seconds": 34.45351959997788,
+    "fields_count": 6,
+    "sanitized_pdf_size": 5620,
+    "sanitized_page_count": 1,
+    "orig_pdf_size": 5838,
+    "orig_page_count": 1
+  },
+  "japanese": {
+    "workbook": "Japanese",
+    "timings_ms": {
+      "identify_clusters": 9513.96039998508,
+      "sanitize_workbook": 30795.075500005623,
+      "export_sanitized_pdf": 1183.6891999992076,
+      "render_sanitized_pdf": 46.52250002254732,
+      "scan_black_rectangles": 17019.82630000566,
+      "split_merged_rects": 0.1145999995060265,
+      "normalize_rects": 0.0031999952625483274,
+      "export_original_pdf": 1626.6560000076424,
+      "render_original_png": 261.70580001780763,
+      "get_page_dimensions": 1.0768999927677214
+    },
+    "total_ms": 60448.63040003111,
+    "total_seconds": 60.44863040003111,
+    "fields_count": 5,
+    "sanitized_pdf_size": 5974,
+    "sanitized_page_count": 1,
+    "orig_pdf_size": 373719,
+    "orig_page_count": 1
+  },
+  "formtest_stats": null,
+  "japanese_stats": null
+}

@@ -1,0 +1,260 @@
+{
+  "task1_paper_size_pdf": {
+    "FormTest": {
+      "sheet": "Sheet1",
+      "PaperSize": 1,
+      "Orientation": 1,
+      "Zoom": "100",
+      "FitToPagesWide": 1,
+      "FitToPagesTall": 1,
+      "LeftMargin": 51.02,
+      "RightMargin": 51.02,
+      "TopMargin": 53.86,
+      "BottomMargin": 53.86,
+      "CenterHorizontally": true,
+      "CenterVertically": true,
+      "PrintArea": "$A$1:$D$12",
+      "ps_PageWidth": "ERROR",
+      "ps_PageHeight": "ERROR",
+      "ps_PaperWidth": "ERROR",
+      "ps_PaperHeight": "ERROR",
+      "pdf": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      }
+    },
+    "Japanese": {
+      "error": "Open.Sheets"
+    }
+  },
+  "task3_pagesetup_before_after": {
+    "FormTest": {
+      "sheet": "Sheet1",
+      "before": {
+        "Zoom": "100",
+        "FitToPagesWide": "1",
+        "FitToPagesTall": "1",
+        "LeftMargin": "51.0236220472441",
+        "RightMargin": "51.0236220472441",
+        "TopMargin": "53.85826771653544",
+        "BottomMargin": "53.85826771653544",
+        "CenterHorizontally": "True",
+        "CenterVertically": "True",
+        "Orientation": "1.0",
+        "Order": "1.0",
+        "PaperSize": "1.0",
+        "PrintArea": "'$A$1:$D$12'",
+        "PrintTitleRows": "''",
+        "PrintTitleColumns": "''",
+        "FirstPageNumber": "-4105",
+        "PageNumberLocal": "ERR(<unknown>.PageNumberLocal)",
+        "PageSetup.PageWidth": "ERR(<unknown>.PageSetup)",
+        "PageSetup.PageHeight": "ERR(<unknown>.PageSetup)"
+      },
+      "after": {
+        "Zoom": "False",
+        "FitToPagesWide": "False",
+        "FitToPagesTall": "False",
+        "LeftMargin": "51.0236220472441",
+        "RightMargin": "51.0236220472441",
+        "TopMargin": "53.85826771653544",
+        "BottomMargin": "53.85826771653544",
+        "CenterHorizontally": "True",
+        "CenterVertically": "True",
+        "Orientation": "1.0",
+        "Order": "1.0",
+        "PaperSize": "1.0",
+        "PrintArea": "'$A$1:$D$12'",
+        "PrintTitleRows": "''",
+        "PrintTitleColumns": "''",
+        "FirstPageNumber": "-4105",
+        "PageNumberLocal": "ERR(<unknown>.PageNumberLocal)",
+        "PageSetup.PageWidth": "ERR(<unknown>.PageSetup)",
+        "PageSetup.PageHeight": "ERR(<unknown>.PageSetup)"
+      }
+    },
+    "Japanese": {
+      "sheet": "第15回DMSK_i-Reporter",
+      "before": {
+        "Zoom": "False",
+        "FitToPagesWide": "1",
+        "FitToPagesTall": "1",
+        "LeftMargin": "28.34645669291339",
+        "RightMargin": "28.34645669291339",
+        "TopMargin": "14.173228346456694",
+        "BottomMargin": "14.173228346456694",
+        "CenterHorizontally": "True",
+        "CenterVertically": "True",
+        "Orientation": "1.0",
+        "Order": "1.0",
+        "PaperSize": "9.0",
+        "PrintArea": "'$B$1:$M$44'",
+        "PrintTitleRows": "''",
+        "PrintTitleColumns": "''",
+        "FirstPageNumber": "-4105",
+        "PageNumberLocal": "ERR(<unknown>.PageNumberLocal)",
+        "PageSetup.PageWidth": "ERR(<unknown>.PageSetup)",
+        "PageSetup.PageHeight": "ERR(<unknown>.PageSetup)"
+      },
+      "after": {
+        "Zoom": "False",
+        "FitToPagesWide": "False",
+        "FitToPagesTall": "False",
+        "LeftMargin": "28.34645669291339",
+        "RightMargin": "28.34645669291339",
+        "TopMargin": "14.173228346456694",
+        "BottomMargin": "14.173228346456694",
+        "CenterHorizontally": "True",
+        "CenterVertically": "True",
+        "Orientation": "1.0",
+        "Order": "1.0",
+        "PaperSize": "9.0",
+        "PrintArea": "'$B$1:$M$44'",
+        "PrintTitleRows": "''",
+        "PrintTitleColumns": "''",
+        "FirstPageNumber": "-4105",
+        "PageNumberLocal": "ERR(<unknown>.PageNumberLocal)",
+        "PageSetup.PageWidth": "ERR(<unknown>.PageSetup)",
+        "PageSetup.PageHeight": "ERR(<unknown>.PageSetup)"
+      }
+    }
+  },
+  "task4_ignore_print_areas": {
+    "FormTest": {
+      "sheet": "Sheet1",
+      "PrintArea": "$A$1:$D$12",
+      "ignorePA_false": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "ignorePA_true": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "identical": true
+    },
+    "Japanese": {
+      "sheet": "第15回DMSK_i-Reporter",
+      "PrintArea": "$B$1:$M$44",
+      "ignorePA_false": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "ignorePA_true": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "identical": true
+    }
+  },
+  "task5_workbook_vs_worksheet": {
+    "FormTest": {
+      "workbook_level": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "worksheet_level": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "identical": true
+    },
+    "Japanese": {
+      "workbook_level": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "worksheet_level": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "identical": true
+    }
+  },
+  "task27_sanitized_vs_original_pixel": {
+    "FormTest": {
+      "cluster_count": 6,
+      "original_pdf": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "sanitized_pdf": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "orig_img": "2550x3300",
+      "san_img": "2550x3300",
+      "img_match": true,
+      "pixel_diff_pct": 5.285,
+      "orig_bbox": {
+        "t": 1265,
+        "b": 2031,
+        "l": 853,
+        "r": 1693
+      },
+      "san_bbox": {
+        "t": 1269,
+        "b": 2029,
+        "l": 857,
+        "r": 1691
+      },
+      "content_offset_px": "(4, 4)",
+      "content_match": false
+    },
+    "Japanese": {
+      "cluster_count": 5,
+      "original_pdf": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "sanitized_pdf": {
+        "pages": 1,
+        "media_box_pt": "612.0x792.0",
+        "width_pt": 612.0,
+        "height_pt": 792.0
+      },
+      "orig_img": "2550x3300",
+      "san_img": "2550x3300",
+      "img_match": true,
+      "pixel_diff_pct": 21.256,
+      "orig_bbox": {
+        "t": 90,
+        "b": 3234,
+        "l": 175,
+        "r": 2370
+      },
+      "san_bbox": {
+        "t": 690,
+        "b": 1240,
+        "l": 1768,
+        "r": 2549
+      },
+      "content_offset_px": "(1593, 600)",
+      "content_match": false
+    }
+  }
+}
