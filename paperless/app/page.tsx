@@ -1,11 +1,23 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import type { RuntimeForm } from "@/types/runtime";
 import { useRuntime } from "@/hooks/useRuntime";
 import { RuntimeFormViewer, useRuntimeState } from "@/components/Runtime";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
+
+function mapPreviewType(type: string): "text" | "number" | "date" | "checkbox" | "signature" | "dropdown" | "calculated" {
+  const t = type.toLowerCase();
+  if (t.includes("numeric") || t.includes("number")) return "number";
+  if (t.includes("date")) return "date";
+  if (t.includes("checkbox") || t.includes("radio") || t.includes("bool")) return "checkbox";
+  if (t.includes("signature")) return "signature";
+  if (t.includes("dropdown") || t.includes("select") || t.includes("list")) return "dropdown";
+  if (t.includes("calc") || t.includes("formula") || t.includes("computed")) return "calculated";
+  return "text";
+}
 export default function Home() {
   // ── Upload state ──
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -20,7 +32,7 @@ export default function Home() {
     runtimeForm,
     loading: runtimeLoading,
     error: runtimeError,
-    loadByTemplateId,
+    setRuntimeForm,
   } = useRuntime(null);
 
   // ── Runtime state — manages field values ──
@@ -51,7 +63,7 @@ export default function Home() {
       const formData = new FormData();
       formData.append("file", uploadFile);
 
-      const response = await fetch(`${API_BASE_URL}/api/form/from-excel`, {
+      const response = await fetch(`${API_BASE_URL}/api/form/upload-preview`, {
         method: "POST",
         body: formData,
       });
@@ -62,16 +74,72 @@ export default function Home() {
         throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
       }
 
-      if (!result.templateId) {
-        throw new Error(result.message || "Upload succeeded but no template ID was returned.");
-      }
-
-      const tid = result.templateId;
-      setTemplateId(tid);
       setTemplateName(uploadFile.name);
 
-      // Fetch the RuntimeForm from the COM backend (includes PNG URL + pixel coordinates)
-      await loadByTemplateId(tid);
+      // Convert preview response to RuntimeForm format
+      const pageW = result.page?.width ?? 2550;
+      const pageH = result.page?.height ?? 3300;
+      const bgUrl = result.backgroundImage ?? "";
+
+      const runtimeForm: RuntimeForm = {
+        workbookName: uploadFile.name,
+        title: uploadFile.name,
+        pageWidth: pageW,
+        pageHeight: pageH,
+        scale: 1,
+        dpi: 300,
+        version: "1.0",
+        sheets: [
+          {
+            name: "Sheet1",
+            index: 0,
+            pageWidthPx: pageW,
+            pageHeightPx: pageH,
+            backgroundImage: bgUrl,
+            images: [],
+            shapes: [],
+            printArea: null,
+            fields: (result.fields ?? []).map((f: any, i: number) => {
+              const leftRatio = f.left_ratio ?? 0;
+              const topRatio = f.top_ratio ?? 0;
+              const rightRatio = f.right_ratio ?? 0;
+              const bottomRatio = f.bottom_ratio ?? 0;
+              return {
+                id: f.name ?? `field_${i}`,
+                cellReference: f.cellAddr ?? "",
+                row: 0,
+                column: 0,
+                leftPx: leftRatio * pageW,
+                topPx: topRatio * pageH,
+                widthPx: (rightRatio - leftRatio) * pageW,
+                heightPx: (bottomRatio - topRatio) * pageH,
+                leftRatio,
+                topRatio,
+                widthRatio: rightRatio - leftRatio,
+                heightRatio: bottomRatio - topRatio,
+                mergeRange: (f.cellAddr ?? "").includes(":") ? f.cellAddr : null,
+                isMerged: (f.cellAddr ?? "").includes(":"),
+                dataType: mapPreviewType(f.type ?? ""),
+                readOnly: false,
+                required: false,
+                alignment: null,
+                font: null,
+                fontSize: 0,
+                bold: false,
+                fontColor: null,
+                backgroundColor: null,
+                border: null,
+                placeholder: null,
+                defaultValue: null,
+                maxLength: 0,
+                tabIndex: i,
+              };
+            }),
+          },
+        ],
+      };
+
+      setRuntimeForm(runtimeForm);
     } catch (err) {
       setUploadError(
         `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`

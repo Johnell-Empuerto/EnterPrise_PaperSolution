@@ -20,6 +20,7 @@ namespace ExcelAPI.Controllers
         private readonly FormRuntimeBuilder _runtimeBuilder;
         private readonly RuntimeSerializer _runtimeSerializer;
         private readonly RuntimeCoordinateGenerator _runtimeGenerator;
+        private readonly PythonRenderService _pythonRender;
 
         public FormController(
             IFormSaveService formSaveService,
@@ -29,7 +30,8 @@ namespace ExcelAPI.Controllers
             OpenXmlParser xmlParser,
             FormRuntimeBuilder runtimeBuilder,
             RuntimeSerializer runtimeSerializer,
-            RuntimeCoordinateGenerator runtimeGenerator)
+            RuntimeCoordinateGenerator runtimeGenerator,
+            PythonRenderService pythonRender)
         {
             _formSaveService = formSaveService;
             _env = env;
@@ -39,6 +41,7 @@ namespace ExcelAPI.Controllers
             _runtimeBuilder = runtimeBuilder;
             _runtimeSerializer = runtimeSerializer;
             _runtimeGenerator = runtimeGenerator;
+            _pythonRender = pythonRender;
         }
 
         [HttpPost("save")]
@@ -180,6 +183,62 @@ namespace ExcelAPI.Controllers
                     Message = $"Failed to process Excel file: {ex.Message}",
                     ErrorCode = ErrorCodes.ExcelProcessingError
                 });
+            }
+        }
+
+        [HttpPost("upload-preview")]
+        [RequestSizeLimit(50 * 1024 * 1024)]
+        public async Task<IActionResult> UploadPreview([FromForm] IFormFile? file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new { success = false, message = "No file uploaded." });
+            }
+
+            string extension = Path.GetExtension(file.FileName);
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".xlsx", ".xls" };
+            if (!allowed.Contains(extension))
+            {
+                return BadRequest(new { success = false, message = "Only .xlsx and .xls files are supported." });
+            }
+
+            string uploadsDir = Path.Combine(_env.ContentRootPath, _options.Value.UploadDirectory);
+            Directory.CreateDirectory(uploadsDir);
+            string uniqueId = Guid.NewGuid().ToString("N");
+            string xlsxPath = Path.Combine(uploadsDir, $"{uniqueId}{extension}");
+
+            await using (var stream = new FileStream(xlsxPath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            try
+            {
+                string previewDir = Path.Combine(_env.ContentRootPath, _options.Value.PreviewDirectory);
+                Directory.CreateDirectory(previewDir);
+
+                var pythonResult = await _pythonRender.UploadPreviewAsync(xlsxPath, previewDir);
+
+                if (pythonResult == null || !pythonResult.Success)
+                {
+                    return StatusCode(502, new { success = false, message = "Python preview service returned an error or is unavailable." });
+                }
+
+                var fields = pythonResult.Fields != null
+                    ? pythonResult.Fields.Select(f => (object)new { id = f.Name, name = f.Name, type = f.Type, cellAddr = f.CellAddr, left_ratio = f.LeftRatio, top_ratio = f.TopRatio, right_ratio = f.RightRatio, bottom_ratio = f.BottomRatio }).ToList()
+                    : new List<object>();
+                var response = new { success = true, backgroundImage = $"/preview/{pythonResult.BackgroundImage}", page = new { width = pythonResult.Page?.Width ?? 2550, height = pythonResult.Page?.Height ?? 3300 }, fields };
+
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Upload preview failed");
+                return StatusCode(500, new { success = false, message = $"Preview failed: {ex.Message}" });
+            }
+            finally
+            {
+                try { if (System.IO.File.Exists(xlsxPath)) System.IO.File.Delete(xlsxPath); } catch { }
             }
         }
 

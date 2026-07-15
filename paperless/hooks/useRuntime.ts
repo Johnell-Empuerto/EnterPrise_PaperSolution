@@ -19,6 +19,10 @@ interface UseRuntimeResult {
    * This bypasses the reactive templateId prop for the upload flow.
    */
   loadByTemplateId: (templateId: string) => Promise<void>;
+  /**
+   * Directly set the runtime form data (for upload preview).
+   */
+  setRuntimeForm: (form: RuntimeForm | null) => void;
 }
 
 /**
@@ -112,5 +116,5 @@ export function useRuntime(templateId: string | null): UseRuntimeResult {
     };
   }, [templateId, reloadCounter, doFetch, loadedTemplateId]);
 
-  return { runtimeForm, loading, error, reload, loadByTemplateId };
+  return { runtimeForm, loading, error, reload, loadByTemplateId, setRuntimeForm };
 }

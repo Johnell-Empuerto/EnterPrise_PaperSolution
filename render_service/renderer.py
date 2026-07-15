@@ -61,7 +61,22 @@ def render(template_id: int | None = None,
            xlsx_path: str | None = None,
            output_dir: str | None = None,
            dpi: int = 300) -> RenderResponse:
-    """Render form overlays — original DB-backed pipeline (UNCHANGED)."""
+    if output_dir is None:
+        output_dir = os.path.join(_PROJECT_ROOT, "ExcelAPI", "ExcelAPI", "Preview")
+    os.makedirs(output_dir, exist_ok=True)
+
+    # DB PDF path: published templates with stored PDF blob
+    if xlsx_path is None and template_id is not None:
+        pdf_bytes = _get_pdf_bytes(template_id)
+        if pdf_bytes is not None:
+            print(f"[renderer] Using stored PDF from database for template {template_id}")
+            fields, _ = get_cluster_fielddefs(template_id)
+            print(f"[renderer] Found {len(fields)} fields from ConMas definition")
+            return _fields_to_response(fields, template_id=template_id,
+                                       output_dir=output_dir, dpi=dpi,
+                                       pdf_bytes=pdf_bytes)
+
+    # Fallback: XLSX path (unpublished/legacy templates)
     if xlsx_path is None:
         if template_id is None:
             raise ValueError("Either template_id or xlsx_path is required")
@@ -74,9 +89,6 @@ def render(template_id: int | None = None,
             template_id = abs(hash(stem)) % 1000
     if not os.path.isfile(xlsx_path):
         raise FileNotFoundError(f"XLSX not found: {xlsx_path}")
-    if output_dir is None:
-        output_dir = os.path.join(_PROJECT_ROOT, "ExcelAPI", "ExcelAPI", "Preview")
-    os.makedirs(output_dir, exist_ok=True)
 
     print(f"[renderer] Reading workbook: {xlsx_path}")
     wb = read_workbook(xlsx_path, verbose=False)
@@ -120,18 +132,21 @@ def render_with_fields(fields: list,
 
 
 def _fields_to_response(fields: list,
-                        wb,
-                        xlsx_path: str,
-                        template_id: int,
-                        output_dir: str,
-                        dpi: int) -> RenderResponse:
+                        wb=None,
+                        xlsx_path: str | None = None,
+                        template_id: int = 0,
+                        output_dir: str = "",
+                        dpi: int = 300,
+                        pdf_bytes: bytes | None = None) -> RenderResponse:
     """Common field processing: generate PNG, compute pixel positions, return response.
 
-    Used by both render() (DB path) and render_with_fields() (upload path).
+    Used by both render() (DB path with pdf_bytes) and render_with_fields() (upload path).
     """
-    # Compute layout (needed as fallback if ratios are missing or invalid)
-    sheet_index = next((i for i, s in enumerate(wb.sheets) if s.visible), 0)
-    layout = compute_page_layout(wb, sheet_index=sheet_index, dpi=dpi)
+    sheet_index = 0
+    layout = None
+    if wb is not None:
+        sheet_index = next((i for i, s in enumerate(wb.sheets) if s.visible), 0)
+        layout = compute_page_layout(wb, sheet_index=sheet_index, dpi=dpi)
 
     tmp_dir = tempfile.mkdtemp(prefix="ple_render_")
     page_w_px = page_h_px = 0
@@ -139,15 +154,22 @@ def _fields_to_response(fields: list,
         png_filename = f"runtime_{template_id}_page1.png"
         png_path = os.path.join(output_dir, png_filename)
 
-        print(f"[renderer] Converting to PDF via Excel COM (ExportAsFixedFormat)...")
-        pdf_path = xlsx_to_pdf(xlsx_path, output_dir=tmp_dir)
-        print(f"[renderer] Rendering PDF to PNG: {png_path}")
-        pdf_page_to_png(pdf_path, png_path, dpi=dpi, page_index=0)
+        if pdf_bytes is not None:
+            print(f"[renderer] Using stored PDF from database for template {template_id}...")
+            pdf_path_for_dims = os.path.join(tmp_dir, f"bg_{template_id}.pdf")
+            with open(pdf_path_for_dims, "wb") as f:
+                f.write(pdf_bytes)
+            pdf_page_to_png(pdf_path_for_dims, png_path, dpi=dpi, page_index=0)
+        else:
+            print(f"[renderer] Converting to PDF via Excel COM (ExportAsFixedFormat)...")
+            pdf_path_for_dims = xlsx_to_pdf(xlsx_path, output_dir=tmp_dir)
+            print(f"[renderer] Rendering PDF to PNG: {png_path}")
+            pdf_page_to_png(pdf_path_for_dims, png_path, dpi=dpi, page_index=0)
         try:
             with Image.open(png_path) as pimg:
                 page_w_px, page_h_px = pimg.size
         except Exception:
-            page_w_px, page_h_px = get_page_dimensions(pdf_path, dpi=dpi)
+            page_w_px, page_h_px = get_page_dimensions(pdf_path_for_dims, dpi=dpi)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
 
@@ -167,6 +189,10 @@ def _fields_to_response(fields: list,
                 width_px  = right_px  - left_px
                 height_px = bottom_px - top_px
             else:
+                if wb is None or layout is None:
+                    raise RuntimeError(
+                        f"Invalid ratios for {field.addr} and no workbook available for fallback"
+                    )
                 print(f"[renderer] WARNING: Invalid ratios for {field.addr}, falling back to transformer")
                 rect = cell_range_to_page_rect(layout, wb,
                                                field.col, field.row,
@@ -177,6 +203,10 @@ def _fields_to_response(fields: list,
                 width_px = rect["width_px"]
                 height_px = rect["height_px"]
         else:
+            if wb is None or layout is None:
+                raise RuntimeError(
+                    f"No ratios for {field.addr} and no workbook available for fallback"
+                )
             rect = cell_range_to_page_rect(layout, wb,
                                            field.col, field.row,
                                            field.col_end, field.row_end,
@@ -245,3 +275,25 @@ def _generate_debug_overlay(bg_path: str, fields: list[FieldModel], output_path:
     img = Image.alpha_composite(img, overlay)
     img.convert("RGB").save(output_path, "PNG")
     print(f"[renderer] Debug overlay saved: {output_path}")
+
+
+def _get_pdf_bytes(template_id: int) -> bytes | None:
+    """Query def_top.background_image_file from PostgreSQL.
+
+    Returns the PDF blob if found and non-NULL, otherwise None.
+    """
+    import psycopg2
+    from render_service.db_config import DB_CONFIG
+    conn = psycopg2.connect(**DB_CONFIG)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT background_image_file FROM def_top WHERE def_top_id = %s",
+                (template_id,),
+            )
+            row = cur.fetchone()
+            if row is None or row[0] is None:
+                return None
+            return bytes(row[0])
+    finally:
+        conn.close()
