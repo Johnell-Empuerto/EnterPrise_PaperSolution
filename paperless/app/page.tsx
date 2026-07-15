@@ -106,7 +106,7 @@ export default function Home() {
               const rightRatio = f.right_ratio ?? 0;
               const bottomRatio = f.bottom_ratio ?? 0;
               return {
-                id: f.name ?? `field_${i}`,
+                id: f.name ? `${f.name}_${i}` : `field_${i}`,
                 cellReference: f.cellAddr ?? "",
                 row: 0,
                 column: 0,
@@ -412,15 +412,7 @@ export default function Home() {
               </div>
             )}
 
-            {/* Developer link */}
-            <div className="mt-12 text-center">
-              <a
-                href="/compare"
-                className="text-xs text-slate-400 hover:text-slate-600 underline underline-offset-2 transition-colors"
-              >
-                Developer Tools (Debug / Compare)
-              </a>
-            </div>
+
           </div>
         ) : (
           /* ── Designer View ───────────────────────────────── */

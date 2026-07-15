@@ -17,6 +17,8 @@ export interface RuntimeFormViewerProps {
   runtime: RuntimeState;
   /** Optional: ID of a field to highlight with a selection border */
   selectedFieldId?: string | null;
+  /** Current page (sheet index) to display — defaults to 0 */
+  currentPage?: number;
 }
 
 /**
@@ -37,121 +39,103 @@ export interface RuntimeFormViewerProps {
  * - Only the viewport scrolls — the PageSurface never scales
  * - All layers share identical dimensions
  */
-export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId }: RuntimeFormViewerProps) {
-  // Convert backend RuntimeField[] to OverlayModel[] for RuntimeCanvas compatibility
-  const overlays = useMemo(() => {
-    const result: OverlayModel[] = [];
-    for (const sheet of runtimeForm.sheets) {
-      for (const field of sheet.fields) {
-        // Map backend dataType to OverlayType
-        const type = fieldDataTypeToOverlayType(field.dataType);
-        if (!type) continue;
+export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, currentPage = 0 }: RuntimeFormViewerProps) {
+  const sheet = runtimeForm.sheets[currentPage];
+  if (!sheet) return null;
 
-        result.push({
-          id: field.id,
-          type,
-          cell: field.cellReference,
-          leftPt: field.leftPx,
-          topPt: field.topPx,
-          widthPt: field.widthPx,
-          heightPt: field.heightPx,
-          rotation: 0,
-          metadata: {
-            sheet: sheet.name,
-            mergeRange: field.mergeRange,
-            dataType: field.dataType,
-          },
-        });
-      }
+  // Convert only the CURRENT sheet's fields to OverlayModel[] (optimization: skip other sheets)
+  const overlaysForSheet = useMemo(() => {
+    const result: OverlayModel[] = [];
+    for (const field of sheet.fields) {
+      const type = fieldDataTypeToOverlayType(field.dataType);
+      if (!type) continue;
+      result.push({
+        id: field.id,
+        type,
+        cell: field.cellReference,
+        leftPt: field.leftPx,
+        topPt: field.topPx,
+        widthPt: field.widthPx,
+        heightPt: field.heightPx,
+        rotation: 0,
+        metadata: {
+          sheet: sheet.name,
+          mergeRange: field.mergeRange,
+          dataType: field.dataType,
+        },
+      });
     }
     return result;
-  }, [runtimeForm]);
+  }, [sheet]);
 
-  const overlaysBySheet = useMemo(() => {
-    const map = new Map<string, OverlayModel[]>();
-    for (const overlay of overlays) {
-      const sheet = (overlay.metadata?.sheet as string) ?? "";
-      if (!map.has(sheet)) map.set(sheet, []);
-      map.get(sheet)!.push(overlay);
-    }
-    return map;
-  }, [overlays]);
+  // Resolve background image URL
+  const bgUrl = sheet.backgroundImage
+    ? `${API_BASE_URL}${sheet.backgroundImage.startsWith("/") ? "" : "/"}${sheet.backgroundImage}`
+    : `${API_BASE_URL}/preview/page_${runtimeForm.title}.png`;
 
-  const totalFields = overlays.length;
+  const sheetCollection = {
+    templateId: parseInt(runtimeForm.title, 10) || 0,
+    overlays: overlaysForSheet,
+    byId: Object.fromEntries(overlaysForSheet.map((o) => [o.id, o])),
+    byCell: Object.fromEntries(overlaysForSheet.map((o) => [o.cell, o])),
+    generatedAt: new Date().toISOString(),
+  };
+
+  const hasSheetFields = overlaysForSheet.length > 0;
 
   return (
     <>
-      {runtimeForm.sheets.map((sheet, idx) => {
-        // Resolve background image URL
-        const bgUrl = sheet.backgroundImage
-          ? `${API_BASE_URL}${sheet.backgroundImage.startsWith("/") ? "" : "/"}${sheet.backgroundImage}`
-          : `${API_BASE_URL}/preview/page_${runtimeForm.title}.png`;
+      <PageSurface
+        key={sheet.name + currentPage}
+        widthPx={sheet.pageWidthPx}
+        heightPx={sheet.pageHeightPx}
+      >
+        {/* Layer 1: Background PNG */}
+        <BackgroundLayer
+          src={bgUrl}
+          alt={`${runtimeForm.workbookName} — ${sheet.name}`}
+          widthPx={sheet.pageWidthPx}
+          heightPx={sheet.pageHeightPx}
+        />
 
-        // Filter overlays to only this sheet (multi-sheet safety)
-        const sheetOverlays = overlaysBySheet.get(sheet.name) ?? [];
-        const sheetCollection = {
-          templateId: parseInt(runtimeForm.title, 10) || 0,
-          overlays: sheetOverlays,
-          byId: Object.fromEntries(sheetOverlays.map((o) => [o.id, o])),
-          byCell: Object.fromEntries(sheetOverlays.map((o) => [o.cell, o])),
-          generatedAt: new Date().toISOString(),
-        };
-        const hasSheetFields = sheetOverlays.length > 0;
+        {/* Layer 2: Interactive runtime fields */}
+        {hasSheetFields && (
+          <RuntimeCanvas
+            overlayCollection={sheetCollection}
+            runtimeValues={runtime.values}
+            onValueChange={runtime.setValue}
+            widthPt={sheet.pageWidthPx}
+            heightPt={sheet.pageHeightPx}
+            production
+            usePixelUnits
+          />
+        )}
 
-        return (
-          <PageSurface
-            key={sheet.name + idx}
-            widthPx={sheet.pageWidthPx}
-            heightPx={sheet.pageHeightPx}
-          >
-            {/* Layer 1: Background PNG — rendered by Excel via COM, displayed at native pixels */}
-            <BackgroundLayer
-              src={bgUrl}
-              alt={`${runtimeForm.workbookName} — ${sheet.name}`}
-              widthPx={sheet.pageWidthPx}
-              heightPx={sheet.pageHeightPx}
+        {/* Layer 3: Selection highlight */}
+        {selectedFieldId && (() => {
+          const selOverlay = sheetCollection.byId[selectedFieldId];
+          if (!selOverlay) return null;
+          return (
+            <div
+              style={{
+                position: "absolute",
+                left: selOverlay.leftPt,
+                top: selOverlay.topPt,
+                width: selOverlay.widthPt,
+                height: selOverlay.heightPt,
+                border: "2px solid #2196F3",
+                backgroundColor: "rgba(33, 150, 243, 0.08)",
+                pointerEvents: "none",
+                zIndex: 30,
+                boxSizing: "border-box",
+              }}
             />
-
-            {/* Layer 2: Interactive runtime fields — positioned over the PNG using pixel coords */}
-            {hasSheetFields && (
-              <RuntimeCanvas
-                overlayCollection={sheetCollection}
-                runtimeValues={runtime.values}
-                onValueChange={runtime.setValue}
-                widthPt={sheet.pageWidthPx}
-                heightPt={sheet.pageHeightPx}
-                production
-                usePixelUnits
-              />
-            )}
-
-            {/* Layer 3: Selection highlight for the designer sidebar */}
-            {selectedFieldId && (() => {
-              const selOverlay = sheetCollection.byId[selectedFieldId];
-              if (!selOverlay) return null;
-              return (
-                <div
-                  style={{
-                    position: "absolute",
-                    left: selOverlay.leftPt,
-                    top: selOverlay.topPt,
-                    width: selOverlay.widthPt,
-                    height: selOverlay.heightPt,
-                    border: "2px solid #2196F3",
-                    backgroundColor: "rgba(33, 150, 243, 0.08)",
-                    pointerEvents: "none",
-                    zIndex: 30,
-                    boxSizing: "border-box",
-                  }}
-                />
-              );
-            })()}
-          </PageSurface>
-        );
-      })}
+          );
+        })()}
+      </PageSurface>
 
       {/* Empty state */}
-      {totalFields === 0 && runtimeForm.sheets.length > 0 && (
+      {!hasSheetFields && (
         <div className="bg-amber-50 text-amber-700 text-sm px-4 py-2 rounded-lg border border-amber-200" data-runtime-empty>
           No editable fields detected in this template
         </div>

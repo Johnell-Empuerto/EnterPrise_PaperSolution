@@ -22,10 +22,26 @@ export function PaperlessDesigner({
   onReset,
   onUploadClick,
 }: PaperlessDesignerProps) {
-  const sheet = runtimeForm.sheets[0];
+  // ── Multi-page navigation ──
+  const [currentPage, setCurrentPage] = useState(0);
+  const totalPages = runtimeForm.sheets.length;
+  const sheet = runtimeForm.sheets[currentPage] ?? runtimeForm.sheets[0];
   const fields = sheet?.fields ?? [];
   const pageW = sheet?.pageWidthPx ?? runtimeForm.pageWidth;
   const pageH = sheet?.pageHeightPx ?? runtimeForm.pageHeight;
+
+  const goNext = useCallback(() => {
+    setCurrentPage((p) => Math.min(p + 1, totalPages - 1));
+  }, [totalPages]);
+
+  const goPrev = useCallback(() => {
+    setCurrentPage((p) => Math.max(p - 1, 0));
+  }, []);
+
+  // Reset page on new form
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [runtimeForm]);
 
   // ── Selection ──
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null);
@@ -90,11 +106,11 @@ export function PaperlessDesigner({
   const [cw, setCw] = useState(800);
   const [ch, setCh] = useState(600);
 
-  // Fit Page: compute scale and offset to center paper with padding
+  // Fit Page: compute scale and offset to center paper with padding inside the canvas area
   const fitPage = useCallback(() => {
     if (cw <= 0 || ch <= 0 || pageW <= 0 || pageH <= 0) return;
-    const pad = 40;
-    const s = Math.max(0.1, Math.min(8, Math.min((cw - pad) / pageW, (ch - pad) / pageH)));
+    const pad = 60;
+    const s = Math.max(0.1, Math.min(8, Math.min((cw - pad * 2) / pageW, (ch - pad * 2) / pageH)));
     setZoom(s);
     setOffsetX((cw - pageW * s) / 2);
     setOffsetY((ch - pageH * s) / 2);
@@ -105,19 +121,19 @@ export function PaperlessDesigner({
   const fitWidth = useCallback(() => {
     if (cw <= 0 || pageW <= 0) return;
     const pad = 40;
-    const s = Math.max(0.1, Math.min(8, (cw - pad) / pageW));
+    const s = Math.max(0.1, Math.min(8, (cw - pad * 2) / pageW));
     setZoom(s);
-    setOffsetX(pad / 2);
-    setOffsetY((ch - pageH * s) / 2);
+    setOffsetX((cw - pageW * s) / 2);
+    setOffsetY((ch - pageH * s) / 3);
     setZoomMode("fit-width");
   }, [cw, ch, pageW, pageH]);
 
-  // Auto fit-page on mount and resize when in fit mode
+  // Auto-fit on mount and when page/zoomMode changes
   useEffect(() => {
     if (zoomMode === "fit-page") fitPage();
     else if (zoomMode === "fit-width") fitWidth();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cw, ch, zoomMode]);
+  }, [cw, ch, zoomMode, currentPage]);
 
   // ResizeObserver
   useEffect(() => {
@@ -137,9 +153,10 @@ export function PaperlessDesigner({
   const zoomToward = useCallback((newZoom: number, cx: number, cy: number) => {
     const wx = (cx - offsetX) / zoom;
     const wy = (cy - offsetY) / zoom;
-    setZoom(Math.max(0.1, Math.min(8, newZoom)));
-    setOffsetX(cx - wx * newZoom);
-    setOffsetY(cy - wy * newZoom);
+    const clampedZoom = Math.max(0.1, Math.min(8, newZoom));
+    setZoom(clampedZoom);
+    setOffsetX(cx - wx * clampedZoom);
+    setOffsetY(cy - wy * clampedZoom);
   }, [offsetX, offsetY, zoom]);
 
   // ── Zoom to center (for toolbar buttons) ──
@@ -182,7 +199,7 @@ export function PaperlessDesigner({
       e.preventDefault();
       startPan(e.clientX, e.clientY);
     }
-  }, [startPan]);
+  }, [spaceHeld, startPan]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     doPan(e.clientX, e.clientY);
@@ -228,12 +245,11 @@ export function PaperlessDesigner({
 
   const handleDoubleClick = useCallback(() => fitPage(), [fitPage]);
 
-  // ── Overlay / background toggles (visual only — RuntimeFormViewer always renders both) ──
+  // ── Overlay / background toggles ──
   const [showOverlay, setShowOverlay] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
 
   const cursorClass = isPanning.current ? "grabbing" : spaceHeld ? "grab" : "default";
-
   const currentZoomPercent = Math.round(zoom * 100);
 
   return (
@@ -249,6 +265,10 @@ export function PaperlessDesigner({
         templateName={templateName}
         zoomPercent={currentZoomPercent}
         zoomMode={zoomMode}
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onGoPrev={goPrev}
+        onGoNext={goNext}
         onReset={onReset}
         onUploadClick={onUploadClick}
         onZoomIn={zoomIn}
@@ -260,6 +280,7 @@ export function PaperlessDesigner({
         onToggleOverlay={() => setShowOverlay((v) => !v)}
         showBackground={showBackground}
         onToggleBackground={() => setShowBackground((v) => !v)}
+        onPageSelect={setCurrentPage}
       />
 
       {/* ── Main area ── */}
@@ -301,7 +322,18 @@ export function PaperlessDesigner({
           onWheel={handleWheel}
           onDoubleClick={handleDoubleClick}
         >
-          {/* Camera transform: paper floats in workspace */}
+          {/* Grid dots pattern for infinite canvas feel */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)",
+              backgroundSize: "24px 24px",
+              pointerEvents: "none",
+            }}
+          />
+
+          {/* Camera transform: paper floats above the canvas */}
           <div
             style={{
               position: "absolute",
@@ -310,38 +342,80 @@ export function PaperlessDesigner({
               transform: `scale(${zoom})`,
               transformOrigin: "0 0",
               lineHeight: 0,
-              boxShadow: "0 2px 16px rgba(0,0,0,0.12)",
-              borderRadius: 2,
-              overflow: "hidden",
+              transition: "transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1)",
+              willChange: "transform",
+              filter: "drop-shadow(0 4px 24px rgba(0,0,0,0.15))",
             }}
           >
-            <RuntimeFormViewer
-              runtimeForm={runtimeForm}
-              runtime={runtime}
-              selectedFieldId={selectedFieldId}
-            />
+            {/* Paper wrapper with rounded corners + clip */}
+            <div
+              style={{
+                borderRadius: 2,
+                overflow: "hidden",
+                backgroundColor: "#ffffff",
+              }}
+            >
+              <RuntimeFormViewer
+                runtimeForm={runtimeForm}
+                runtime={runtime}
+                selectedFieldId={selectedFieldId}
+                currentPage={currentPage}
+              />
+            </div>
           </div>
 
-          {/* Zoom indicator */}
+          {/* ── Bottom-right overlay: Page navigation + zoom ── */}
           <div
-            className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-sm border border-slate-200 rounded-lg shadow-sm flex items-center gap-1 px-1 py-1 select-none z-40"
+            className="absolute bottom-4 right-4 flex flex-col gap-2 z-40 select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={zoomOut}
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100 text-slate-600 text-sm font-medium"
-              title="Zoom out"
-            >−</button>
-            <span
-              className="w-14 text-center text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded py-1"
-              onClick={fitPage}
-              title="Fit Page"
-            >{currentZoomPercent}%</span>
-            <button
-              onClick={zoomIn}
-              className="w-7 h-7 flex items-center justify-center rounded hover:bg-slate-100 text-slate-600 text-sm font-medium"
-              title="Zoom in"
-            >+</button>
+            {/* Page navigation */}
+            {totalPages > 1 && (
+              <div className="bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl shadow-sm flex items-center gap-1 px-1 py-1">
+                <button
+                  onClick={goPrev}
+                  disabled={currentPage === 0}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
+                  title="Previous page"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-xs font-medium text-slate-700 min-w-[60px] text-center select-none">
+                  {currentPage + 1} / {totalPages}
+                </span>
+                <button
+                  onClick={goNext}
+                  disabled={currentPage >= totalPages - 1}
+                  className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
+                  title="Next page"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+
+            {/* Zoom controls */}
+            <div className="bg-white/95 backdrop-blur-sm border border-slate-200 rounded-xl shadow-sm flex items-center gap-1 px-1 py-1">
+              <button
+                onClick={zoomOut}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Zoom out"
+              >−</button>
+              <span
+                className="min-w-[52px] text-center text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded-lg py-1 transition-colors"
+                onClick={fitPage}
+                title="Fit Page"
+              >{currentZoomPercent}%</span>
+              <button
+                onClick={zoomIn}
+                className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
+                title="Zoom in"
+              >+</button>
+            </div>
           </div>
         </div>
 
@@ -364,6 +438,10 @@ interface ToolbarProps {
   templateName: string;
   zoomPercent: number;
   zoomMode: ZoomMode;
+  currentPage: number;
+  totalPages: number;
+  onGoPrev: () => void;
+  onGoNext: () => void;
   onReset: () => void;
   onUploadClick: () => void;
   onZoomIn: () => void;
@@ -375,12 +453,17 @@ interface ToolbarProps {
   onToggleOverlay: () => void;
   showBackground: boolean;
   onToggleBackground: () => void;
+  onPageSelect: (page: number) => void;
 }
 
 function Toolbar({
   templateName,
   zoomPercent,
   zoomMode,
+  currentPage,
+  totalPages,
+  onGoPrev,
+  onGoNext,
   onReset,
   onUploadClick,
   onZoomIn,
@@ -392,11 +475,13 @@ function Toolbar({
   onToggleOverlay,
   showBackground,
   onToggleBackground,
+  onPageSelect,
 }: ToolbarProps) {
   return (
     <div className="h-12 bg-white border-b border-slate-200 flex items-center px-3 gap-1 shrink-0 select-none">
-      <div className="flex items-center gap-2 mr-3">
-        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+      {/* Logo */}
+      <div className="flex items-center gap-2 mr-2">
+        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
@@ -406,6 +491,7 @@ function Toolbar({
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
+      {/* File */}
       <ToolbarButton onClick={onReset} title="Open Template" icon={
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
       } />
@@ -415,6 +501,7 @@ function Toolbar({
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
+      {/* View controls */}
       <ToolbarButton onClick={onFitPage} title="Fit Page" active={zoomMode === "fit-page"} icon={
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
       } />
@@ -434,15 +521,89 @@ function Toolbar({
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
-      <ToolbarButton onClick={onToggleOverlay} title="Toggle Overlay" active={showOverlay} icon={
+      {/* Overlay / Background toggles */}
+      <ToolbarButton onClick={onToggleOverlay} title="Toggle Field Overlay" active={showOverlay} icon={
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
       } />
-      <ToolbarButton onClick={onToggleBackground} title="Toggle Background" active={showBackground} icon={
+      <ToolbarButton onClick={onToggleBackground} title="Toggle Background Image" active={showBackground} icon={
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
       } />
 
+      {/* Spacer */}
       <div className="flex-1" />
-      <span className="text-xs text-slate-400 truncate max-w-[200px]">{templateName}</span>
+
+      {/* Page navigation (desktop toolbar) */}
+      {totalPages > 1 && (
+        <>
+          <button
+            onClick={onGoPrev}
+            disabled={currentPage === 0}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            Previous
+          </button>
+
+          <span className="text-xs font-medium text-slate-500 min-w-[80px] text-center select-none">
+            Page {currentPage + 1} <span className="text-slate-300">of</span> {totalPages}
+          </span>
+
+          <button
+            onClick={onGoNext}
+            disabled={currentPage >= totalPages - 1}
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
+          >
+            Next
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+
+          <div className="w-px h-6 bg-slate-200 mx-1" />
+        </>
+      )}
+
+      {/* Sheet names as page thumbnails */}
+      <PageThumbnails
+        currentPage={currentPage}
+        totalPages={totalPages}
+        onSelect={onPageSelect}
+      />
+
+      {/* Template name */}
+      <span className="text-xs text-slate-400 truncate max-w-[160px] ml-2">{templateName}</span>
+    </div>
+  );
+}
+
+/* ── Page Thumbnails in Toolbar ── */
+function PageThumbnails({
+  currentPage,
+  totalPages,
+  onSelect,
+}: {
+  currentPage: number;
+  totalPages: number;
+  onSelect: (page: number) => void;
+}) {
+  // Show page numbers as clickable chips
+  return (
+    <div className="flex items-center gap-0.5 mr-1">
+      {Array.from({ length: totalPages }, (_, i) => (
+        <button
+          key={i}
+          onClick={() => onSelect(i)}
+          className={`min-w-[24px] h-6 flex items-center justify-center rounded text-[11px] font-medium transition-all duration-150 ${
+            i === currentPage
+              ? "bg-emerald-100 text-emerald-700 shadow-sm"
+              : "text-slate-500 hover:bg-slate-100"
+          }`}
+        >
+          {i + 1}
+        </button>
+      ))}
     </div>
   );
 }
@@ -557,10 +718,10 @@ function FieldTypeIcon({ type }: { type: string }) {
     text: { char: "T", color: "text-blue-500" },
     number: { char: "#", color: "text-orange-500" },
     date: { char: "D", color: "text-purple-500" },
-    checkbox: { char: "✓", color: "text-emerald-500" },
+    checkbox: { char: "\u2713", color: "text-emerald-500" },
     signature: { char: "S", color: "text-rose-500" },
-    dropdown: { char: "▼", color: "text-cyan-500" },
-    calculated: { char: "∑", color: "text-slate-500" },
+    dropdown: { char: "\u25BC", color: "text-cyan-500" },
+    calculated: { char: "\u2211", color: "text-slate-500" },
   };
   const meta = iconMap[type] ?? { char: "?", color: "text-slate-400" };
   return (
@@ -592,7 +753,7 @@ function FieldPropertiesPanel({ field }: { field: RuntimeField | null }) {
     ["Bottom (ratio)", (field.topRatio + field.heightRatio).toFixed(4)],
     ["Width (px)", String(Math.round(field.widthPx))],
     ["Height (px)", String(Math.round(field.heightPx))],
-    ["Merge Range", field.mergeRange ?? "—"],
+    ["Merge Range", field.mergeRange ?? "\u2014"],
     ["Read Only", field.readOnly ? "Yes" : "No"],
     ["Required", field.required ? "Yes" : "No"],
   ];
