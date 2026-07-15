@@ -1,8 +1,0 @@
-[
-  {
-    "name": "_xlnm.Print_Area",
-    "refers_to": "Sheet1!$A$1:$D$12",
-    "local_sheet_id": "1",
-    "hidden": false
-  }
-]
