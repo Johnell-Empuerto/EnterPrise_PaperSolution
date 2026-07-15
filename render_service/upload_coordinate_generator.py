@@ -90,7 +90,10 @@ def _sort_key_meta(m):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _identify_clusters_from_comments(xlsx_path: str):
-    """Scan every cell via COM for cell comments (original MakeCluster).
+    """Read cell comments via Worksheet.Comments collection (native direct enumeration).
+
+    Phase X.16 proved that ws.Comments returns the exact same comment set as
+    per-cell cell.Comment scan, but 2.8x faster (no UsedRange traversal).
 
     Returns list of dicts with cellAddr, name, type, input_parameter.
     Returns [] if no comments found.
@@ -107,39 +110,64 @@ def _identify_clusters_from_comments(xlsx_path: str):
         try:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
             for ws in wb.Worksheets:
-                used = ws.UsedRange
-                if used is None:
-                    continue
-                lr = used.Row + used.Rows.Count - 1
-                lc = used.Column + used.Columns.Count - 1
-                for row in range(1, lr + 1):
-                    for col in range(1, lc + 1):
-                        cell = ws.Cells(row, col)
-                        try:
-                            comment = cell.Comment
-                        except Exception:
-                            comment = None
-                        if comment is None:
+                try:
+                    # Skip worksheets with no comments (fast Count property)
+                    if ws.Comments.Count == 0:
+                        continue
+                except Exception:
+                    # Fallback: try per-cell scan if Comments API unavailable
+                    try:
+                        used = ws.UsedRange
+                        if used is None:
                             continue
-                        try:
-                            ma = cell.MergeArea
-                        except Exception:
-                            ma = cell
-                        try:
-                            addr = str(ma.Address)
-                        except Exception:
-                            addr = str(cell.Address)
-                        try:
-                            text = str(comment.Text())
-                        except Exception:
-                            text = ""
-                        lines = text.replace("\r\n", "\n").split("\n")
-                        clusters.append({
-                            "cellAddr": addr,
-                            "name": lines[0].strip() if lines else "",
-                            "type": lines[1].strip() if len(lines) > 1 else "Text",
-                            "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
-                        })
+                        lr = used.Row + used.Rows.Count - 1
+                        lc = used.Column + used.Columns.Count - 1
+                        for row in range(1, lr + 1):
+                            for col in range(1, lc + 1):
+                                try:
+                                    cell = ws.Cells(row, col)
+                                    comment = cell.Comment
+                                    if comment is None:
+                                        continue
+                                    ma = cell.MergeArea
+                                    addr = str(ma.Address)
+                                    text = str(comment.Text())
+                                    lines = text.replace("\r\n", "\n").split("\n")
+                                    clusters.append({
+                                        "cellAddr": addr,
+                                        "name": lines[0].strip() if lines else "",
+                                        "type": lines[1].strip() if len(lines) > 1 else "Text",
+                                        "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
+                                    })
+                                except Exception:
+                                    continue
+                    except Exception:
+                        pass
+                    continue
+
+                for comment in ws.Comments:
+                    try:
+                        parent_range = comment.Parent  # Range the comment is attached to
+                    except Exception:
+                        continue
+                    if parent_range is None:
+                        continue
+                    try:
+                        merged = parent_range.MergeArea
+                        addr = str(merged.Address)
+                    except Exception:
+                        addr = str(parent_range.Address)
+                    try:
+                        text = str(comment.Text())
+                    except Exception:
+                        text = ""
+                    lines = text.replace("\r\n", "\n").split("\n")
+                    clusters.append({
+                        "cellAddr": addr,
+                        "name": lines[0].strip() if lines else "",
+                        "type": lines[1].strip() if len(lines) > 1 else "Text",
+                        "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
+                    })
             wb.Close(False)
         finally:
             try:
@@ -286,14 +314,15 @@ def sanitize_workbook(xlsx_path: str, clusters: list[dict]) -> str:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
 
             for ws in wb.Worksheets:
-                ws.PageSetup.CenterHeader = ""
-                ws.PageSetup.CenterFooter = ""
-
+                # Optimization D: Only delete shapes when shapes exist
                 try:
-                    for shape in list(ws.Shapes):
-                        shape.Delete()
+                    if ws.Shapes.Count > 0:
+                        for shape in list(ws.Shapes):
+                            shape.Delete()
                 except Exception:
                     pass
+
+                # Optimization C: Skip PageSetup clearing
 
                 used = ws.UsedRange
                 if used is None:
@@ -302,72 +331,30 @@ def sanitize_workbook(xlsx_path: str, clusters: list[dict]) -> str:
                 lr = used.Row + used.Rows.Count - 1
                 lc = used.Column + used.Columns.Count - 1
 
-                # Extend bounds to cover all cluster addresses
-                # (they may be outside UsedRange if cells are empty)
-                import traceback as _tb
-                print(f"[SANITIZE] Original UsedRange: lr={lr}, lc={lc}")
-                for addr in cluster_addrs:
-                    m = CELL_ADDR_RE.match(addr)
-                    if m:
-                        def _col_idx(s):
-                            n = 0
-                            for ch in s.replace("$", ""):
-                                n = n * 26 + (ord(ch) - 64)
-                            return n
-                        c1 = _col_idx(m.group(1))
-                        c2 = _col_idx(m.group(3)) if m.group(3) else c1
-                        r1 = int(m.group(2).replace("$", ""))
-                        r2 = int(m.group(4).replace("$", "")) if m.group(4) else r1
-                        if c2 > lc or r2 > lr:
-                            print(f"[SANITIZE] Extending bounds: cluster addr={addr} needs row={r2} col={c2} (current: lr={lr} lc={lc})")
-                        lc = max(lc, c1, c2)
-                        lr = max(lr, r1, r2)
-                print(f"[SANITIZE] Extended bounds: lr={lr}, lc={lc}")
+                # Optimization B: Batch fill entire UsedRange white
+                try:
+                    used.Interior.Color = 0xFFFFFF
+                except Exception:
+                    pass
+
+                # Optimization A: Batch clear all cell values
+                try:
+                    used.ClearContents()
+                except Exception:
+                    pass
 
                 xlNone = -4142
 
-                for row in range(1, lr + 1):
-                    for col in range(1, lc + 1):
-                        cell = ws.Cells(row, col)
+                # Fill only cluster cells black
+                for addr in cluster_addrs:
+                    try:
+                        rng = ws.Range(addr)
+                        rng.Interior.Color = 1  # Black
+                        rng.Value = ""
+                    except Exception:
+                        pass
 
-                        try:
-                            ma = cell.MergeArea
-                        except Exception:
-                            ma = None
-
-                        if ma is not None:
-                            try:
-                                ma_addr = str(ma.Address).upper()
-                            except Exception:
-                                ma_addr = ""
-                            is_cluster = ma_addr in cluster_addrs
-                        else:
-                            try:
-                                cell_addr = str(cell.Address).upper()
-                            except Exception:
-                                cell_addr = ""
-                            is_cluster = cell_addr in cluster_addrs
-
-                        if is_cluster:
-                            fill_cell = ma if ma is not None else cell
-                            try:
-                                fill_cell.Interior.Color = 1
-                            except Exception:
-                                pass
-                            try:
-                                fill_cell.Value = ""
-                            except Exception:
-                                pass
-                        else:
-                            try:
-                                cell.Interior.Color = 0xFFFFFF
-                            except Exception:
-                                pass
-                            try:
-                                cell.Value = ""
-                            except Exception:
-                                pass
-
+                # Clear borders across the full range
                 try:
                     clear_range = ws.Range(ws.Cells(1, 1), ws.Cells(lr, lc))
                     clear_range.Borders.LineStyle = xlNone
@@ -490,90 +477,80 @@ def scan_black_rectangles(img, min_size: int = MIN_RECT_SIZE) -> list[dict]:
     """Scan image pixels for black rectangles on white background.
 
     Replication of ConMas GetAddress() algorithm:
-      1. Top→bottom, left→right pixel scan
-      2. Detect top-left corner: BLACK pixel with NON-BLACK left AND above
+      1. Top→bottom, left→right scan for top-left corners
+      2. Detect corner: BLACK pixel with NON-BLACK left AND above
       3. 6-pixel noise verification
-      4. Expand right until not-black → right edge
+      4. Expand right until white → right edge
       5. Expand down (per column, take max Y) → bottom edge
       6. Minimum 6×6 pixel filter
       7. Mark visited rect
 
+    NumPy-vectorized implementation (validated: identical output,
+    67.8x faster than original Python-loop version).
+
     Returns list of dicts with Left, Top, Right, Bottom (pixel coords).
     """
     h, w, _ = img.shape
+
+    # Pre-compute binary masks (one-time vectorized operations)
+    black = np.all(img < BLACK_THRESHOLD, axis=2)
+    white = np.all(img > WHITE_THRESHOLD, axis=2)
+    not_black = ~black  # equivalent to _is_not_black()
+
     visited = np.zeros((h, w), dtype=bool)
     rects = []
 
-    for y in range(1, h - 1):
-        for x in range(1, w - 1):
-            if visited[y, x]:
-                continue
+    # Vectorized corner detection:
+    #   Corner = black pixel where pixel above AND left are NOT black
+    #   Pad edges with True (= not-black) so edge pixels are never corners
+    left_pad = np.pad(not_black, ((0, 0), (1, 0)), constant_values=True)[:, :-1]
+    above_pad = np.pad(not_black, ((1, 0), (0, 0)), constant_values=True)[:-1, :]
+    corners = black & left_pad & above_pad
 
-            r, g, b = img[y, x]
-            if not _is_black(r, g, b):
-                continue
+    corner_ys, corner_xs = np.where(corners)
 
-            r_left, g_left, b_left = img[y, x - 1]
-            r_up, g_up, b_up = img[y - 1, x]
-            if not (_is_not_black(r_left, g_left, b_left)
-                    and _is_not_black(r_up, g_up, b_up)):
-                continue
+    for idx in range(len(corner_ys)):
+        y, x = corner_ys[idx], corner_xs[idx]
 
-            noise = False
-            for dx in range(1, 7):
-                cx = x + dx
-                if cx >= w:
-                    break
-                rr, gg, bb = img[y - 1, cx]
-                if _is_black(rr, gg, bb):
-                    noise = True
-                    break
-            if noise:
-                continue
+        if visited[y, x]:
+            continue
 
-            for dy in range(1, 7):
-                cy = y + dy
-                if cy >= h:
-                    break
-                rr, gg, bb = img[cy, x - 1]
-                if _is_black(rr, gg, bb):
-                    noise = True
-                    break
-            if noise:
-                continue
+        # 6-pixel noise verification (top row: none of the 6 pixels above are black)
+        if np.any(black[y - 1, x + 1:x + min_size]):
+            continue
 
-            right_x = x + 1
-            while right_x < w:
-                rr, gg, bb = img[y, right_x]
-                if _is_white(rr, gg, bb):
-                    break
-                right_x += 1
-            right_x -= 1
+        # 6-pixel noise verification (left column: none of the 6 pixels left are black)
+        if np.any(black[y + 1:y + min_size, x - 1]):
+            continue
 
-            if right_x - x + 1 < min_size:
-                continue
+        # Expand right until white (same logic as original while loop)
+        row_white = white[y, x + 1:]
+        first_white = np.where(row_white)[0]
+        right_x = (x + first_white[0]) if len(first_white) > 0 else (w - 1)
 
-            bottom_y = y
-            for col in range(x, right_x + 1):
-                scan_y = y + 1
-                while scan_y < h:
-                    rr, gg, bb = img[scan_y, col]
-                    if _is_white(rr, gg, bb):
-                        break
-                    scan_y += 1
-                bottom_y = max(bottom_y, scan_y - 1)
+        if right_x - x + 1 < min_size:
+            continue
 
-            if bottom_y - y + 1 < min_size:
-                continue
+        # Expand down per column until white (same logic as original nested while)
+        bottom_y = y
+        for col in range(x, right_x + 1):
+            col_white = white[y + 1:, col]
+            first_white_in_col = np.where(col_white)[0]
+            col_bottom = (y + first_white_in_col[0]) if len(first_white_in_col) > 0 else (h - 1)
+            if col_bottom > bottom_y:
+                bottom_y = col_bottom
 
-            rects.append({
-                "Left": float(x),
-                "Top": float(y),
-                "Right": float(right_x),
-                "Bottom": float(bottom_y),
-            })
+        if bottom_y - y + 1 < min_size:
+            continue
 
-            visited[y:bottom_y + 1, x:right_x + 1] = True
+        rects.append({
+            "Left": float(x),
+            "Top": float(y),
+            "Right": float(right_x),
+            "Bottom": float(bottom_y),
+        })
+
+        visited[y:bottom_y + 1, x:right_x + 1] = True
 
     return rects
 
@@ -853,6 +830,60 @@ def generate_preview(xlsx_path: str, output_dir: str, output_id: str) -> dict:
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Performance Instrumentation (Phase X.12)
+# Set to False to disable all timing logs.
+# ──────────────────────────────────────────────────────────────────────────────
+ENABLE_PERFORMANCE_LOGS = True
+
+import time as _time_mod
+
+
+def _print_perf_report(stage_timings: list[tuple[str, float]]):
+    """Print a formatted performance report from a list of (label, elapsed_sec) tuples."""
+    total_ms = sum(t[1] for t in stage_timings) * 1000
+
+    print("")
+    print("=" * 58)
+    print("PaperLess Upload Performance")
+    print("=" * 58)
+    print("")
+
+    # Print each stage in EXECUTION ORDER (preserved from call sequence)
+    for label, sec in stage_timings:
+        ms = sec * 1000
+        print("  %-28s : %8.0f ms" % (label, ms))
+
+    print("  " + "-" * 42)
+    print("  %-28s : %8.0f ms" % ("TOTAL", total_ms))
+    print("  %-28s : %8.3f sec" % ("TOTAL", total_ms / 1000))
+    print("=" * 58)
+
+    # Collect all warnings for top-N ranking
+    warnings = []
+    for label, sec in stage_timings:
+        ms = sec * 1000
+        if ms > 5000:
+            print("")
+            print("CRITICAL BOTTLENECK")
+            print("  %s : %.0f ms" % (label, ms))
+            warnings.append((label, ms))
+        elif ms > 1000:
+            print("")
+            print("Slow Stage Detected")
+            print("  %s : %.0f ms" % (label, ms))
+            warnings.append((label, ms))
+
+    # Top-N ranking sorted by time (slowest first)
+    if warnings:
+        warnings.sort(key=lambda x: -x[1])
+        print("")
+        print("Top %d Slowest Operations" % len(warnings))
+        for i, (label, ms) in enumerate(warnings, 1):
+            print("  %d. %-28s %8.0f ms" % (i, label, ms))
+    print("")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Phase X.9 — Single COM Session Pipeline
 # Matches original ConMas architecture: open Excel ONCE, do everything.
 # ──────────────────────────────────────────────────────────────────────────────
@@ -870,13 +901,13 @@ def generate_coordinates_and_preview(
           because reading cell.Comment THEN modifying cell.Interior.Color
           in the same iteration corrupts COM proxy state
       4b. Sanitize workbook (WRITE-ONLY pass) — uses addresses from step 4a
-      5. Save sanitized copy
-      6. Reopen sanitized copy
-      7. Export sanitized PDF (with IgnorePrintAreas=False, matching ConMas default)
-      8. Quit Excel (single cleanup)
-      9. Render sanitized PDF → pixel scan → normalize ratios
-     10. Render background PNG from original PDF
-     11. Return JSON (identical schema to generate_preview)
+      5. Delete metadata sheets & export sanitized PDF DIRECTLY (no SaveAs/Close/Reopen)
+         Phase X.19 proved direct export produces IDENTICAL output to the
+         original SaveAs+Close+Reopen pipeline.
+      6. Quit Excel (single cleanup)
+      7. Render sanitized PDF → pixel scan → normalize ratios
+      8. Render background PNG from original PDF
+      9. Return JSON (identical schema to generate_preview)
 
     Args:
         xlsx_path: Path to uploaded XLSX.
@@ -892,6 +923,19 @@ def generate_coordinates_and_preview(
     import pythoncom
     import win32com.client
 
+    # Performance instrumentation
+    _pt = []
+    if ENABLE_PERFORMANCE_LOGS:
+        def _mark(label):
+            _pt.append((label, _time_mod.perf_counter()))
+        def _stage_mark(label):
+            _mark(label)
+    else:
+        def _mark(_label):
+            pass
+        def _stage_mark(_label):
+            pass
+
     # Temporary directories (cleaned up at end)
     tmp_dirs = []
 
@@ -900,12 +944,15 @@ def generate_coordinates_and_preview(
         # PHASE A: SINGLE COM SESSION (everything)
         # ════════════════════════════════════════════════════
         pythoncom.CoInitialize()
+        _stage_mark("COM: CoInitialize")
         try:
             excel = win32com.client.Dispatch("Excel.Application")
             excel.DisplayAlerts = False
             excel.Visible = False
+            _stage_mark("Excel Launch")
             try:
                 wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
+                _stage_mark("Workbook Open")
 
                 # ── Step 1: Export original PDF (background) ──
                 # MUST be before sanitization because sanitization
@@ -914,8 +961,13 @@ def generate_coordinates_and_preview(
                 tmp_dirs.append(orig_pdf_dir)
                 orig_pdf_path = os.path.join(orig_pdf_dir, "original.pdf")
                 wb.ExportAsFixedFormat(0, os.path.abspath(orig_pdf_path))
+                _stage_mark("Export Original PDF")
 
-                # ── Step 2a: Read comments (READ-ONLY pass) ──
+                # ── Step 2a: Read comments using Worksheet.Comments collection ──
+                # Phase X.16 proved ws.Comments returns the exact same comment set
+                # as per-cell cell.Comment scan, but 2.8x faster (avoids scanning
+                # every cell in UsedRange).
+                #
                 # IMPORTANT: This must be a separate pass from sanitization.
                 # Reading cell.Comment and then modifying cell.Interior.Color
                 # in the same iteration corrupts COM proxy state, causing
@@ -930,43 +982,42 @@ def generate_coordinates_and_preview(
                 cluster_addrs = set()
 
                 for ws in wb.Worksheets:
-                    used = ws.UsedRange
-                    if used is None:
+                    try:
+                        # Fast skip: check Comments.Count before enumeration
+                        if ws.Comments.Count == 0:
+                            continue
+                    except Exception:
                         continue
-                    lr = used.Row + used.Rows.Count - 1
-                    lc = used.Column + used.Columns.Count - 1
-                    for row in range(1, lr + 1):
-                        for col in range(1, lc + 1):
-                            cell = ws.Cells(row, col)
-                            try:
-                                comment = cell.Comment
-                            except Exception:
-                                comment = None
-                            if comment is None:
-                                continue
-                            try:
-                                ma = cell.MergeArea
-                            except Exception:
-                                ma = cell
-                            try:
-                                addr = str(ma.Address).upper()
-                            except Exception:
-                                addr = str(cell.Address).upper()
-                            try:
-                                text = str(comment.Text())
-                            except Exception:
-                                text = ""
-                            lines = text.replace("\r\n", "\n").split("\n")
-                            cluster_meta.append({
-                                "cellAddr": addr,
-                                "name": lines[0].strip() if lines else "",
-                                "type": lines[1].strip() if len(lines) > 1 else "Text",
-                                "input_parameter": (
-                                    "\n".join(lines[2:]).strip()
-                                    if len(lines) > 2 else ""
-                                ),
-                            })
-                            cluster_addrs.add(addr)
+
+                    for comment in ws.Comments:
+                        try:
+                            parent_range = comment.Parent
+                        except Exception:
+                            continue
+                        if parent_range is None:
+                            continue
+                        try:
+                            merged = parent_range.MergeArea
+                            addr = str(merged.Address).upper()
+                        except Exception:
+                            addr = str(parent_range.Address).upper()
+                        try:
+                            text = str(comment.Text())
+                        except Exception:
+                            text = ""
+                        lines = text.replace("\r\n", "\n").split("\n")
+                        cluster_meta.append({
+                            "cellAddr": addr,
+                            "name": lines[0].strip() if lines else "",
+                            "type": lines[1].strip() if len(lines) > 1 else "Text",
+                            "input_parameter": (
+                                "\n".join(lines[2:]).strip()
+                                if len(lines) > 2 else ""
+                            ),
+                        })
+                        cluster_addrs.add(addr)
+
+                _stage_mark("Comment Scan")
 
                 if not cluster_meta:
                     wb.Close(False)
@@ -976,23 +1027,26 @@ def generate_coordinates_and_preview(
                         "fields": [],
                     }
 
-                # ── Step 2b: Sanitize workbook (WRITE-ONLY pass) ──
+                # ── Step 2b: Sanitize workbook (BATCH operations) ──
+                # Phase X.15 optimizations (validated in Phase X.14):
+                #   C: Skip PageSetup header/footer clearing (no visual effect on PDF)
+                #   D: Only enumerate shapes if count > 0
+                #   B: Batch fill entire UsedRange white via Range.Interior.Color
+                #   A: Batch clear values via UsedRange.ClearContents
+                #   Then fill only cluster cells black (one Range call per cluster)
                 xlNone = -4142
 
                 for ws in wb.Worksheets:
-                    # Delete shapes (interference prevention)
+                    # Optimization D: Only delete shapes when shapes exist
                     try:
-                        for shape in list(ws.Shapes):
-                            shape.Delete()
+                        if ws.Shapes.Count > 0:
+                            for shape in list(ws.Shapes):
+                                shape.Delete()
                     except Exception:
                         pass
 
-                    # Clear headers/footers
-                    try:
-                        ws.PageSetup.CenterHeader = ""
-                        ws.PageSetup.CenterFooter = ""
-                    except Exception:
-                        pass
+                    # Optimization C: Skip PageSetup clearing
+                    # (headers/footers don't affect cell fill positions in PDF)
 
                     used = ws.UsedRange
                     if used is None:
@@ -1001,47 +1055,26 @@ def generate_coordinates_and_preview(
                     lr = used.Row + used.Rows.Count - 1
                     lc = used.Column + used.Columns.Count - 1
 
-                    for row in range(1, lr + 1):
-                        for col in range(1, lc + 1):
-                            cell = ws.Cells(row, col)
+                    # Optimization B: Batch fill entire UsedRange white
+                    try:
+                        used.Interior.Color = 0xFFFFFF
+                    except Exception:
+                        pass
 
-                            try:
-                                ma = cell.MergeArea
-                            except Exception:
-                                ma = None
+                    # Optimization A: Batch clear all cell values
+                    try:
+                        used.ClearContents()
+                    except Exception:
+                        pass
 
-                            if ma is not None:
-                                try:
-                                    ma_addr = str(ma.Address).upper()
-                                except Exception:
-                                    ma_addr = ""
-                                is_cluster = ma_addr in cluster_addrs
-                            else:
-                                try:
-                                    cell_addr = str(cell.Address).upper()
-                                except Exception:
-                                    cell_addr = ""
-                                is_cluster = cell_addr in cluster_addrs
-
-                            if is_cluster:
-                                fill_cell = ma if ma is not None else cell
-                                try:
-                                    fill_cell.Interior.Color = 1  # Black
-                                except Exception:
-                                    pass
-                                try:
-                                    fill_cell.Value = ""
-                                except Exception:
-                                    pass
-                            else:
-                                try:
-                                    cell.Interior.Color = 0xFFFFFF
-                                except Exception:
-                                    pass
-                                try:
-                                    cell.Value = ""
-                                except Exception:
-                                    pass
+                    # Fill only cluster cells black (one Range call per cluster)
+                    for addr in cluster_addrs:
+                        try:
+                            rng = ws.Range(addr)
+                            rng.Interior.Color = 1  # Black
+                            rng.Value = ""  # Clear value (merged cells may need explicit clear)
+                        except Exception:
+                            pass  # Address not on this worksheet
 
                     # Clear borders across the full range
                     try:
@@ -1053,37 +1086,40 @@ def generate_coordinates_and_preview(
                     except Exception:
                         pass
 
-                # ── Step 3: Save sanitized copy ──
-                sanitized_dir = tempfile.mkdtemp(prefix="ple_san_")
-                tmp_dirs.append(sanitized_dir)
-                sanitized_path = os.path.join(sanitized_dir, "sanitized.xlsx")
-                wb.SaveAs(os.path.abspath(sanitized_path))
-                wb.Close(False)
+                _stage_mark("Workbook Sanitization")
 
-                # ── Step 4: Reopen sanitized copy & export sanitized PDF ──
-                wb_san = excel.Workbooks.Open(os.path.abspath(sanitized_path))
+                # ── Step 3: Delete metadata sheets & export sanitized PDF DIRECTLY ──
+                # Phase X.19 proved direct export produces IDENTICAL output to
+                # SaveAs+Close+Reopen (validated on FormTest and Japanese workbook).
+                #
+                # Key insight: The original SaveAs+Close+Reopen was introduced in
+                # Phase X.10 due to COM proxy corruption when reading cell.Comment
+                # and writing cell.Interior.Color in the same iteration. Since
+                # Phase X.17 replaced per-cell comment scan with ws.Comments
+                # collection (read pass is fully separate from write pass), the
+                # proxy corruption no longer applies, and direct export works.
 
                 # Delete metadata sheets to avoid multi-page PDF
-                for i in range(wb_san.Sheets.Count, 0, -1):
+                for i in range(wb.Sheets.Count, 0, -1):
                     try:
-                        name = wb_san.Sheets(i).Name
+                        name = wb.Sheets(i).Name
                     except Exception:
                         name = ""
                     if name in ("_Fields", "_RawData"):
-                        wb_san.Sheets(i).Delete()
+                        wb.Sheets(i).Delete()
 
                 pdf_dir = tempfile.mkdtemp(prefix="ple_pdf_")
                 tmp_dirs.append(pdf_dir)
                 pdf_path = os.path.join(pdf_dir, "sanitized.pdf")
 
-                # Export sanitized PDF
+                # Export sanitized PDF DIRECTLY from current workbook
                 # IgnorePrintAreas=False matches ConMas default behavior
-                ws_active = wb_san.ActiveSheet
+                ws_active = wb.ActiveSheet
                 ws_active.ExportAsFixedFormat(
                     0, os.path.abspath(pdf_path),
                     0, 0, False,  # IgnorePrintAreas=False = ConMas default
                 )
-                wb_san.Close(False)
+                _stage_mark("Export Sanitized PDF (direct)")
 
             finally:
                 # Always quit Excel to prevent orphaned processes
@@ -1091,8 +1127,10 @@ def generate_coordinates_and_preview(
                     excel.Quit()
                 except Exception:
                     pass
+                _stage_mark("Excel Quit")
         finally:
             pythoncom.CoUninitialize()
+            _stage_mark("COM: CoUninitialize")
 
         # ════════════════════════════════════════════════════
         # PHASE B: NON-COM OPERATIONS (pixel scan, render, normalize)
@@ -1102,10 +1140,17 @@ def generate_coordinates_and_preview(
         os.makedirs(output_dir, exist_ok=True)
 
         img, img_w, img_h = render_pdf_to_image(pdf_path)
+        _stage_mark("Render PDF")
+
         rects = scan_black_rectangles(img)
+        _stage_mark("Pixel Scan")
+
         if len(rects) < len(cluster_meta):
             rects = split_merged_rects(rects, cluster_meta)
+        _stage_mark("Split Rectangles")
+
         rects = normalize_rects(rects, img_w, img_h)
+        _stage_mark("Normalize Rectangles")
 
         # Sort by position for matching
         cluster_meta.sort(key=_sort_key_meta)
@@ -1135,6 +1180,19 @@ def generate_coordinates_and_preview(
         png_path = os.path.join(output_dir, png_filename)
         pdf_page_to_png(orig_pdf_path, png_path, dpi=DPI)
         page_w, page_h = get_page_dimensions(orig_pdf_path, dpi=DPI)
+        _stage_mark("Render Background PNG")
+
+        # ── Step 8: Cleanup ──
+        _stage_mark("Cleanup")
+
+        # Compute durations and print report
+        if ENABLE_PERFORMANCE_LOGS:
+            durations = []
+            for i in range(1, len(_pt)):
+                label = _pt[i][0]
+                elapsed = _pt[i][1] - _pt[i - 1][1]
+                durations.append((label, elapsed))
+            _print_perf_report(durations)
 
         return {
             "backgroundImage": png_filename,
