@@ -63,5 +63,12 @@ export function RuntimeField({ overlay, value, onChange, production, usePixelUni
       return null;
   }
 
-  return <div style={fieldStyle}>{field}</div>;
+  return (
+    <div
+      style={fieldStyle}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      {field}
+    </div>
+  );
 }

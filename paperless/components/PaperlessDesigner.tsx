@@ -167,22 +167,16 @@ export function PaperlessDesigner({
     setZoomMode("custom");
   }, [cw, ch, zoomToward]);
 
-  // ── Pan state ──
-  const [spaceHeld, setSpaceHeld] = useState(false);
+  // ── Pan state (grab anywhere, no Space key required) ──
   const isPanning = useRef(false);
+  const [isGrabbing, setIsGrabbing] = useState(false);
   const panAnchor = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
-
-  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
-    if (e.code === "Space") { e.preventDefault(); setSpaceHeld(true); }
-  }, []);
-
-  const handleKeyUp = useCallback((e: React.KeyboardEvent) => {
-    if (e.code === "Space") setSpaceHeld(false);
-  }, []);
 
   const startPan = useCallback((clientX: number, clientY: number) => {
     isPanning.current = true;
+    setIsGrabbing(true);
     panAnchor.current = { x: clientX, y: clientY, ox: offsetX, oy: offsetY };
+    document.body.style.userSelect = "none";
   }, [offsetX, offsetY]);
 
   const doPan = useCallback((clientX: number, clientY: number) => {
@@ -192,14 +186,18 @@ export function PaperlessDesigner({
     setZoomMode("custom");
   }, []);
 
-  const endPan = useCallback(() => { isPanning.current = false; }, []);
+  const endPan = useCallback(() => {
+    isPanning.current = false;
+    setIsGrabbing(false);
+    document.body.style.userSelect = "";
+  }, []);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 1 || (e.button === 0 && spaceHeld)) {
+    if (e.button === 0 || e.button === 1) {
       e.preventDefault();
       startPan(e.clientX, e.clientY);
     }
-  }, [spaceHeld, startPan]);
+  }, [startPan]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     doPan(e.clientX, e.clientY);
@@ -226,17 +224,13 @@ export function PaperlessDesigner({
     setZoomMode("custom");
   }, [zoom, zoomToward]);
 
-  // ── Zoom helpers ──
+  // ── Zoom helpers (fine 5% increments instead of preset jumps) ──
   const zoomIn = useCallback(() => {
-    const presets = [0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 6, 8];
-    const next = presets.find((z) => z > zoom * 1.01) ?? presets[presets.length - 1];
-    zoomToCenter(next);
+    zoomToCenter(Math.round((zoom + 0.05) * 100) / 100);
   }, [zoom, zoomToCenter]);
 
   const zoomOut = useCallback(() => {
-    const presets = [0.1, 0.25, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 6, 8];
-    const prev = [...presets].reverse().find((z) => z < zoom * 0.99) ?? presets[0];
-    zoomToCenter(prev);
+    zoomToCenter(Math.round((zoom - 0.05) * 100) / 100);
   }, [zoom, zoomToCenter]);
 
   const zoom100 = useCallback(() => {
@@ -249,15 +243,12 @@ export function PaperlessDesigner({
   const [showOverlay, setShowOverlay] = useState(true);
   const [showBackground, setShowBackground] = useState(true);
 
-  const cursorClass = isPanning.current ? "grabbing" : spaceHeld ? "grab" : "default";
+  const cursorClass = isGrabbing ? "grabbing" : "grab";
   const currentZoomPercent = Math.round(zoom * 100);
 
   return (
     <div
       className="flex flex-col h-full"
-      onKeyDown={handleKeyDown}
-      onKeyUp={handleKeyUp}
-      tabIndex={-1}
       style={{ outline: "none" }}
     >
       {/* ── Toolbar ── */}
@@ -333,16 +324,13 @@ export function PaperlessDesigner({
             }}
           />
 
-          {/* Camera transform: paper floats above the canvas */}
+          {/* Camera transform: unified translate + scale for smooth pan/zoom */}
           <div
             style={{
               position: "absolute",
-              left: offsetX,
-              top: offsetY,
-              transform: `scale(${zoom})`,
+              transform: `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`,
               transformOrigin: "0 0",
               lineHeight: 0,
-              transition: "transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1)",
               willChange: "transform",
               filter: "drop-shadow(0 4px 24px rgba(0,0,0,0.15))",
             }}
