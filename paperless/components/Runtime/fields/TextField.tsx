@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, memo } from "react";
+import { useCallback, memo, useRef } from "react";
 import type { OverlayModel, OverlayConfig } from "@/types/overlay";
 
 export interface FieldComponentProps {
@@ -66,6 +66,52 @@ function TextFieldInner({
   const maxLength = inputCfg.maxLength ?? undefined;
   const charRestriction = inputCfg.characterRestriction ?? undefined;
 
+  // Ref to the inner input/textarea so the wrapper can forward clicks
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+
+  // Click handler: forward wrapper clicks to the actual input/textarea
+  const handleWrapperClick = useCallback(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  // ── Visual wrapper: border, background, flex alignment ──
+  const fieldStyle: React.CSSProperties = {
+    width: "100%",
+    height: "100%",
+    boxSizing: "border-box",
+    display: "flex",
+    alignItems: verticalAlignment,
+    overflow: "hidden",
+    border: production
+      ? "2px solid rgba(234, 179, 8, 0.6)"
+      : "1px solid rgba(59, 130, 246, 0.5)",
+    borderRadius: "2px",
+    background: appearanceCfg.backgroundColor ?? (production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)"),
+    transition: "border-color 0.15s, box-shadow 0.15s",
+    opacity: enabled ? 1 : 0.5,
+    cursor: enabled ? "text" : "not-allowed",
+    ...(behaviorCfg.required && !readOnly
+      ? { borderLeft: "3px solid #dc2626" }
+      : {}),
+  };
+
+  // ── Inner element: font, text alignment, natural sizing ──
+  const innerStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    border: "none",
+    background: "transparent",
+    outline: "none",
+    fontFamily: appearanceCfg.fontFamily ?? "Calibri, sans-serif",
+    fontSize: appearanceCfg.fontSize ? `${appearanceCfg.fontSize}pt` : "11pt",
+    fontWeight: appearanceCfg.fontWeight ?? "normal",
+    color: appearanceCfg.textColor ?? "#1a1a1a",
+    textAlign: (layoutCfg.horizontalAlign as React.CSSProperties["textAlign"]) ?? "left",
+    padding: "1px 3px",
+    resize: "none",
+    overflow: "hidden",
+  };
+
   const handleChange = useCallback(
     (raw: string) => {
       if (readOnly || !enabled) return;
@@ -89,51 +135,22 @@ function TextFieldInner({
     [readOnly, enabled, charRestriction, maxLength, onChange],
   );
 
-  const style: React.CSSProperties = {
-    width: "100%",
-    height: "100%",
-    boxSizing: "border-box",
-    padding: "1px 3px",
-    border: appearanceCfg.border
-      ? `1px ${appearanceCfg.border} ${production ? "rgba(234, 179, 8, 0.6)" : "rgba(59, 130, 246, 0.5)"}`
-      : production
-        ? "2px solid rgba(234, 179, 8, 0.6)"
-        : "1px solid rgba(59, 130, 246, 0.5)",
-    borderRadius: appearanceCfg.borderRadius ?? "2px",
-    background: appearanceCfg.backgroundColor ?? (production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)"),
-    fontFamily: appearanceCfg.fontFamily ?? "Calibri, sans-serif",
-    fontSize: appearanceCfg.fontSize ? `${appearanceCfg.fontSize}pt` : "11pt",
-    fontWeight: appearanceCfg.fontWeight ?? "normal",
-    color: appearanceCfg.textColor ?? "#1a1a1a",
-    textAlign: (layoutCfg.horizontalAlign as React.CSSProperties["textAlign"]) ?? "left",
-    outline: "none",
-    transition: "border-color 0.15s, box-shadow 0.15s",
-    resize: "none",
-    overflow: "hidden",
-    opacity: enabled ? 1 : 0.5,
-    cursor: enabled ? undefined : "not-allowed",
-    ...(behaviorCfg.required && !readOnly
-      ? { borderLeft: "3px solid #dc2626" }
-      : {}),
-  };
-
   if (readOnly) {
     return (
       <div
         style={{
-          ...style,
-          display: "flex",
-          alignItems: verticalAlignment,
+          ...fieldStyle,
           background: appearanceCfg.backgroundColor ?? "#f1f5f9",
           cursor: "default",
         }}
       >
         <span
           style={{
-            fontSize: style.fontSize,
-            fontFamily: style.fontFamily,
-            fontWeight: style.fontWeight,
-            color: style.color,
+            fontSize: innerStyle.fontSize,
+            fontFamily: innerStyle.fontFamily,
+            fontWeight: innerStyle.fontWeight,
+            color: innerStyle.color,
+            padding: innerStyle.padding,
             opacity: 0.6,
           }}
         >
@@ -145,7 +162,29 @@ function TextFieldInner({
 
   if (isMultiline) {
     return (
-      <textarea
+      <div style={fieldStyle} onClick={handleWrapperClick}>
+        <textarea
+          ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+          value={(value as string) ?? ""}
+          onChange={(e) => handleChange(e.target.value)}
+          onBlur={onBlur}
+          placeholder=""
+          maxLength={maxLength}
+          readOnly={readOnly}
+          disabled={!enabled}
+          style={{ ...innerStyle, maxHeight: "100%", overflowY: "auto" }}
+          className="runtime-field runtime-textarea"
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div style={fieldStyle} onClick={handleWrapperClick}>
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type={kb.type}
+        inputMode={kb.inputMode}
         value={(value as string) ?? ""}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={onBlur}
@@ -153,26 +192,10 @@ function TextFieldInner({
         maxLength={maxLength}
         readOnly={readOnly}
         disabled={!enabled}
-        style={style}
-        className="runtime-field runtime-textarea"
+        style={innerStyle}
+        className="runtime-field runtime-input"
       />
-    );
-  }
-
-  return (
-    <input
-      type={kb.type}
-      inputMode={kb.inputMode}
-      value={(value as string) ?? ""}
-      onChange={(e) => handleChange(e.target.value)}
-      onBlur={onBlur}
-      placeholder=""
-      maxLength={maxLength}
-      readOnly={readOnly}
-      disabled={!enabled}
-      style={style}
-      className="runtime-field runtime-input"
-    />
+    </div>
   );
 }
 

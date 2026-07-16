@@ -46,9 +46,6 @@ export interface FieldConfig {
     fontWeight?: string;
     textColor?: string;
     backgroundColor?: string;
-    border?: string;
-    borderRadius?: string;
-    textAlign?: string;
   };
   behavior: {
     readOnly?: boolean;

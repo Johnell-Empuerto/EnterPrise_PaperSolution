@@ -1284,33 +1284,6 @@ function ConfigPanel({ field, onUpdateConfig }: ConfigPanelProps) {
               className="w-full h-6 px-1 border border-slate-200 rounded-md cursor-pointer"
             />
           </ConfigField>
-          <ConfigField label="Border">
-            <select
-              value={cfg.appearance.border ?? "solid"}
-              onChange={(e) => onUpdateConfig("appearance", "border", e.target.value)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {["none", "solid", "dashed", "dotted", "double"].map((b) => (
-                <option key={b} value={b}>
-                  {b.charAt(0).toUpperCase() + b.slice(1)}
-                </option>
-              ))}
-            </select>
-          </ConfigField>
-          <ConfigField label="Border Radius">
-            <select
-              value={cfg.appearance.borderRadius ?? "2px"}
-              onChange={(e) => onUpdateConfig("appearance", "borderRadius", e.target.value)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {["0px", "2px", "4px", "6px", "8px", "12px", "9999px"].map((r) => (
-                <option key={r} value={r}>
-                  {r === "9999px" ? "Full" : r}
-                </option>
-              ))}
-            </select>
-          </ConfigField>
-
         </div>
       </CollapsibleSection>
 

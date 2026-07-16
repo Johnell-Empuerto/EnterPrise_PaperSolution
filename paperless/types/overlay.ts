@@ -41,8 +41,6 @@ export interface OverlayConfig {
     fontWeight?: string;
     textColor?: string;
     backgroundColor?: string;
-    border?: string;
-    borderRadius?: string;
   };
   /**
    * Layout alignment — single source of truth for text/content positioning.
