@@ -233,7 +233,7 @@ export default function Home() {
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
       {/* ── Header ─────────────────────────────────────────── */}
       <header className="border-b border-slate-200 bg-white/90 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="mx-auto px-3  py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
               <svg
