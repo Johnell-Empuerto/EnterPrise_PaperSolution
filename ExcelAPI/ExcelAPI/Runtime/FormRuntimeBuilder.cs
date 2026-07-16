@@ -75,7 +75,7 @@ namespace ExcelAPI.Runtime
 
                 // Detect editable fields using CoordinateEngine pixel bounds
                 runtimeSheet.Fields = _fieldDetector.DetectFields(
-                    sheet, originXPt, originYPt, dpi);
+                    sheet, originXPt, originYPt, dpi, sheet.Index + 1);
 
                 // Convert drawing objects to runtime image/shape references
                 if (sheet.DrawingObjects != null)

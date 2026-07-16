@@ -460,11 +460,16 @@ namespace ExcelAPI.Services
                         // Infer field type from comment text
                         string fieldType = InferFieldType(commentText);
 
-                        string fieldId = $"field_{cellRef.Replace("$", "")}";
+                        // Extract display name from comment first line
+                        string fieldName = ExtractFieldName(commentText, cellRef, tabIndex);
+
+                        // Generate unique internal ID: page{page}field{index}
+                        string fieldId = $"page1field{fields.Count + 1}";
 
                         fields.Add(new ExcelField
                         {
                             Id = fieldId,
+                            Name = fieldName,
                             Cell = cellRef.Replace("$", ""),
                             Type = fieldType,
                             Comment = commentText,
@@ -575,6 +580,26 @@ namespace ExcelAPI.Services
 
             // Default: treat as text field
             return "Text";
+        }
+
+        /// <summary>
+        /// Extract a user-visible field name from comment text.
+        /// Uses the first non-empty line of the comment. Falls back to a default name.
+        /// </summary>
+        private static string ExtractFieldName(string commentText, string cellRef, int index)
+        {
+            if (!string.IsNullOrWhiteSpace(commentText))
+            {
+                string firstLine = commentText
+                    .Replace("\r\n", "\n")
+                    .Split('\n')
+                    .Select(l => l.Trim())
+                    .FirstOrDefault(l => l.Length > 0) ?? "";
+
+                if (!string.IsNullOrWhiteSpace(firstLine))
+                    return firstLine;
+            }
+            return $"p1f{index + 1}";
         }
 
         // ═══════════════════════════════════════════════════════════════════

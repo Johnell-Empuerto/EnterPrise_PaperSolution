@@ -33,7 +33,7 @@ namespace ExcelAPI.Runtime
         /// <param name="dpi">Rendering DPI for pixel conversion.</param>
         /// <returns>List of runtime fields.</returns>
         public List<RuntimeField> DetectFields(
-            RenderSheet sheet, double originXPt, double originYPt, int dpi)
+            RenderSheet sheet, double originXPt, double originYPt, int dpi, int pageIndex = 1)
         {
             var fields = new List<RuntimeField>();
             var renderedMerges = new HashSet<int>();
@@ -60,7 +60,7 @@ namespace ExcelAPI.Runtime
                 var bounds = _coords.GetCellOrMergePixelBounds(sheet, cell, originXPt, originYPt);
 
                 // Build the runtime field
-                var field = BuildField(cell, sheet, bounds, tabIndex, dpi);
+                var field = BuildField(cell, sheet, bounds, tabIndex, dpi, pageIndex);
 
                 fields.Add(field);
                 tabIndex++;
@@ -107,7 +107,7 @@ namespace ExcelAPI.Runtime
         /// </summary>
         private RuntimeField BuildField(
             RenderCell cell, RenderSheet sheet,
-            SkiaSharp.SKRect bounds, int tabIndex, int dpi)
+            SkiaSharp.SKRect bounds, int tabIndex, int dpi, int pageIndex = 1)
         {
             double ptsToPx = dpi / 72.0;
 
@@ -140,7 +140,8 @@ namespace ExcelAPI.Runtime
 
             return new RuntimeField
             {
-                Id = $"field_{cell.Reference ?? $"R{cell.RowIndex}C{cell.ColumnIndex}"}_{tabIndex}",
+                Id = $"page{pageIndex}field{tabIndex + 1}",
+                Name = $"p{pageIndex}f{tabIndex + 1}",
                 CellReference = cell.Reference ?? $"R{cell.RowIndex}C{cell.ColumnIndex}",
                 Row = cell.RowIndex,
                 Column = cell.ColumnIndex,

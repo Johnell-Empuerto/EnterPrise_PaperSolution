@@ -41,6 +41,8 @@ export interface RuntimeSheet {
 
 export interface RuntimeField {
   id: string;
+  /** User-visible field name (from comment or default). Never shown as `id`. */
+  name?: string;
   cellReference: string;
   row: number;
   column: number;

@@ -124,6 +124,7 @@ export default function Home() {
               const bottomRatio = f.bottom_ratio ?? 0;
               return {
                 id: f.name ? `${f.name}_${i}` : `field_${i}`,
+                name: f.name ?? null,
                 cellReference: f.cellAddr ?? "",
                 row: 0,
                 column: 0,

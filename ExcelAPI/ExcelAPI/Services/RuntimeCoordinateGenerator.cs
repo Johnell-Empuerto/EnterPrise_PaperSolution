@@ -56,6 +56,7 @@ namespace ExcelAPI.Services
                 }
 
                 var fieldList = new List<object>();
+                int tabIndex = 0;
                 foreach (var f in capture.Fields)
                 {
                     double leftRatio = pngWidth > 0 ? Math.Round(f.Left / pngWidth, 7) : 0;
@@ -63,9 +64,14 @@ namespace ExcelAPI.Services
                     double widthRatio = pngWidth > 0 ? Math.Round(f.Width / pngWidth, 7) : 0;
                     double heightRatio = pngHeight > 0 ? Math.Round(f.Height / pngHeight, 7) : 0;
 
+                    string fieldName = !string.IsNullOrWhiteSpace(f.Name)
+                        ? f.Name
+                        : $"p1f{tabIndex + 1}";
+
                     fieldList.Add(new
                     {
-                        id = f.Id,
+                        id = $"page1field{tabIndex + 1}",
+                        name = fieldName,
                         cellReference = f.Cell,
                         leftPx = Math.Round(f.Left, 1),
                         topPx = Math.Round(f.Top, 1),
@@ -83,6 +89,8 @@ namespace ExcelAPI.Services
                         readOnly = false,
                         required = false
                     });
+
+                    tabIndex++;
                 }
 
                 var sheets = new List<object>
@@ -211,9 +219,13 @@ namespace ExcelAPI.Services
                                         cellRef = crs;
                                 }
 
+                                string fieldName = fieldElem.TryGetProperty("name", out var nm)
+                                    ? nm.GetString() ?? "" : "";
+
                                 runtimeSheet.Fields.Add(new RuntimeField
                                 {
                                     Id = fieldId,
+                                    Name = fieldName,
                                     CellReference = cellRef,
                                     LeftPx = fieldElem.TryGetProperty("leftPx", out var lx)
                                         ? lx.GetDouble() : 0,

@@ -60,7 +60,7 @@ export function PaperlessDesigner({
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (f) =>
-          f.id.toLowerCase().includes(q) ||
+          (f.name ?? f.id).toLowerCase().includes(q) ||
           f.cellReference.toLowerCase().includes(q) ||
           f.dataType.toLowerCase().includes(q),
       );
@@ -68,7 +68,7 @@ export function PaperlessDesigner({
     const sorted = [...result];
     switch (sortBy) {
       case "name":
-        sorted.sort((a, b) => a.id.localeCompare(b.id));
+        sorted.sort((a, b) => (a.name ?? a.id).localeCompare(b.name ?? b.id));
         break;
       case "cell":
         sorted.sort((a, b) => a.cellReference.localeCompare(b.cellReference));
@@ -920,7 +920,7 @@ function FieldExplorer({
             <div className="flex items-center gap-2">
               <FieldTypeIcon type={field.dataType} />
               <span className="text-xs font-medium text-slate-800 truncate flex-1">
-                {field.id}
+                {field.name ?? field.id}
               </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5 ml-5">
@@ -979,7 +979,7 @@ function FieldPropertiesPanel({ field }: { field: RuntimeField | null }) {
   }
 
   const rows: [string, string][] = [
-    ["Name", field.id],
+    ["Name", field.name ?? field.id],
     ["Cell", field.cellReference],
     ["Type", field.dataType],
     ["Left (ratio)", field.leftRatio.toFixed(4)],
