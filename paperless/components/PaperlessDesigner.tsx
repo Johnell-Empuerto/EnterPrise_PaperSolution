@@ -81,10 +81,20 @@ export function PaperlessDesigner({
   );
 
   // Merge config into a RuntimeField for rendering
+  // Deep-merges per category so partial overrides (e.g. only {behavior: {readOnly: true}})
+  // don't wipe out other categories like appearance, input, layout.
   const fieldWithConfig = useCallback(
     (field: RuntimeField): RuntimeField =>
       fieldConfigs[field.id]
-        ? { ...field, config: { ...field.config, ...fieldConfigs[field.id] } }
+        ? {
+            ...field,
+            config: {
+              appearance: { ...(field.config?.appearance || {}), ...(fieldConfigs[field.id]?.appearance || {}) },
+              behavior: { ...(field.config?.behavior || {}), ...(fieldConfigs[field.id]?.behavior || {}) },
+              input: { ...(field.config?.input || {}), ...(fieldConfigs[field.id]?.input || {}) },
+              layout: { ...(field.config?.layout || {}), ...(fieldConfigs[field.id]?.layout || {}) },
+            },
+          }
         : field,
     [fieldConfigs],
   );
@@ -97,7 +107,17 @@ export function PaperlessDesigner({
       sheets: runtimeForm.sheets.map((s) => ({
         ...s,
         fields: s.fields.map((f) =>
-          fieldConfigs[f.id] ? { ...f, config: { ...f.config, ...fieldConfigs[f.id] } } : f,
+          fieldConfigs[f.id]
+            ? {
+                ...f,
+                config: {
+                  appearance: { ...(f.config?.appearance || {}), ...(fieldConfigs[f.id]?.appearance || {}) },
+                  behavior: { ...(f.config?.behavior || {}), ...(fieldConfigs[f.id]?.behavior || {}) },
+                  input: { ...(f.config?.input || {}), ...(fieldConfigs[f.id]?.input || {}) },
+                  layout: { ...(f.config?.layout || {}), ...(fieldConfigs[f.id]?.layout || {}) },
+                },
+              }
+            : f,
         ),
       })),
     };
@@ -1290,19 +1310,7 @@ function ConfigPanel({ field, onUpdateConfig }: ConfigPanelProps) {
               ))}
             </select>
           </ConfigField>
-          <ConfigField label="Text Align">
-            <select
-              value={cfg.appearance.textAlign ?? "left"}
-              onChange={(e) => onUpdateConfig("appearance", "textAlign", e.target.value)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {["left", "center", "right", "justify"].map((a) => (
-                <option key={a} value={a}>
-                  {a.charAt(0).toUpperCase() + a.slice(1)}
-                </option>
-              ))}
-            </select>
-          </ConfigField>
+
         </div>
       </CollapsibleSection>
 

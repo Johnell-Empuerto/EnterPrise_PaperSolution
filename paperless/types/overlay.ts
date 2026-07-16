@@ -43,7 +43,14 @@ export interface OverlayConfig {
     backgroundColor?: string;
     border?: string;
     borderRadius?: string;
-    textAlign?: string;
+  };
+  /**
+   * Layout alignment — single source of truth for text/content positioning.
+   * Replaces the old appearance.textAlign.
+   */
+  layout: {
+    horizontalAlign?: "left" | "center" | "right";
+    verticalAlign?: "top" | "middle" | "bottom";
   };
 }
 

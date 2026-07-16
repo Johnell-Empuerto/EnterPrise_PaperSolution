@@ -47,6 +47,15 @@ function TextFieldInner({
   const inputCfg = config?.input ?? {};
   const behaviorCfg = config?.behavior ?? {};
   const appearanceCfg = config?.appearance ?? {};
+  const layoutCfg = config?.layout ?? {};
+
+  // Vertical alignment mapping — single source of truth from Layout config
+  const VERTICAL_ALIGN_MAP: Record<string, React.CSSProperties["alignItems"]> = {
+    top: "flex-start",
+    middle: "center",
+    bottom: "flex-end",
+  };
+  const verticalAlignment = VERTICAL_ALIGN_MAP[layoutCfg.verticalAlign ?? "middle"] ?? "center";
 
   const keyboardType = inputCfg.keyboardType ?? "text";
   const kb = KEYBOARD_MAP[keyboardType] ?? KEYBOARD_MAP.text;
@@ -96,7 +105,7 @@ function TextFieldInner({
     fontSize: appearanceCfg.fontSize ? `${appearanceCfg.fontSize}pt` : "11pt",
     fontWeight: appearanceCfg.fontWeight ?? "normal",
     color: appearanceCfg.textColor ?? "#1a1a1a",
-    textAlign: (appearanceCfg.textAlign as any) ?? "left",
+    textAlign: (layoutCfg.horizontalAlign as React.CSSProperties["textAlign"]) ?? "left",
     outline: "none",
     transition: "border-color 0.15s, box-shadow 0.15s",
     resize: "none",
@@ -114,7 +123,7 @@ function TextFieldInner({
         style={{
           ...style,
           display: "flex",
-          alignItems: "center",
+          alignItems: verticalAlignment,
           background: appearanceCfg.backgroundColor ?? "#f1f5f9",
           cursor: "default",
         }}
