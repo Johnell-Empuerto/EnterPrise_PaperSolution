@@ -8,15 +8,26 @@ import { PaperlessDesigner } from "@/components/PaperlessDesigner";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
-
-function mapPreviewType(type: string): "text" | "number" | "date" | "checkbox" | "signature" | "dropdown" | "calculated" {
+function mapPreviewType(
+  type: string,
+):
+  | "text"
+  | "number"
+  | "date"
+  | "checkbox"
+  | "signature"
+  | "dropdown"
+  | "calculated" {
   const t = type.toLowerCase();
   if (t.includes("numeric") || t.includes("number")) return "number";
   if (t.includes("date")) return "date";
-  if (t.includes("checkbox") || t.includes("radio") || t.includes("bool")) return "checkbox";
+  if (t.includes("checkbox") || t.includes("radio") || t.includes("bool"))
+    return "checkbox";
   if (t.includes("signature")) return "signature";
-  if (t.includes("dropdown") || t.includes("select") || t.includes("list")) return "dropdown";
-  if (t.includes("calc") || t.includes("formula") || t.includes("computed")) return "calculated";
+  if (t.includes("dropdown") || t.includes("select") || t.includes("list"))
+    return "dropdown";
+  if (t.includes("calc") || t.includes("formula") || t.includes("computed"))
+    return "calculated";
   return "text";
 }
 export default function Home() {
@@ -52,7 +63,9 @@ export default function Home() {
 
     const ext = uploadFile.name.split(".").pop()?.toLowerCase();
     if (!ext || (ext !== "xlsx" && ext !== "xls")) {
-      setUploadError("Invalid file extension. Please select an .xlsx or .xls file.");
+      setUploadError(
+        "Invalid file extension. Please select an .xlsx or .xls file.",
+      );
       return;
     }
 
@@ -72,7 +85,9 @@ export default function Home() {
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
+        throw new Error(
+          result.message || `HTTP ${response.status}: ${response.statusText}`,
+        );
       }
 
       setTemplateName(uploadFile.name);
@@ -120,7 +135,9 @@ export default function Home() {
                 topRatio,
                 widthRatio: rightRatio - leftRatio,
                 heightRatio: bottomRatio - topRatio,
-                mergeRange: (f.cellAddr ?? "").includes(":") ? f.cellAddr : null,
+                mergeRange: (f.cellAddr ?? "").includes(":")
+                  ? f.cellAddr
+                  : null,
                 isMerged: (f.cellAddr ?? "").includes(":"),
                 dataType: mapPreviewType(f.type ?? ""),
                 readOnly: false,
@@ -145,7 +162,7 @@ export default function Home() {
       setRuntimeForm(runtimeForm);
     } catch (err) {
       setUploadError(
-        `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`
+        `Upload failed: ${err instanceof Error ? err.message : "Unknown error"}`,
       );
     } finally {
       setUploading(false);
@@ -218,8 +235,18 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-              <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              <svg
+                className="w-4 h-4 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
               </svg>
             </div>
             <div>
@@ -239,8 +266,18 @@ export default function Home() {
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors"
               title="Open a new template"
             >
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+              <svg
+                className="w-3.5 h-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                />
               </svg>
               Open Template
             </button>
@@ -252,8 +289,18 @@ export default function Home() {
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors shadow-sm"
                   title="Print or Save as PDF"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
+                    />
                   </svg>
                   Print / Save PDF
                 </button>
@@ -264,8 +311,18 @@ export default function Home() {
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
                     title="Reset all form fields"
                   >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                      strokeWidth={2}
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                      />
                     </svg>
                     Reset
                   </button>
@@ -277,22 +334,33 @@ export default function Home() {
       </header>
 
       {/* ── Main Content ───────────────────────────────────── */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6 sm:py-10">
+      <main className="flex-1 w-full overflow-hidden ">
         {!hasTemplate ? (
           /* ── Upload Screen ───────────────────────────────── */
           <div className="flex flex-col items-center justify-center pt-12 sm:pt-20">
             {/* Logo / Branding */}
             <div className="mb-8 text-center">
               <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg mx-auto mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                <svg
+                  className="w-8 h-8 text-white"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={1.5}
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
+                  />
                 </svg>
               </div>
               <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 mb-2">
                 PaperLess Enterprise
               </h2>
               <p className="text-sm text-slate-500 max-w-md mx-auto">
-                Upload an Excel template. Excel renders the form. Fill it in the browser.
+                Upload an Excel template. Excel renders the form. Fill it in the
+                browser.
               </p>
             </div>
 
@@ -305,9 +373,10 @@ export default function Home() {
               className={`
                 w-full max-w-lg cursor-pointer rounded-2xl border-2 border-dashed p-12 text-center
                 transition-all duration-200
-                ${isDragOver
-                  ? "border-emerald-400 bg-emerald-50 scale-[1.02]"
-                  : "border-slate-300 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"
+                ${
+                  isDragOver
+                    ? "border-emerald-400 bg-emerald-50 scale-[1.02]"
+                    : "border-slate-300 bg-white hover:border-emerald-300 hover:bg-emerald-50/50"
                 }
               `}
             >
@@ -327,19 +396,33 @@ export default function Home() {
 
               <div className="flex flex-col items-center gap-3">
                 {/* Upload icon */}
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
-                  isDragOver ? "bg-emerald-100" : "bg-slate-100"
-                }`}>
-                  <svg className={`w-6 h-6 transition-colors ${
-                    isDragOver ? "text-emerald-600" : "text-slate-400"
-                  }`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                <div
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+                    isDragOver ? "bg-emerald-100" : "bg-slate-100"
+                  }`}
+                >
+                  <svg
+                    className={`w-6 h-6 transition-colors ${
+                      isDragOver ? "text-emerald-600" : "text-slate-400"
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={1.5}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+                    />
                   </svg>
                 </div>
 
                 <div>
                   <p className="text-sm font-medium text-slate-700">
-                    {isDragOver ? "Drop your file here" : "Choose an Excel file"}
+                    {isDragOver
+                      ? "Drop your file here"
+                      : "Choose an Excel file"}
                   </p>
                   <p className="text-xs text-slate-400 mt-1">
                     Drag and drop or click to browse
@@ -356,10 +439,22 @@ export default function Home() {
             {uploadFile && (
               <div className="mt-4 flex items-center gap-3">
                 <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
-                  <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4 text-emerald-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
-                  <span className="text-sm text-slate-700">{uploadFile.name}</span>
+                  <span className="text-sm text-slate-700">
+                    {uploadFile.name}
+                  </span>
                   <span className="text-xs text-slate-400">
                     ({(uploadFile.size / 1024).toFixed(1)} KB)
                   </span>
@@ -372,16 +467,41 @@ export default function Home() {
                 >
                   {uploading ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      <svg
+                        className="animate-spin h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        />
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                        />
                       </svg>
                       Processing...
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth={2}
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+                        />
                       </svg>
                       Upload &amp; Open Form
                     </>
@@ -394,8 +514,18 @@ export default function Home() {
             {uploadError && (
               <div className="mt-4 p-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 max-w-lg">
                 <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4 mt-0.5 shrink-0 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <span>{uploadError}</span>
                 </div>
@@ -406,19 +536,27 @@ export default function Home() {
             {runtimeError && (
               <div className="mt-4 p-3 rounded-xl text-sm bg-red-50 text-red-700 border border-red-200 max-w-lg">
                 <div className="flex items-start gap-2">
-                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  <svg
+                    className="w-4 h-4 mt-0.5 shrink-0 text-red-500"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                    />
                   </svg>
                   <span>{runtimeError}</span>
                 </div>
               </div>
             )}
-
-
           </div>
         ) : (
           /* ── Designer View ───────────────────────────────── */
-          <div className="h-[calc(100vh-0px)] flex flex-col -mx-4 sm:-mx-6 -mb-6 sm:-mb-10">
+          <div className=" flex flex-col h-[100vh] ">
             <PaperlessDesigner
               runtimeForm={runtimeForm}
               runtime={runtime}

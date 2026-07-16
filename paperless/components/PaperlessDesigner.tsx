@@ -67,9 +67,15 @@ export function PaperlessDesigner({
     }
     const sorted = [...result];
     switch (sortBy) {
-      case "name": sorted.sort((a, b) => a.id.localeCompare(b.id)); break;
-      case "cell": sorted.sort((a, b) => a.cellReference.localeCompare(b.cellReference)); break;
-      case "type": sorted.sort((a, b) => a.dataType.localeCompare(b.dataType)); break;
+      case "name":
+        sorted.sort((a, b) => a.id.localeCompare(b.id));
+        break;
+      case "cell":
+        sorted.sort((a, b) => a.cellReference.localeCompare(b.cellReference));
+        break;
+      case "type":
+        sorted.sort((a, b) => a.dataType.localeCompare(b.dataType));
+        break;
     }
     return sorted;
   }, [fields, searchQuery, sortBy]);
@@ -78,23 +84,28 @@ export function PaperlessDesigner({
   const [leftWidth, setLeftWidth] = useState(280);
   const isResizing = useRef(false);
 
-  const handleResizeStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizing.current = true;
-    const startX = e.clientX;
-    const startW = leftWidth;
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!isResizing.current) return;
-      setLeftWidth(Math.max(200, Math.min(500, startW + (ev.clientX - startX))));
-    };
-    const onMouseUp = () => {
-      isResizing.current = false;
-      document.removeEventListener("mousemove", onMouseMove);
-      document.removeEventListener("mouseup", onMouseUp);
-    };
-    document.addEventListener("mousemove", onMouseMove);
-    document.addEventListener("mouseup", onMouseUp);
-  }, [leftWidth]);
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+      const startX = e.clientX;
+      const startW = leftWidth;
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        setLeftWidth(
+          Math.max(200, Math.min(500, startW + (ev.clientX - startX))),
+        );
+      };
+      const onMouseUp = () => {
+        isResizing.current = false;
+        document.removeEventListener("mousemove", onMouseMove);
+        document.removeEventListener("mouseup", onMouseUp);
+      };
+      document.addEventListener("mousemove", onMouseMove);
+      document.addEventListener("mouseup", onMouseUp);
+    },
+    [leftWidth],
+  );
 
   // ── Camera model (offsetX, offsetY = paper top-left in screen px, zoom = scale) ──
   const [zoom, setZoom] = useState(1);
@@ -110,7 +121,10 @@ export function PaperlessDesigner({
   const fitPage = useCallback(() => {
     if (cw <= 0 || ch <= 0 || pageW <= 0 || pageH <= 0) return;
     const pad = 60;
-    const s = Math.max(0.1, Math.min(8, Math.min((cw - pad * 2) / pageW, (ch - pad * 2) / pageH)));
+    const s = Math.max(
+      0.1,
+      Math.min(8, Math.min((cw - pad * 2) / pageW, (ch - pad * 2) / pageH)),
+    );
     setZoom(s);
     setOffsetX((cw - pageW * s) / 2);
     setOffsetY((ch - pageH * s) / 2);
@@ -150,34 +164,43 @@ export function PaperlessDesigner({
   }, []);
 
   // ── Zoom toward cursor ──
-  const zoomToward = useCallback((newZoom: number, cx: number, cy: number) => {
-    const wx = (cx - offsetX) / zoom;
-    const wy = (cy - offsetY) / zoom;
-    const clampedZoom = Math.max(0.1, Math.min(8, newZoom));
-    setZoom(clampedZoom);
-    setOffsetX(cx - wx * clampedZoom);
-    setOffsetY(cy - wy * clampedZoom);
-  }, [offsetX, offsetY, zoom]);
+  const zoomToward = useCallback(
+    (newZoom: number, cx: number, cy: number) => {
+      const wx = (cx - offsetX) / zoom;
+      const wy = (cy - offsetY) / zoom;
+      const clampedZoom = Math.max(0.1, Math.min(8, newZoom));
+      setZoom(clampedZoom);
+      setOffsetX(cx - wx * clampedZoom);
+      setOffsetY(cy - wy * clampedZoom);
+    },
+    [offsetX, offsetY, zoom],
+  );
 
   // ── Zoom to center (for toolbar buttons) ──
-  const zoomToCenter = useCallback((newZoom: number) => {
-    const cx = cw / 2;
-    const cy = ch / 2;
-    zoomToward(newZoom, cx, cy);
-    setZoomMode("custom");
-  }, [cw, ch, zoomToward]);
+  const zoomToCenter = useCallback(
+    (newZoom: number) => {
+      const cx = cw / 2;
+      const cy = ch / 2;
+      zoomToward(newZoom, cx, cy);
+      setZoomMode("custom");
+    },
+    [cw, ch, zoomToward],
+  );
 
   // ── Pan state (grab anywhere, no Space key required) ──
   const isPanning = useRef(false);
   const [isGrabbing, setIsGrabbing] = useState(false);
   const panAnchor = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
 
-  const startPan = useCallback((clientX: number, clientY: number) => {
-    isPanning.current = true;
-    setIsGrabbing(true);
-    panAnchor.current = { x: clientX, y: clientY, ox: offsetX, oy: offsetY };
-    document.body.style.userSelect = "none";
-  }, [offsetX, offsetY]);
+  const startPan = useCallback(
+    (clientX: number, clientY: number) => {
+      isPanning.current = true;
+      setIsGrabbing(true);
+      panAnchor.current = { x: clientX, y: clientY, ox: offsetX, oy: offsetY };
+      document.body.style.userSelect = "none";
+    },
+    [offsetX, offsetY],
+  );
 
   const doPan = useCallback((clientX: number, clientY: number) => {
     if (!isPanning.current) return;
@@ -192,37 +215,46 @@ export function PaperlessDesigner({
     document.body.style.userSelect = "";
   }, []);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    if (e.button === 0 || e.button === 1) {
-      e.preventDefault();
-      startPan(e.clientX, e.clientY);
-    }
-  }, [startPan]);
+  const handleMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button === 0 || e.button === 1) {
+        e.preventDefault();
+        startPan(e.clientX, e.clientY);
+      }
+    },
+    [startPan],
+  );
 
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    doPan(e.clientX, e.clientY);
-  }, [doPan]);
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent) => {
+      doPan(e.clientX, e.clientY);
+    },
+    [doPan],
+  );
 
   const handleMouseUp = useCallback(() => endPan(), [endPan]);
 
   // ── Wheel zoom (Ctrl/Meta = zoom toward cursor, else = pan) ──
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    if (!e.ctrlKey && !e.metaKey) {
-      setOffsetX((o) => o - e.deltaX);
-      setOffsetY((o) => o - e.deltaY);
+  const handleWheel = useCallback(
+    (e: React.WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) {
+        setOffsetX((o) => o - e.deltaX);
+        setOffsetY((o) => o - e.deltaY);
+        setZoomMode("custom");
+        return;
+      }
+      e.preventDefault();
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const factor = Math.pow(1.001, -e.deltaY);
+      const newZoom = zoom * factor;
+      zoomToward(newZoom, cx, cy);
       setZoomMode("custom");
-      return;
-    }
-    e.preventDefault();
-    const rect = containerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const cx = e.clientX - rect.left;
-    const cy = e.clientY - rect.top;
-    const factor = Math.pow(1.001, -e.deltaY);
-    const newZoom = zoom * factor;
-    zoomToward(newZoom, cx, cy);
-    setZoomMode("custom");
-  }, [zoom, zoomToward]);
+    },
+    [zoom, zoomToward],
+  );
 
   // ── Zoom helpers (fine 5% increments instead of preset jumps) ──
   const zoomIn = useCallback(() => {
@@ -247,10 +279,7 @@ export function PaperlessDesigner({
   const currentZoomPercent = Math.round(zoom * 100);
 
   return (
-    <div
-      className="flex flex-col h-full"
-      style={{ outline: "none" }}
-    >
+    <div className="flex flex-col h-full" style={{ outline: "none" }}>
       {/* ── Toolbar ── */}
       <Toolbar
         templateName={templateName}
@@ -275,11 +304,11 @@ export function PaperlessDesigner({
       />
 
       {/* ── Main area ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden ">
         {/* Left sidebar */}
         <div
           style={{ width: leftWidth, minWidth: 200 }}
-          className="bg-white border-r border-slate-200 flex flex-col overflow-hidden"
+          className="bg-white border-r border-slate-200 flex flex-col overflow-hidden "
         >
           <FieldExplorer
             fields={filteredFields}
@@ -301,7 +330,7 @@ export function PaperlessDesigner({
         {/* ── Infinite workspace ── */}
         <div
           ref={containerRef}
-          className="flex-1 overflow-hidden relative select-none"
+          className="flex-1 overflow-hidden relative select-none "
           style={{
             backgroundColor: "#e6e6e6",
             cursor: cursorClass,
@@ -318,7 +347,8 @@ export function PaperlessDesigner({
             style={{
               position: "absolute",
               inset: 0,
-              backgroundImage: "radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)",
+              backgroundImage:
+                "radial-gradient(circle, rgba(0,0,0,0.08) 1px, transparent 1px)",
               backgroundSize: "24px 24px",
               pointerEvents: "none",
             }}
@@ -366,8 +396,18 @@ export function PaperlessDesigner({
                   className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
                   title="Previous page"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M15 19l-7-7 7-7"
+                    />
                   </svg>
                 </button>
                 <span className="text-xs font-medium text-slate-700 min-w-[60px] text-center select-none">
@@ -379,8 +419,18 @@ export function PaperlessDesigner({
                   className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
                   title="Next page"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M9 5l7 7-7 7"
+                    />
                   </svg>
                 </button>
               </div>
@@ -392,17 +442,23 @@ export function PaperlessDesigner({
                 onClick={zoomOut}
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
                 title="Zoom out"
-              >−</button>
+              >
+                −
+              </button>
               <span
                 className="min-w-[52px] text-center text-xs font-medium text-slate-700 cursor-pointer hover:bg-slate-100 rounded-lg py-1 transition-colors"
                 onClick={fitPage}
                 title="Fit Page"
-              >{currentZoomPercent}%</span>
+              >
+                {currentZoomPercent}%
+              </span>
               <button
                 onClick={zoomIn}
                 className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-slate-100 text-slate-600 transition-colors"
                 title="Zoom in"
-              >+</button>
+              >
+                +
+              </button>
             </div>
           </div>
         </div>
@@ -470,8 +526,18 @@ function Toolbar({
       {/* Logo */}
       <div className="flex items-center gap-2 mr-2">
         <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
-          <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          <svg
+            className="w-3 h-3 text-white"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
           </svg>
         </div>
         <span className="text-sm font-semibold text-slate-800">PaperLess</span>
@@ -480,42 +546,174 @@ function Toolbar({
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
       {/* File */}
-      <ToolbarButton onClick={onReset} title="Open Template" icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-      } />
-      <ToolbarButton onClick={onUploadClick} title="Upload" icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-      } />
+      <ToolbarButton
+        onClick={onReset}
+        title="Open Template"
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onUploadClick}
+        title="Upload"
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+            />
+          </svg>
+        }
+      />
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
       {/* View controls */}
-      <ToolbarButton onClick={onFitPage} title="Fit Page" active={zoomMode === "fit-page"} icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5" /></svg>
-      } />
-      <ToolbarButton onClick={onFitWidth} title="Fit Width" active={zoomMode === "fit-width"} icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14M5 12l4-4m-4 4l4 4m11-4l-4-4m4 4l-4 4" /></svg>
-      } />
-      <ToolbarButton onClick={onZoomOut} title="Zoom Out" icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" /></svg>
-      } />
-      <ToolbarButton onClick={onZoom100} title="Zoom to 100%" icon={
-        <span className="text-xs font-semibold">1:1</span>
-      } />
-      <ToolbarButton onClick={onZoomIn} title="Zoom In" icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>
-      } />
-      <span className="text-xs font-medium text-slate-600 w-12 text-center select-none">{zoomPercent}%</span>
+      <ToolbarButton
+        onClick={onFitPage}
+        title="Fit Page"
+        active={zoomMode === "fit-page"}
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5v-4m0 4h-4m4 0l-5-5"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onFitWidth}
+        title="Fit Width"
+        active={zoomMode === "fit-width"}
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M5 12h14M5 12l4-4m-4 4l4 4m11-4l-4-4m4 4l-4 4"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onZoomOut}
+        title="Zoom Out"
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M20 12H4" />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onZoom100}
+        title="Zoom to 100%"
+        icon={<span className="text-xs font-semibold">1:1</span>}
+      />
+      <ToolbarButton
+        onClick={onZoomIn}
+        title="Zoom In"
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        }
+      />
+      <span className="text-xs font-medium text-slate-600 w-12 text-center select-none">
+        {zoomPercent}%
+      </span>
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
       {/* Overlay / Background toggles */}
-      <ToolbarButton onClick={onToggleOverlay} title="Toggle Field Overlay" active={showOverlay} icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-      } />
-      <ToolbarButton onClick={onToggleBackground} title="Toggle Background Image" active={showBackground} icon={
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-      } />
+      <ToolbarButton
+        onClick={onToggleOverlay}
+        title="Toggle Field Overlay"
+        active={showOverlay}
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onToggleBackground}
+        title="Toggle Background Image"
+        active={showBackground}
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+            />
+          </svg>
+        }
+      />
 
       {/* Spacer */}
       <div className="flex-1" />
@@ -528,14 +726,25 @@ function Toolbar({
             disabled={currentPage === 0}
             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
           >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M15 19l-7-7 7-7"
+              />
             </svg>
             Previous
           </button>
 
           <span className="text-xs font-medium text-slate-500 min-w-[80px] text-center select-none">
-            Page {currentPage + 1} <span className="text-slate-300">of</span> {totalPages}
+            Page {currentPage + 1} <span className="text-slate-300">of</span>{" "}
+            {totalPages}
           </span>
 
           <button
@@ -544,8 +753,18 @@ function Toolbar({
             className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-slate-600 hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent transition-colors"
           >
             Next
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            <svg
+              className="w-3.5 h-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M9 5l7 7-7 7"
+              />
             </svg>
           </button>
 
@@ -561,7 +780,9 @@ function Toolbar({
       />
 
       {/* Template name */}
-      <span className="text-xs text-slate-400 truncate max-w-[160px] ml-2">{templateName}</span>
+      <span className="text-xs text-slate-400 truncate max-w-[160px] ml-2">
+        {templateName}
+      </span>
     </div>
   );
 }
@@ -597,7 +818,10 @@ function PageThumbnails({
 }
 
 function ToolbarButton({
-  onClick, title, icon, active,
+  onClick,
+  title,
+  icon,
+  active,
 }: {
   onClick: () => void;
   title: string;
@@ -647,8 +871,12 @@ function FieldExplorer({
     <>
       <div className="px-3 py-2 border-b border-slate-100">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Fields</span>
-          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">{totalFields}</span>
+          <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+            Fields
+          </span>
+          <span className="text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded-full">
+            {totalFields}
+          </span>
         </div>
         <input
           type="text"
@@ -667,7 +895,9 @@ function FieldExplorer({
                   ? "bg-emerald-100 text-emerald-700 font-medium"
                   : "text-slate-400 hover:text-slate-600"
               }`}
-            >{s.charAt(0).toUpperCase() + s.slice(1)}</button>
+            >
+              {s.charAt(0).toUpperCase() + s.slice(1)}
+            </button>
           ))}
         </div>
       </div>
@@ -678,22 +908,32 @@ function FieldExplorer({
             key={field.id}
             onClick={() => onFieldSelect(field.id)}
             className={`px-3 py-2 cursor-pointer border-b border-slate-50 hover:bg-slate-50 transition-colors ${
-              field.id === selectedFieldId ? "bg-emerald-50 border-l-2 border-l-emerald-500" : ""
+              field.id === selectedFieldId
+                ? "bg-emerald-50 border-l-2 border-l-emerald-500"
+                : ""
             }`}
           >
             <div className="flex items-center gap-2">
               <FieldTypeIcon type={field.dataType} />
-              <span className="text-xs font-medium text-slate-800 truncate flex-1">{field.id}</span>
+              <span className="text-xs font-medium text-slate-800 truncate flex-1">
+                {field.id}
+              </span>
             </div>
             <div className="flex items-center gap-2 mt-0.5 ml-5">
-              <span className="text-[10px] text-slate-400 font-mono">{field.cellReference}</span>
-              <span className="text-[10px] text-slate-400">{field.dataType}</span>
+              <span className="text-[10px] text-slate-400 font-mono">
+                {field.cellReference}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                {field.dataType}
+              </span>
             </div>
           </div>
         ))}
         {fields.length === 0 && (
           <div className="px-3 py-6 text-center text-xs text-slate-400">
-            {totalFields === 0 ? "No fields detected" : "No fields match search"}
+            {totalFields === 0
+              ? "No fields detected"
+              : "No fields match search"}
           </div>
         )}
       </div>
@@ -713,7 +953,10 @@ function FieldTypeIcon({ type }: { type: string }) {
   };
   const meta = iconMap[type] ?? { char: "?", color: "text-slate-400" };
   return (
-    <span className={`w-4 h-4 flex items-center justify-center text-[10px] font-bold rounded ${meta.color}`} style={{ fontSize: 9, lineHeight: 1 }}>
+    <span
+      className={`w-4 h-4 flex items-center justify-center text-[10px] font-bold rounded ${meta.color}`}
+      style={{ fontSize: 9, lineHeight: 1 }}
+    >
       {meta.char}
     </span>
   );
@@ -749,13 +992,19 @@ function FieldPropertiesPanel({ field }: { field: RuntimeField | null }) {
   return (
     <div className="flex flex-col h-full">
       <div className="px-3 py-2 border-b border-slate-100">
-        <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">Properties</span>
+        <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+          Properties
+        </span>
       </div>
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {rows.map(([label, value]) => (
           <div key={label}>
-            <div className="text-[10px] text-slate-400 uppercase tracking-wide">{label}</div>
-            <div className="text-xs text-slate-800 font-mono truncate">{value}</div>
+            <div className="text-[10px] text-slate-400 uppercase tracking-wide">
+              {label}
+            </div>
+            <div className="text-xs text-slate-800 font-mono truncate">
+              {value}
+            </div>
           </div>
         ))}
       </div>
