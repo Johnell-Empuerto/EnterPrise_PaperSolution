@@ -378,6 +378,8 @@ export function PaperlessDesigner({
                 runtime={runtime}
                 selectedFieldId={selectedFieldId}
                 currentPage={currentPage}
+                showOverlay={showOverlay}
+                showBackground={showBackground}
               />
             </div>
           </div>
@@ -673,47 +675,49 @@ function Toolbar({
 
       <div className="w-px h-6 bg-slate-200 mx-1" />
 
-      {/* Overlay / Background toggles */}
-      <ToolbarButton
+      {/* Visibility toggles */}
+      <button
         onClick={onToggleOverlay}
-        title="Toggle Field Overlay"
-        active={showOverlay}
-        icon={
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        }
-      />
-      <ToolbarButton
+        title="Show or hide interactive form fields"
+        className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium transition-colors ${
+          showOverlay
+            ? "bg-emerald-100 text-emerald-700"
+            : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={showOverlay ? 2 : 1.5}>
+          {showOverlay ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+          ) : (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+            </>
+          )}
+        </svg>
+        <span>Fields</span>
+      </button>
+      <button
         onClick={onToggleBackground}
-        title="Toggle Background Image"
-        active={showBackground}
-        icon={
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-        }
-      />
+        title="Show or hide the rendered Excel page"
+        className={`flex items-center gap-1.5 h-8 px-2.5 rounded-md text-xs font-medium transition-colors ${
+          showBackground
+            ? "bg-emerald-100 text-emerald-700"
+            : "text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+        }`}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={showBackground ? 2 : 1.5}>
+          {showBackground ? (
+            <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+          ) : (
+            <>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M3 3l18 18" />
+            </>
+          )}
+        </svg>
+        <span>Background</span>
+      </button>
 
       {/* Spacer */}
       <div className="flex-1" />
