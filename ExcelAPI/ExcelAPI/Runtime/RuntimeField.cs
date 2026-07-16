@@ -9,7 +9,7 @@ namespace ExcelAPI.Runtime
     /// </summary>
     public class RuntimeField
     {
-        /// <summary>Unique internal field identifier (e.g., "page1field1"). Never shown to users.</summary>
+        /// <summary>Unique internal field identifier (e.g., "p1f1"). Never shown to users.</summary>
         public string Id { get; set; } = "";
 
         /// <summary>User-visible field name (from comment first line or default). Never duplicate IDs.</summary>

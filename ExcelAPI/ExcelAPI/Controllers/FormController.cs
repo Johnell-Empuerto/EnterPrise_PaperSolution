@@ -226,23 +226,32 @@ namespace ExcelAPI.Controllers
 
                 // Map multi-page response
                 var pageResults = (pythonResult.Pages ?? new List<PythonPreviewPageResult>())
-                    .Select(p => new
+                    .Select((p, pageIndex) =>
                     {
-                        sheetName = p.SheetName,
-                        backgroundImage = $"/preview/{p.BackgroundImage}",
-                        page = new { width = p.Page?.Width ?? 2550, height = p.Page?.Height ?? 3300 },
-                        fields = (p.Fields ?? new List<PythonPreviewField>())
-                            .Select(f => (object)new
-                            {
-                                id = f.Name,
-                                name = f.Name,
-                                type = f.Type,
-                                cellAddr = f.CellAddr,
-                                left_ratio = f.LeftRatio,
-                                top_ratio = f.TopRatio,
-                                right_ratio = f.RightRatio,
-                                bottom_ratio = f.BottomRatio,
-                            }).ToList()
+                        int fi = 0;
+                        return new
+                        {
+                            sheetName = p.SheetName,
+                            backgroundImage = $"/preview/{p.BackgroundImage}",
+                            page = new { width = p.Page?.Width ?? 2550, height = p.Page?.Height ?? 3300 },
+                            fields = (p.Fields ?? new List<PythonPreviewField>())
+                                .Select(f =>
+                                {
+                                    string id = $"p{pageIndex + 1}f{++fi}";
+                                    string name = string.IsNullOrWhiteSpace(f.Name) ? id : f.Name;
+                                    return (object)new
+                                    {
+                                        id,
+                                        name,
+                                        type = f.Type,
+                                        cellAddr = f.CellAddr,
+                                        left_ratio = f.LeftRatio,
+                                        top_ratio = f.TopRatio,
+                                        right_ratio = f.RightRatio,
+                                        bottom_ratio = f.BottomRatio,
+                                    };
+                                }).ToList()
+                        };
                     })
                     .ToList();
 

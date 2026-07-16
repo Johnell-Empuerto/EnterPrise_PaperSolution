@@ -463,8 +463,8 @@ namespace ExcelAPI.Services
                         // Extract display name from comment first line
                         string fieldName = ExtractFieldName(commentText, cellRef, tabIndex);
 
-                        // Generate unique internal ID: page{page}field{index}
-                        string fieldId = $"page1field{fields.Count + 1}";
+                        // Generate unique internal ID: p{page}f{index}
+                        string fieldId = $"p1f{fields.Count + 1}";
 
                         fields.Add(new ExcelField
                         {

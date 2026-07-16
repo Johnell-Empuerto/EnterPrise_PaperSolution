@@ -8,7 +8,7 @@ namespace ExcelAPI.Models
     /// </summary>
     public class ExcelField
     {
-        /// <summary>A unique identifier for this field (e.g., "page1field1").</summary>
+        /// <summary>A unique identifier for this field (e.g., "p1f1").</summary>
         public string Id { get; set; } = string.Empty;
 
         /// <summary>User-visible field name (from comment first line or default).</summary>

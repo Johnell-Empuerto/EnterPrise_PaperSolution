@@ -923,6 +923,13 @@ function FieldExplorer({
                 {field.name ?? field.id}
               </span>
             </div>
+            {field.name && (
+              <div className="ml-5 mt-0.5">
+                <span className="text-xs text-slate-400 font-mono">
+                  {field.id}
+                </span>
+              </div>
+            )}
             <div className="flex items-center gap-2 mt-0.5 ml-5">
               <span className="text-[10px] text-slate-400 font-mono">
                 {field.cellReference}

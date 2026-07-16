@@ -123,8 +123,8 @@ export default function Home() {
               const rightRatio = f.right_ratio ?? 0;
               const bottomRatio = f.bottom_ratio ?? 0;
               return {
-                id: f.name ? `${f.name}_${i}` : `field_${i}`,
-                name: f.name ?? null,
+                id: f.id,
+                name: f.name,
                 cellReference: f.cellAddr ?? "",
                 row: 0,
                 column: 0,
