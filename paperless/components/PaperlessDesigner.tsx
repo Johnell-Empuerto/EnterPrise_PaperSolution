@@ -320,6 +320,99 @@ export function PaperlessDesigner({
             onSortChange={setSortBy}
             onFieldSelect={setSelectedFieldId}
           />
+          {selectedField && (
+            <div className="border-t border-slate-200 px-3 py-2 space-y-1.5 shrink-0">
+              <div className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1.5">
+                Selected Field
+              </div>
+              <div>
+                <div className="text-[10px] text-slate-400 uppercase tracking-wide">Name</div>
+                <div className="text-xs text-slate-700 font-mono truncate">
+                  {selectedField.name ?? selectedField.id}
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wide">Cell</div>
+                  <div className="text-xs text-slate-700 font-mono truncate">
+                    {selectedField.cellReference}
+                  </div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wide">Type</div>
+                  <div className="text-xs text-slate-700 font-mono truncate">
+                    {selectedField.dataType}
+                  </div>
+                </div>
+              </div>
+              <div className="pt-1">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                  Properties
+                </div>
+                <div className="space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Left</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedField.leftRatio.toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Top</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedField.topRatio.toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Right</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {(selectedField.leftRatio + selectedField.widthRatio).toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Bottom</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {(selectedField.topRatio + selectedField.heightRatio).toFixed(4)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Width</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {Math.round(selectedField.widthPx)}px
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Height</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {Math.round(selectedField.heightPx)}px
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Merge Range</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedField.mergeRange ?? "\u2014"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Read Only</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedField.readOnly ? "Yes" : "No"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] text-slate-400">Required</span>
+                    <span className="text-[10px] text-slate-600 font-mono">
+                      {selectedField.required ? "Yes" : "No"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {!selectedField && (
+            <div className="border-t border-slate-200 px-3 py-3 text-xs text-slate-400 text-center shrink-0">
+              No field selected
+            </div>
+          )}
         </div>
 
         <div
@@ -465,12 +558,30 @@ export function PaperlessDesigner({
           </div>
         </div>
 
-        {/* Right sidebar */}
+        {/* Right sidebar — reserved for future configuration */}
         <div
           style={{ width: 280 }}
           className="bg-white border-l border-slate-200 flex flex-col overflow-hidden"
         >
-          <FieldPropertiesPanel field={selectedField} />
+          <div className="px-3 py-2 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
+              Configuration
+            </span>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {["Appearance", "Behavior", "Validation", "Keyboard", "Formatting"].map(
+              (section) => (
+                <div key={section}>
+                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                    {section}
+                  </div>
+                  <div className="text-[10px] text-slate-300 italic">
+                    No editable configuration yet.
+                  </div>
+                </div>
+              ),
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -973,52 +1084,4 @@ function FieldTypeIcon({ type }: { type: string }) {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   Field Properties Panel (Right Sidebar)
-   ═══════════════════════════════════════════════ */
-function FieldPropertiesPanel({ field }: { field: RuntimeField | null }) {
-  if (!field) {
-    return (
-      <div className="p-4 text-xs text-slate-400 text-center mt-8">
-        Select a field to view properties
-      </div>
-    );
-  }
 
-  const rows: [string, string][] = [
-    ["Name", field.name ?? field.id],
-    ["Cell", field.cellReference],
-    ["Type", field.dataType],
-    ["Left (ratio)", field.leftRatio.toFixed(4)],
-    ["Top (ratio)", field.topRatio.toFixed(4)],
-    ["Right (ratio)", (field.leftRatio + field.widthRatio).toFixed(4)],
-    ["Bottom (ratio)", (field.topRatio + field.heightRatio).toFixed(4)],
-    ["Width (px)", String(Math.round(field.widthPx))],
-    ["Height (px)", String(Math.round(field.heightPx))],
-    ["Merge Range", field.mergeRange ?? "\u2014"],
-    ["Read Only", field.readOnly ? "Yes" : "No"],
-    ["Required", field.required ? "Yes" : "No"],
-  ];
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="px-3 py-2 border-b border-slate-100">
-        <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
-          Properties
-        </span>
-      </div>
-      <div className="flex-1 overflow-y-auto p-3 space-y-2">
-        {rows.map(([label, value]) => (
-          <div key={label}>
-            <div className="text-[10px] text-slate-400 uppercase tracking-wide">
-              {label}
-            </div>
-            <div className="text-xs text-slate-800 font-mono truncate">
-              {value}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
