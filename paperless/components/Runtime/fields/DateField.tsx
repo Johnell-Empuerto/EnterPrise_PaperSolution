@@ -6,21 +6,30 @@ export interface FieldComponentProps {
   overlay: OverlayModel;
   value: string | boolean | null;
   onChange: (value: string | boolean | null) => void;
-  /** Production mode: use yellow theme */
+  onBlur?: () => void;
   production?: boolean;
+  disabled?: boolean;
+  readOnly?: boolean;
 }
 
-/**
- * Date field — renders <input type="date">.
- * Falls back gracefully to text input on browsers that don't support date inputs.
- */
-export function DateField({ overlay, value, onChange, production }: FieldComponentProps) {
+export function DateField({
+  overlay,
+  value,
+  onChange,
+  onBlur,
+  production,
+  disabled,
+  readOnly,
+}: FieldComponentProps) {
   return (
     <input
       type="date"
       className="runtime-field"
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
+      onBlur={onBlur}
+      disabled={disabled}
+      readOnly={readOnly}
       style={inputStyle(overlay, production)}
     />
   );
@@ -28,8 +37,8 @@ export function DateField({ overlay, value, onChange, production }: FieldCompone
 
 function inputStyle(overlay: OverlayModel, production?: boolean): React.CSSProperties {
   const borderColor = production
-    ? "rgba(234, 179, 8, 0.6)"       // yellow-500
-    : "rgba(245, 158, 11, 0.5)";     // amber-500
+    ? "rgba(234, 179, 8, 0.6)"
+    : "rgba(245, 158, 11, 0.5)";
 
   return {
     width: "100%",
@@ -40,7 +49,7 @@ function inputStyle(overlay: OverlayModel, production?: boolean): React.CSSPrope
     borderRadius: "2px",
     background: production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)",
     fontFamily: "Calibri, sans-serif",
-    fontSize: `11pt`,
+    fontSize: "11pt",
     color: "#1a1a1a",
     outline: "none",
     cursor: "text",

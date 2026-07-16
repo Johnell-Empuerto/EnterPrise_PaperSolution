@@ -1,19 +1,31 @@
 "use client";
 
-import type { OverlayModel } from "@/types/overlay";
+import type { OverlayModel, OverlayConfig } from "@/types/overlay";
 
 export interface FieldComponentProps {
   overlay: OverlayModel;
   value: string | boolean | null;
   onChange: (value: string | boolean | null) => void;
-  /** Production mode: use yellow theme */
+  onBlur?: () => void;
   production?: boolean;
+  config?: OverlayConfig;
+  disabled?: boolean;
+  readOnly?: boolean;
 }
 
-/**
- * Checkbox field — renders <input type="checkbox"> centered inside the overlay.
- */
-export function CheckboxField({ overlay, value, onChange, production }: FieldComponentProps) {
+export function CheckboxField({
+  overlay,
+  value,
+  onChange,
+  production,
+  config,
+  disabled,
+  readOnly,
+}: FieldComponentProps) {
+  const behaviorCfg = config?.behavior ?? {};
+  const enabled = !(disabled ?? !(behaviorCfg.enabled ?? true));
+  const isReadOnly = readOnly ?? behaviorCfg.readOnly ?? false;
+
   const boxSize = Math.min(overlay.widthPt, overlay.heightPt, 20);
 
   return (
@@ -24,20 +36,23 @@ export function CheckboxField({ overlay, value, onChange, production }: FieldCom
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        cursor: "pointer",
+        cursor: isReadOnly || !enabled ? "default" : "pointer",
+        opacity: enabled ? 1 : 0.5,
       }}
-      onClick={() => onChange(!(value === true))}
     >
       <input
         type="checkbox"
         className="runtime-field"
         checked={value === true}
-        onChange={(e) => onChange(e.target.checked)}
-        onClick={(e) => e.stopPropagation()}
+        onChange={(e) => {
+          if (isReadOnly || !enabled) return;
+          onChange(e.target.checked);
+        }}
+        disabled={!enabled}
         style={{
           width: `${boxSize}pt`,
           height: `${boxSize}pt`,
-          cursor: "pointer",
+          cursor: isReadOnly || !enabled ? "default" : "pointer",
           accentColor: production ? "#eab308" : "#3b82f6",
           outline: production ? "1px solid rgba(234, 179, 8, 0.4)" : undefined,
           outlineOffset: "1px",

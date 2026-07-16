@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect, useMemo } from "react";
-import type { RuntimeForm, RuntimeField } from "@/types/runtime";
+import type { RuntimeForm, RuntimeField, FieldConfig } from "@/types/runtime";
 import type { RuntimeState } from "./Runtime/useRuntimeState";
 import { RuntimeFormViewer } from "./Runtime/RuntimeFormViewer";
 
@@ -49,6 +49,59 @@ export function PaperlessDesigner({
     () => fields.find((f) => f.id === selectedFieldId) ?? null,
     [fields, selectedFieldId],
   );
+
+  // DEBUG: Log selection changes
+  useEffect(() => {
+    console.log("SELECTION CHANGED", { selectedFieldId, timestamp: new Date().toISOString() });
+  }, [selectedFieldId]);
+
+  // ── Field configuration overrides (live editing, no persistence) ──
+  const [fieldConfigs, setFieldConfigs] = useState<Record<string, FieldConfig>>({});
+
+  const updateFieldConfig = useCallback(
+    <K extends keyof FieldConfig, SK extends keyof FieldConfig[K]>(
+      fieldId: string,
+      category: K,
+      key: SK,
+      value: FieldConfig[K][SK],
+    ) => {
+      setFieldConfigs((prev) => {
+        const existing = prev[fieldId];
+        const categoryConfig = existing?.[category] ?? {};
+        return {
+          ...prev,
+          [fieldId]: {
+            ...existing,
+            [category]: { ...categoryConfig, [key]: value },
+          } as FieldConfig,
+        };
+      });
+    },
+    [],
+  );
+
+  // Merge config into a RuntimeField for rendering
+  const fieldWithConfig = useCallback(
+    (field: RuntimeField): RuntimeField =>
+      fieldConfigs[field.id]
+        ? { ...field, config: { ...field.config, ...fieldConfigs[field.id] } }
+        : field,
+    [fieldConfigs],
+  );
+
+  // Merged RuntimeForm with field configs applied — passed to the canvas viewer
+  const mergedForm = useMemo<RuntimeForm>(() => {
+    if (Object.keys(fieldConfigs).length === 0) return runtimeForm;
+    return {
+      ...runtimeForm,
+      sheets: runtimeForm.sheets.map((s) => ({
+        ...s,
+        fields: s.fields.map((f) =>
+          fieldConfigs[f.id] ? { ...f, config: { ...f.config, ...fieldConfigs[f.id] } } : f,
+        ),
+      })),
+    };
+  }, [runtimeForm, fieldConfigs]);
 
   // ── Field explorer state ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -218,6 +271,25 @@ export function PaperlessDesigner({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
       if (e.button === 0 || e.button === 1) {
+        const target = e.target as HTMLElement;
+        const el = target;
+        // DEBUG: Log every mouse down on the workspace with full target inspection
+        console.log("WORKSPACE MOUSEDOWN", {
+          tag: target.tagName,
+          id: target.id,
+          className: target.className,
+          closestForm: target.closest("input, textarea, select, button, [contenteditable]")?.tagName,
+          preventDefault: !target.closest("input, textarea, select, button, [contenteditable]"),
+        });
+        // FIELD SELECT inspection: check if click could be inside a form control
+        console.log("FIELD SELECT", {
+          tag: el.tagName,
+          textarea: !!el.closest("textarea"),
+          input: !!el.closest("input"),
+          button: !!el.closest("button"),
+          isContentEditable: el.isContentEditable,
+        });
+        if (target.closest("input, textarea, select, button, [contenteditable]")) return;
         e.preventDefault();
         startPan(e.clientX, e.clientY);
       }
@@ -236,7 +308,7 @@ export function PaperlessDesigner({
 
   // ── Wheel zoom (Ctrl/Meta = zoom toward cursor, else = pan) ──
   const handleWheel = useCallback(
-    (e: React.WheelEvent) => {
+    (e: WheelEvent) => {
       if (!e.ctrlKey && !e.metaKey) {
         setOffsetX((o) => o - e.deltaX);
         setOffsetY((o) => o - e.deltaY);
@@ -255,6 +327,14 @@ export function PaperlessDesigner({
     },
     [zoom, zoomToward],
   );
+
+  // Attach native wheel listener with { passive: false } so preventDefault works
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   // ── Zoom helpers (fine 5% increments instead of preset jumps) ──
   const zoomIn = useCallback(() => {
@@ -318,7 +398,10 @@ export function PaperlessDesigner({
             onSearchChange={setSearchQuery}
             sortBy={sortBy}
             onSortChange={setSortBy}
-            onFieldSelect={setSelectedFieldId}
+            onFieldSelect={(id) => {
+              console.log("FIELD SELECTED (explorer)", id);
+              setSelectedFieldId(id);
+            }}
           />
           {selectedField && (
             <div className="border-t border-slate-200 px-3 py-2 space-y-1.5 shrink-0">
@@ -432,7 +515,6 @@ export function PaperlessDesigner({
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
-          onWheel={handleWheel}
           onDoubleClick={handleDoubleClick}
         >
           {/* Grid dots pattern for infinite canvas feel */}
@@ -467,7 +549,7 @@ export function PaperlessDesigner({
               }}
             >
               <RuntimeFormViewer
-                runtimeForm={runtimeForm}
+                runtimeForm={mergedForm}
                 runtime={runtime}
                 selectedFieldId={selectedFieldId}
                 currentPage={currentPage}
@@ -558,7 +640,7 @@ export function PaperlessDesigner({
           </div>
         </div>
 
-        {/* Right sidebar — reserved for future configuration */}
+        {/* Right sidebar — Configuration panel */}
         <div
           style={{ width: 280 }}
           className="bg-white border-l border-slate-200 flex flex-col overflow-hidden"
@@ -568,18 +650,18 @@ export function PaperlessDesigner({
               Configuration
             </span>
           </div>
-          <div className="flex-1 overflow-y-auto p-3 space-y-3">
-            {["Appearance", "Behavior", "Validation", "Keyboard", "Formatting"].map(
-              (section) => (
-                <div key={section}>
-                  <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide mb-1">
-                    {section}
-                  </div>
-                  <div className="text-[10px] text-slate-300 italic">
-                    No editable configuration yet.
-                  </div>
-                </div>
-              ),
+          <div className="flex-1 overflow-y-auto p-3 space-y-2">
+            {selectedFieldId && selectedField ? (
+              <ConfigPanel
+                field={fieldWithConfig(selectedField)}
+                onUpdateConfig={(category, key, value) =>
+                  updateFieldConfig(selectedField.id, category, key, value)
+                }
+              />
+            ) : (
+              <div className="text-xs text-slate-400 text-center mt-4">
+                Select a field to configure
+              </div>
             )}
           </div>
         </div>
@@ -1081,6 +1163,363 @@ function FieldTypeIcon({ type }: { type: string }) {
     >
       {meta.char}
     </span>
+  );
+}
+
+/* ═══════════════════════════════════════════════
+   Configuration Panel (Right Sidebar)
+   ═══════════════════════════════════════════════ */
+interface ConfigPanelProps {
+  field: RuntimeField;
+  onUpdateConfig: <K extends keyof FieldConfig, SK extends keyof FieldConfig[K]>(
+    category: K,
+    key: SK,
+    value: FieldConfig[K][SK],
+  ) => void;
+}
+
+function ConfigPanel({ field, onUpdateConfig }: ConfigPanelProps) {
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    appearance: false,
+    behavior: false,
+    input: true,
+    layout: false,
+  });
+
+  const toggle = (key: string) =>
+    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const cfg = field.config ?? { appearance: {}, behavior: {}, input: {}, layout: {} };
+
+  return (
+    <div className="space-y-1">
+      {/* ── Appearance ── */}
+      <CollapsibleSection
+        label="Appearance"
+        open={openSections.appearance}
+        onToggle={() => toggle("appearance")}
+      >
+        <div className="space-y-2">
+          <ConfigField label="Font Family">
+            <select
+              value={cfg.appearance.fontFamily ?? "Calibri, sans-serif"}
+              onChange={(e) => onUpdateConfig("appearance", "fontFamily", e.target.value)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {[
+                "Calibri, sans-serif",
+                "Arial, sans-serif",
+                "Times New Roman, serif",
+                "Courier New, monospace",
+                "Georgia, serif",
+                "Verdana, sans-serif",
+              ].map((f) => (
+                <option key={f} value={f}>
+                  {f.split(",")[0]}
+                </option>
+              ))}
+            </select>
+          </ConfigField>
+          <ConfigField label="Font Size">
+            <select
+              value={cfg.appearance.fontSize ?? 11}
+              onChange={(e) => onUpdateConfig("appearance", "fontSize", Number(e.target.value))}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 36, 48, 72].map((s) => (
+                <option key={s} value={s}>
+                  {s}pt
+                </option>
+              ))}
+            </select>
+          </ConfigField>
+          <ConfigField label="Font Weight">
+            <select
+              value={cfg.appearance.fontWeight ?? "normal"}
+              onChange={(e) => onUpdateConfig("appearance", "fontWeight", e.target.value)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {["normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900"].map(
+                (w) => (
+                  <option key={w} value={w}>
+                    {w}
+                  </option>
+                ),
+              )}
+            </select>
+          </ConfigField>
+          <ConfigField label="Text Color">
+            <input
+              type="color"
+              value={cfg.appearance.textColor ?? "#1a1a1a"}
+              onChange={(e) => onUpdateConfig("appearance", "textColor", e.target.value)}
+              className="w-full h-6 px-1 border border-slate-200 rounded-md cursor-pointer"
+            />
+          </ConfigField>
+          <ConfigField label="Background">
+            <input
+              type="color"
+              value={cfg.appearance.backgroundColor ?? "#ffffff"}
+              onChange={(e) => onUpdateConfig("appearance", "backgroundColor", e.target.value)}
+              className="w-full h-6 px-1 border border-slate-200 rounded-md cursor-pointer"
+            />
+          </ConfigField>
+          <ConfigField label="Border">
+            <select
+              value={cfg.appearance.border ?? "solid"}
+              onChange={(e) => onUpdateConfig("appearance", "border", e.target.value)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {["none", "solid", "dashed", "dotted", "double"].map((b) => (
+                <option key={b} value={b}>
+                  {b.charAt(0).toUpperCase() + b.slice(1)}
+                </option>
+              ))}
+            </select>
+          </ConfigField>
+          <ConfigField label="Border Radius">
+            <select
+              value={cfg.appearance.borderRadius ?? "2px"}
+              onChange={(e) => onUpdateConfig("appearance", "borderRadius", e.target.value)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {["0px", "2px", "4px", "6px", "8px", "12px", "9999px"].map((r) => (
+                <option key={r} value={r}>
+                  {r === "9999px" ? "Full" : r}
+                </option>
+              ))}
+            </select>
+          </ConfigField>
+          <ConfigField label="Text Align">
+            <select
+              value={cfg.appearance.textAlign ?? "left"}
+              onChange={(e) => onUpdateConfig("appearance", "textAlign", e.target.value)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {["left", "center", "right", "justify"].map((a) => (
+                <option key={a} value={a}>
+                  {a.charAt(0).toUpperCase() + a.slice(1)}
+                </option>
+              ))}
+            </select>
+          </ConfigField>
+        </div>
+      </CollapsibleSection>
+
+      {/* ── Behavior ── */}
+      <CollapsibleSection
+        label="Behavior"
+        open={openSections.behavior}
+        onToggle={() => toggle("behavior")}
+      >
+        <div className="space-y-2">
+          <ToggleField
+            label="Read Only"
+            checked={cfg.behavior.readOnly ?? false}
+            onChange={(v) => onUpdateConfig("behavior", "readOnly", v)}
+          />
+          <ToggleField
+            label="Required"
+            checked={cfg.behavior.required ?? false}
+            onChange={(v) => onUpdateConfig("behavior", "required", v)}
+          />
+          <ToggleField
+            label="Visible"
+            checked={cfg.behavior.visible ?? true}
+            onChange={(v) => onUpdateConfig("behavior", "visible", v)}
+          />
+          <ToggleField
+            label="Enabled"
+            checked={cfg.behavior.enabled ?? true}
+            onChange={(v) => onUpdateConfig("behavior", "enabled", v)}
+          />
+          <ToggleField
+            label="Multiline"
+            checked={cfg.behavior.multiline ?? false}
+            onChange={(v) => onUpdateConfig("behavior", "multiline", v)}
+          />
+        </div>
+      </CollapsibleSection>
+
+      {/* ── Input ── */}
+      <CollapsibleSection
+        label="Input"
+        open={openSections.input}
+        onToggle={() => toggle("input")}
+      >
+        <div className="space-y-2">
+          <ConfigField label="Keyboard Type">
+            <select
+              value={cfg.input.keyboardType ?? "text"}
+              onChange={(e) => onUpdateConfig("input", "keyboardType", e.target.value as any)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              {["text", "number", "decimal", "email", "phone", "password", "url"].map(
+                (opt) => (
+                  <option key={opt} value={opt}>
+                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </option>
+                ),
+              )}
+            </select>
+          </ConfigField>
+          <ConfigField label="Character Restriction">
+            <select
+              value={cfg.input.characterRestriction ?? ""}
+              onChange={(e) => onUpdateConfig("input", "characterRestriction", e.target.value || undefined)}
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            >
+              <option value="">None</option>
+              <option value="letters">Letters only</option>
+              <option value="numbers">Numbers only</option>
+              <option value="alphanumeric">Alphanumeric</option>
+              <option value="uppercase">Uppercase only</option>
+              <option value="lowercase">Lowercase only</option>
+            </select>
+          </ConfigField>
+          <ConfigField label="Max Length">
+            <input
+              type="number"
+              min={0}
+              value={cfg.input.maxLength ?? ""}
+              onChange={(e) =>
+                onUpdateConfig("input", "maxLength", e.target.value ? Number(e.target.value) : undefined)
+              }
+              placeholder="No limit"
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </ConfigField>
+          <ConfigField label="Min Length">
+            <input
+              type="number"
+              min={0}
+              value={cfg.input.minLength ?? ""}
+              onChange={(e) =>
+                onUpdateConfig("input", "minLength", e.target.value ? Number(e.target.value) : undefined)
+              }
+              placeholder="No minimum"
+              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
+            />
+          </ConfigField>
+        </div>
+      </CollapsibleSection>
+
+      {/* ── Layout ── */}
+      <CollapsibleSection
+        label="Layout"
+        open={openSections.layout}
+        onToggle={() => toggle("layout")}
+      >
+        <div className="space-y-2">
+          <ConfigField label="Horizontal">
+            <div className="flex gap-1">
+              {(["left", "center", "right"] as const).map((a) => (
+                <button
+                  key={a}
+                  onClick={() => onUpdateConfig("layout", "horizontalAlign", a)}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded border ${
+                    (cfg.layout.horizontalAlign ?? "left") === a
+                      ? "bg-emerald-100 border-emerald-400 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {a.charAt(0).toUpperCase() + a.slice(1)}
+                </button>
+              ))}
+            </div>
+          </ConfigField>
+          <ConfigField label="Vertical">
+            <div className="flex gap-1">
+              {(["top", "middle", "bottom"] as const).map((a) => (
+                <button
+                  key={a}
+                  onClick={() => onUpdateConfig("layout", "verticalAlign", a)}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded border ${
+                    (cfg.layout.verticalAlign ?? "top") === a
+                      ? "bg-emerald-100 border-emerald-400 text-emerald-700"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {a.charAt(0).toUpperCase() + a.slice(1)}
+                </button>
+              ))}
+            </div>
+          </ConfigField>
+        </div>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
+/* ── Small helpers ── */
+
+function ConfigField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
+      {children}
+    </div>
+  );
+}
+
+function ToggleField({
+  label,
+  checked,
+  onChange,
+}: {
+  label: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <label className="flex items-center justify-between cursor-pointer">
+      <span className="text-xs text-slate-600">{label}</span>
+      <button
+        onClick={() => onChange(!checked)}
+        className={`relative w-8 h-4 rounded-full transition-colors ${
+          checked ? "bg-emerald-500" : "bg-slate-300"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${
+            checked ? "translate-x-4" : ""
+          }`}
+        />
+      </button>
+    </label>
+  );
+}
+
+function CollapsibleSection({
+  label,
+  open,
+  onToggle,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="border border-slate-100 rounded-md overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+      >
+        <span>{label}</span>
+        <svg
+          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && <div className="px-2.5 pb-2">{children}</div>}
+    </div>
   );
 }
 

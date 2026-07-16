@@ -6,21 +6,31 @@ export interface FieldComponentProps {
   overlay: OverlayModel;
   value: string | boolean | null;
   onChange: (value: string | boolean | null) => void;
-  /** Production mode: use yellow theme */
+  onBlur?: () => void;
   production?: boolean;
+  disabled?: boolean;
+  readOnly?: boolean;
 }
 
-/**
- * Number field — renders <input type="number">.
- */
-export function NumberField({ overlay, value, onChange, production }: FieldComponentProps) {
+export function NumberField({
+  overlay,
+  value,
+  onChange,
+  onBlur,
+  production,
+  disabled,
+  readOnly,
+}: FieldComponentProps) {
   return (
     <input
       type="number"
       className="runtime-field"
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value || null)}
+      onBlur={onBlur}
       placeholder=""
+      disabled={disabled}
+      readOnly={readOnly}
       style={inputStyle(overlay, production)}
     />
   );
@@ -28,8 +38,8 @@ export function NumberField({ overlay, value, onChange, production }: FieldCompo
 
 function inputStyle(overlay: OverlayModel, production?: boolean): React.CSSProperties {
   const borderColor = production
-    ? "rgba(234, 179, 8, 0.6)"       // yellow-500
-    : "rgba(239, 68, 68, 0.5)";      // red-500
+    ? "rgba(234, 179, 8, 0.6)"
+    : "rgba(239, 68, 68, 0.5)";
 
   return {
     width: "100%",
@@ -40,7 +50,7 @@ function inputStyle(overlay: OverlayModel, production?: boolean): React.CSSPrope
     borderRadius: "2px",
     background: production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)",
     fontFamily: "Calibri, sans-serif",
-    fontSize: `11pt`,
+    fontSize: "11pt",
     color: "#1a1a1a",
     textAlign: "right" as const,
     outline: "none",

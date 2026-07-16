@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback } from "react";
+import { useStore } from "zustand";
+import { getDefaultStore } from "@/runtime/store";
 import type { FieldValues, DirtyState } from "@/types/runtime";
 
 export interface RuntimeState {
@@ -15,45 +17,52 @@ export interface RuntimeState {
 
 /**
  * Runtime state management hook.
- * Stores form field values in React state only — no backend, no database.
+ *
+ * BRIDGE IMPLEMENTATION (Phase 1 — Runtime V2):
+ * Delegates to the Zustand store internally for backward compatibility.
+ * Components that call this hook still work exactly as before.
+ * New components should use `useRuntimeStore(selector)` directly
+ * for per-field subscriptions and optimal re-renders.
  */
 export function useRuntimeState(): RuntimeState {
-  const [values, setValues] = useState<FieldValues>({});
-  const [dirty, setDirty] = useState<DirtyState>({});
-  const lastUpdatedRef = useRef<string | null>(null);
+  const store = getDefaultStore();
 
-  const setValue = useCallback((overlayId: string, value: string | boolean | null) => {
-    setValues((prev) => ({ ...prev, [overlayId]: value }));
-    setDirty((prev) => ({ ...prev, [overlayId]: true }));
-    lastUpdatedRef.current = new Date().toISOString();
-  }, []);
+  const values = useStore(store, (s) => s.values);
+  const dirty = useStore(store, (s) => s.dirty);
+
+  const setValue = useCallback(
+    (overlayId: string, value: string | boolean | null) => {
+      store.getState().setValue(overlayId, value);
+      store.getState().markDirty(overlayId);
+    },
+    [store],
+  );
 
   const reset = useCallback(() => {
-    setValues({});
-    setDirty({});
-    lastUpdatedRef.current = null;
-  }, []);
+    store.getState().resetValues();
+    store.getState().resetDirty();
+  }, [store]);
 
   const exportJson = useCallback((): string => {
     return JSON.stringify(
       {
-        values,
+        values: store.getState().values,
         exportedAt: new Date().toISOString(),
-        fieldCount: Object.keys(values).length,
+        fieldCount: Object.keys(store.getState().values).length,
       },
       null,
-      2
+      2,
     );
-  }, [values]);
+  }, [store]);
 
   const isDirty = useCallback((): boolean => {
-    return Object.keys(dirty).length > 0;
-  }, [dirty]);
+    return store.getState().isDirty();
+  }, [store]);
 
   return {
     values,
     dirty,
-    lastUpdated: lastUpdatedRef.current,
+    lastUpdated: null,
     setValue,
     reset,
     exportJson,

@@ -19,6 +19,35 @@ export type OverlayType =
   | "unknown";
 
 /**
+ * Live-editable field configuration, carried on the overlay for canvas rendering.
+ */
+export interface OverlayConfig {
+  input: {
+    keyboardType?: "text" | "number" | "decimal" | "email" | "phone" | "password" | "url";
+    characterRestriction?: string;
+    maxLength?: number;
+    minLength?: number;
+  };
+  behavior: {
+    readOnly?: boolean;
+    required?: boolean;
+    visible?: boolean;
+    enabled?: boolean;
+    multiline?: boolean;
+  };
+  appearance: {
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    textColor?: string;
+    backgroundColor?: string;
+    border?: string;
+    borderRadius?: string;
+    textAlign?: string;
+  };
+}
+
+/**
  * An overlay definition — a single field region on the rendered Excel page.
  * Coordinates are in points (pt) measured from the print origin (top-left of content area).
  */
@@ -41,6 +70,8 @@ export interface OverlayModel {
   rotation: number;
   /** Arbitrary metadata associated with this overlay */
   metadata: Record<string, unknown>;
+  /** Live-editable configuration overrides for the canvas */
+  config?: OverlayConfig;
 }
 
 /**

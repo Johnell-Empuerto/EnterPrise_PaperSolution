@@ -1,28 +1,36 @@
 "use client";
 
+import { memo } from "react";
 import type { OverlayModel } from "@/types/overlay";
-import { TextField } from "./fields/TextField";
-import { CheckboxField } from "./fields/CheckboxField";
-import { DateField } from "./fields/DateField";
-import { NumberField } from "./fields/NumberField";
-import { SignatureField } from "./fields/SignatureField";
+import { getFieldComponent } from "@/runtime/components/fields";
+import { useRuntimeStore } from "@/runtime/store";
+import { ValidationService } from "@/runtime/services/ValidationService";
 
 export interface RuntimeFieldProps {
   overlay: OverlayModel;
   value: string | boolean | null;
   onChange: (value: string | boolean | null) => void;
-  /** Production mode: use yellow styling for all fields */
   production?: boolean;
-  /** Use px units instead of pt (for COM-based coordinate system where pixels are source of truth) */
   usePixelUnits?: boolean;
 }
 
-/**
- * Dispatches to the correct field component based on overlay type.
- * Every field uses OverlayModel coordinates — no coordinate calculations inside components.
- */
-export function RuntimeField({ overlay, value, onChange, production, usePixelUnits }: RuntimeFieldProps) {
-  // Container div positioned at the overlay coordinates
+function RuntimeFieldInner({ overlay, production, usePixelUnits }: RuntimeFieldProps) {
+  const cfg = overlay.config;
+  const visible = cfg?.behavior?.visible ?? true;
+  const readOnly = cfg?.behavior?.readOnly ?? false;
+
+  // Per-field selectors — only subscribe to THIS field's value and error
+  const fieldId = overlay.id;
+  const value = useRuntimeStore((s) => s.values[fieldId]);
+  const error = useRuntimeStore((s) => s.errors[fieldId]);
+  const setValue = useRuntimeStore((s) => s.setValue);
+  const markDirty = useRuntimeStore((s) => s.markDirty);
+  const setError = useRuntimeStore((s) => s.setError);
+
+  // Look up the field component from the registry (not a switch-case)
+  const FieldComponent = getFieldComponent(overlay.type);
+  if (!FieldComponent) return null;
+
   const unit = usePixelUnits ? "px" : "pt";
   const fieldStyle: React.CSSProperties = {
     position: "absolute",
@@ -30,45 +38,68 @@ export function RuntimeField({ overlay, value, onChange, production, usePixelUni
     top: `${overlay.topPt}${unit}`,
     width: `${overlay.widthPt}${unit}`,
     height: `${overlay.heightPt}${unit}`,
-    pointerEvents: "auto", // Inputs must be interactive
-    zIndex: 26,
+    display: visible ? undefined : "none",
   };
 
-  const commonProps = {
-    overlay,
-    value,
-    onChange,
-    production,
+  const handleChange = (newValue: string | boolean | null) => {
+    setValue(fieldId, newValue);
+    if (!readOnly) {
+      markDirty(fieldId);
+    }
   };
 
-  let field: React.ReactNode;
-
-  switch (overlay.type) {
-    case "textbox":
-      field = <TextField {...commonProps} />;
-      break;
-    case "checkbox":
-      field = <CheckboxField {...commonProps} />;
-      break;
-    case "date":
-      field = <DateField {...commonProps} />;
-      break;
-    case "number":
-      field = <NumberField {...commonProps} />;
-      break;
-    case "signature":
-      field = <SignatureField {...commonProps} />;
-      break;
-    default:
-      return null;
-  }
+  // Validate on blur — uses pure ValidationService, no store logic here
+  const handleBlur = () => {
+    if (overlay.metadata?.dataType) {
+      const fieldDef = {
+        id: fieldId,
+        cellReference: overlay.cell,
+        dataType: overlay.metadata.dataType as any,
+        required: cfg?.behavior?.required ?? false,
+        maxLength: cfg?.input?.maxLength ?? 0,
+        validationPattern: null,
+        validationMessage: null,
+      };
+      const err = ValidationService.validateField(fieldDef, value);
+      setError(fieldId, err);
+    }
+  };
 
   return (
     <div
       style={fieldStyle}
-      onMouseDown={(e) => e.stopPropagation()}
+      data-field-id={fieldId}
     >
-      {field}
+      {cfg?.behavior?.required && (
+        <span
+          style={{
+            position: "absolute",
+            top: 0,
+            right: 0,
+            transform: "translate(50%, -50%)",
+            fontSize: "10px",
+            color: "#dc2626",
+            fontWeight: "bold",
+            zIndex: 1,
+            pointerEvents: "none",
+          }}
+        >
+          *
+        </span>
+      )}
+      <FieldComponent
+        overlay={overlay}
+        value={value}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        production={production}
+        config={cfg}
+        readOnly={readOnly}
+        required={cfg?.behavior?.required}
+        placeholder={overlay.metadata?.placeholder as string | undefined}
+      />
     </div>
   );
 }
+
+export const RuntimeField = memo(RuntimeFieldInner);

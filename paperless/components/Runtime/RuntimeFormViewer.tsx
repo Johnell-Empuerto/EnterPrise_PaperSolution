@@ -1,53 +1,44 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import type { RuntimeForm } from "@/types/runtime";
 import type { OverlayModel, OverlayType } from "@/types/overlay";
 import { RuntimeCanvas } from "./RuntimeCanvas";
 import { PageSurface } from "./PageSurface";
 import { BackgroundLayer } from "./BackgroundLayer";
 import type { RuntimeState } from "./useRuntimeState";
+import { initializeStore, getDefaultStore } from "@/runtime/store";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
 export interface RuntimeFormViewerProps {
-  /** The runtime form from the COM backend (includes PNG URL + pixel coords) */
   runtimeForm: RuntimeForm;
-  /** The runtime state hook */
   runtime: RuntimeState;
-  /** Optional: ID of a field to highlight with a selection border */
   selectedFieldId?: string | null;
-  /** Current page (sheet index) to display — defaults to 0 */
   currentPage?: number;
-  /** Whether to show interactive field overlays */
   showOverlay?: boolean;
-  /** Whether to show the background PNG */
   showBackground?: boolean;
 }
 
-/**
- * PaperLess Production Runtime — COM-powered form viewer.
- *
- * Architecture (mirrors the legacy WPF rendering pipeline):
- *
- *   PageSurface (WPF Canvas equivalent — fixed pixel size)
- *   ├── BackgroundLayer (WPF Image, Stretch=None — PNG at native pixels)
- *   ├── FieldLayer (WPF overlay controls — fields at absolute pixel positions)
- *   ├── AnnotationLayer (future)
- *   ├── SelectionLayer (future)
- *   └── DebugLayer (future)
- *
- * Key design principles:
- * - SINGLE coordinate space: 2550×3299px (at 300 DPI for Letter)
- * - No responsive layout ever affects page geometry
- * - Only the viewport scrolls — the PageSurface never scales
- * - All layers share identical dimensions
- */
-export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, currentPage = 0, showOverlay = true, showBackground = true }: RuntimeFormViewerProps) {
+export function RuntimeFormViewer({
+  runtimeForm,
+  runtime,
+  selectedFieldId,
+  currentPage = 0,
+  showOverlay = true,
+  showBackground = true,
+}: RuntimeFormViewerProps) {
+  // Initialize the Zustand store with form data on mount/data change
+  useEffect(() => {
+    if (runtimeForm) {
+      const store = getDefaultStore();
+      initializeStore(store, runtimeForm);
+    }
+  }, [runtimeForm]);
+
   const sheet = runtimeForm.sheets[currentPage];
   if (!sheet) return null;
 
-  // Convert only the CURRENT sheet's fields to OverlayModel[] (optimization: skip other sheets)
   const overlaysForSheet = useMemo(() => {
     const result: OverlayModel[] = [];
     for (const field of sheet.fields) {
@@ -66,13 +57,14 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
           sheet: sheet.name,
           mergeRange: field.mergeRange,
           dataType: field.dataType,
+          placeholder: field.placeholder,
         },
+        config: field.config as any,
       });
     }
     return result;
   }, [sheet]);
 
-  // Resolve background image URL
   const bgUrl = sheet.backgroundImage
     ? `${API_BASE_URL}${sheet.backgroundImage.startsWith("/") ? "" : "/"}${sheet.backgroundImage}`
     : `${API_BASE_URL}/preview/page_${runtimeForm.title}.png`;
@@ -94,7 +86,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
         widthPx={sheet.pageWidthPx}
         heightPx={sheet.pageHeightPx}
       >
-        {/* Layer 1: Background PNG (toggled by Show Background) */}
         {showBackground && (
           <BackgroundLayer
             src={bgUrl}
@@ -104,7 +95,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
           />
         )}
 
-        {/* Layer 2: Interactive runtime fields (toggled by Show Fields) */}
         {showOverlay && hasSheetFields && (
           <RuntimeCanvas
             overlayCollection={sheetCollection}
@@ -117,7 +107,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
           />
         )}
 
-        {/* Empty state when both are hidden */}
         {!showBackground && !showOverlay && (
           <div
             style={{
@@ -142,7 +131,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
           </div>
         )}
 
-        {/* Layer 3: Selection highlight */}
         {selectedFieldId && (() => {
           const selOverlay = sheetCollection.byId[selectedFieldId];
           if (!selOverlay) return null;
@@ -165,7 +153,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
         })()}
       </PageSurface>
 
-      {/* Empty state */}
       {!hasSheetFields && (
         <div className="bg-amber-50 text-amber-700 text-sm px-4 py-2 rounded-lg border border-amber-200" data-runtime-empty>
           No editable fields detected in this template
@@ -175,10 +162,6 @@ export function RuntimeFormViewer({ runtimeForm, runtime, selectedFieldId, curre
   );
 }
 
-/**
- * Maps backend RuntimeField dataType to OverlayType for RuntimeCanvas compatibility.
- * Returns null for non-interactive types.
- */
 function fieldDataTypeToOverlayType(dataType: string): OverlayType | null {
   const map: Record<string, OverlayType> = {
     text: "textbox",
@@ -186,8 +169,8 @@ function fieldDataTypeToOverlayType(dataType: string): OverlayType | null {
     date: "date",
     checkbox: "checkbox",
     signature: "signature",
-    dropdown: "textbox",       // Fall back to textbox for dropdown
-    calculated: "textbox",     // Fall back to textbox for calculated
+    dropdown: "textbox",
+    calculated: "textbox",
   };
   return map[dataType] ?? null;
 }

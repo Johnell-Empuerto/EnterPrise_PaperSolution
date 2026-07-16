@@ -39,6 +39,36 @@ export interface RuntimeSheet {
   backgroundImage?: string | null;
 }
 
+export interface FieldConfig {
+  appearance: {
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: string;
+    textColor?: string;
+    backgroundColor?: string;
+    border?: string;
+    borderRadius?: string;
+    textAlign?: string;
+  };
+  behavior: {
+    readOnly?: boolean;
+    required?: boolean;
+    visible?: boolean;
+    enabled?: boolean;
+    multiline?: boolean;
+  };
+  input: {
+    keyboardType?: "text" | "number" | "decimal" | "email" | "phone" | "password" | "url";
+    characterRestriction?: string;
+    maxLength?: number;
+    minLength?: number;
+  };
+  layout: {
+    horizontalAlign?: "left" | "center" | "right";
+    verticalAlign?: "top" | "middle" | "bottom";
+  };
+}
+
 export interface RuntimeField {
   id: string;
   /** User-visible field name (from comment or default). Never shown as `id`. */
@@ -76,6 +106,8 @@ export interface RuntimeField {
   tabIndex: number;
   validationPattern?: string | null;
   validationMessage?: string | null;
+  /** Live-editable configuration overrides — source of truth during editing. */
+  config?: FieldConfig;
 }
 
 export interface RuntimeImage {
