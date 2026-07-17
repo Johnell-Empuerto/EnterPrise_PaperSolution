@@ -287,8 +287,11 @@ export function KeyboardTextPropertyPanel({ params, onChange }: KeyboardTextProp
           label="Required"
           checked={params.required}
           onChange={(v) => {
-            update("required", v);
-            if (!v) update("validateOnEditing", false);
+            if (v) {
+              update("required", true);
+            } else {
+              onChange({ ...params, required: false, validateOnEditing: false });
+            }
           }}
         />
         {params.required && (

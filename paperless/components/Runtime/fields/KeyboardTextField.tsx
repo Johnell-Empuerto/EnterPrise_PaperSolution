@@ -43,7 +43,7 @@ function KeyboardTextFieldInner({
   const enabled = !(disabled ?? false);
   const maxLength = kt.maxLength > 0 ? kt.maxLength : undefined;
   const restriction = toCharacterRestriction(kt.inputRestriction);
-  const required = propRequired ?? kt.required;
+  const required = kt.required || propRequired;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const dirtyRef = useRef(false);
