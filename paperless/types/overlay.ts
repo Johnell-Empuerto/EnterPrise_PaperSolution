@@ -7,7 +7,6 @@
 
 /** Supported overlay field types */
 export type OverlayType =
-  | "textbox"
   | "signature"
   | "checkbox"
   | "date"
@@ -16,24 +15,22 @@ export type OverlayType =
   | "barcode"
   | "image"
   | "ocr"
+  | "KeyboardText"
   | "unknown";
 
 /**
  * Live-editable field configuration, carried on the overlay for canvas rendering.
  */
 export interface OverlayConfig {
-  input: {
-    keyboardType?: "text" | "number" | "decimal" | "email" | "phone" | "password" | "url";
-    characterRestriction?: string;
-    maxLength?: number;
-    minLength?: number;
-  };
   behavior: {
     readOnly?: boolean;
     required?: boolean;
     visible?: boolean;
     enabled?: boolean;
-    multiline?: boolean;
+  };
+  input: {
+    maxLength?: number;
+    minLength?: number;
   };
   appearance: {
     fontFamily?: string;
@@ -42,10 +39,6 @@ export interface OverlayConfig {
     textColor?: string;
     backgroundColor?: string;
   };
-  /**
-   * Layout alignment — single source of truth for text/content positioning.
-   * Replaces the old appearance.textAlign.
-   */
   layout: {
     horizontalAlign?: "left" | "center" | "right";
     verticalAlign?: "top" | "middle" | "bottom";

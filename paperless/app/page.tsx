@@ -11,13 +11,13 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 function mapPreviewType(
   type: string,
 ):
-  | "text"
   | "number"
   | "date"
   | "checkbox"
   | "signature"
   | "dropdown"
-  | "calculated" {
+  | "calculated"
+  | "KeyboardText" {
   const t = type.toLowerCase();
   if (t.includes("numeric") || t.includes("number")) return "number";
   if (t.includes("date")) return "date";
@@ -28,7 +28,7 @@ function mapPreviewType(
     return "dropdown";
   if (t.includes("calc") || t.includes("formula") || t.includes("computed"))
     return "calculated";
-  return "text";
+  return "KeyboardText";
 }
 export default function Home() {
   // ── Upload state ──

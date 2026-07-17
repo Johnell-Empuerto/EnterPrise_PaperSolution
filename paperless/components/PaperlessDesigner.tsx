@@ -4,6 +4,10 @@ import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import type { RuntimeForm, RuntimeField, FieldConfig } from "@/types/runtime";
 import type { RuntimeState } from "./Runtime/useRuntimeState";
 import { RuntimeFormViewer } from "./Runtime/RuntimeFormViewer";
+import { KeyboardTextPropertyPanel } from "@/components/Runtime/fields/KeyboardTextPropertyPanel";
+import { DEFAULTS } from "@/runtime/config/keyboardTextConfig";
+import { convertLegacyConfigToKtParams, isLegacyTextField } from "@/runtime/config/migration";
+import type { KeyboardTextInputParameters } from "@/runtime/config/keyboardTextConfig";
 
 export interface PaperlessDesignerProps {
   runtimeForm: RuntimeForm;
@@ -50,13 +54,24 @@ export function PaperlessDesigner({
     [fields, selectedFieldId],
   );
 
+  // ── Field configuration overrides (live editing, no persistence) ──
+  const [fieldConfigs, setFieldConfigs] = useState<Record<string, FieldConfig>>({});
+  const [ktConfigs, setKtConfigs] = useState<Record<string, KeyboardTextInputParameters>>({});
+
   // DEBUG: Log selection changes
   useEffect(() => {
     console.log("SELECTION CHANGED", { selectedFieldId, timestamp: new Date().toISOString() });
   }, [selectedFieldId]);
 
-  // ── Field configuration overrides (live editing, no persistence) ──
-  const [fieldConfigs, setFieldConfigs] = useState<Record<string, FieldConfig>>({});
+  // Auto-migrate legacy text fields to KeyboardText on selection
+  useEffect(() => {
+    if (!selectedField || !isLegacyTextField(selectedField)) return;
+    if (ktConfigs[selectedField.id]) return;
+    setKtConfigs((prev) => ({
+      ...prev,
+      [selectedField.id]: convertLegacyConfigToKtParams(selectedField.config),
+    }));
+  }, [selectedField, ktConfigs]);
 
   const updateFieldConfig = useCallback(
     <K extends keyof FieldConfig, SK extends keyof FieldConfig[K]>(
@@ -80,48 +95,62 @@ export function PaperlessDesigner({
     [],
   );
 
+  const updateKeyboardTextConfig = useCallback(
+    (fieldId: string, params: KeyboardTextInputParameters) => {
+      setKtConfigs((prev) => ({ ...prev, [fieldId]: params }));
+    },
+    [],
+  );
+
   // Merge config into a RuntimeField for rendering
   // Deep-merges per category so partial overrides (e.g. only {behavior: {readOnly: true}})
   // don't wipe out other categories like appearance, input, layout.
   const fieldWithConfig = useCallback(
-    (field: RuntimeField): RuntimeField =>
-      fieldConfigs[field.id]
-        ? {
-            ...field,
-            config: {
-              appearance: { ...(field.config?.appearance || {}), ...(fieldConfigs[field.id]?.appearance || {}) },
-              behavior: { ...(field.config?.behavior || {}), ...(fieldConfigs[field.id]?.behavior || {}) },
-              input: { ...(field.config?.input || {}), ...(fieldConfigs[field.id]?.input || {}) },
-              layout: { ...(field.config?.layout || {}), ...(fieldConfigs[field.id]?.layout || {}) },
-            },
-          }
-        : field,
-    [fieldConfigs],
+    (field: RuntimeField): RuntimeField => {
+      const mergedAppearance = { ...(field.config?.appearance || {}), ...(fieldConfigs[field.id]?.appearance || {}) };
+      const mergedBehavior = { ...(field.config?.behavior || {}), ...(fieldConfigs[field.id]?.behavior || {}) };
+      const mergedInput = { ...(field.config?.input || {}), ...(fieldConfigs[field.id]?.input || {}) };
+      const mergedLayout = { ...(field.config?.layout || {}), ...(fieldConfigs[field.id]?.layout || {}) };
+      const kt = ktConfigs[field.id];
+      return {
+        ...field,
+        config: {
+          appearance: mergedAppearance,
+          behavior: mergedBehavior,
+          input: mergedInput,
+          layout: mergedLayout,
+          ...(kt ? { keyboardText: kt } : {}),
+        } as FieldConfig,
+      };
+    },
+    [fieldConfigs, ktConfigs],
   );
 
   // Merged RuntimeForm with field configs applied — passed to the canvas viewer
   const mergedForm = useMemo<RuntimeForm>(() => {
-    if (Object.keys(fieldConfigs).length === 0) return runtimeForm;
+    if (Object.keys(fieldConfigs).length === 0 && Object.keys(ktConfigs).length === 0) return runtimeForm;
     return {
       ...runtimeForm,
       sheets: runtimeForm.sheets.map((s) => ({
         ...s,
-        fields: s.fields.map((f) =>
-          fieldConfigs[f.id]
-            ? {
-                ...f,
-                config: {
-                  appearance: { ...(f.config?.appearance || {}), ...(fieldConfigs[f.id]?.appearance || {}) },
-                  behavior: { ...(f.config?.behavior || {}), ...(fieldConfigs[f.id]?.behavior || {}) },
-                  input: { ...(f.config?.input || {}), ...(fieldConfigs[f.id]?.input || {}) },
-                  layout: { ...(f.config?.layout || {}), ...(fieldConfigs[f.id]?.layout || {}) },
-                },
-              }
-            : f,
-        ),
+        fields: s.fields.map((f) => {
+          const hasFieldConfig = fieldConfigs[f.id];
+          const hasKtConfig = ktConfigs[f.id];
+          if (!hasFieldConfig && !hasKtConfig) return f;
+          return {
+            ...f,
+            config: {
+              appearance: { ...(f.config?.appearance || {}), ...(fieldConfigs[f.id]?.appearance || {}) },
+              behavior: { ...(f.config?.behavior || {}), ...(fieldConfigs[f.id]?.behavior || {}) },
+              input: { ...(f.config?.input || {}), ...(fieldConfigs[f.id]?.input || {}) },
+              layout: { ...(f.config?.layout || {}), ...(fieldConfigs[f.id]?.layout || {}) },
+              ...(hasKtConfig ? { keyboardText: ktConfigs[f.id] } : {}),
+            } as FieldConfig,
+          };
+        }),
       })),
     };
-  }, [runtimeForm, fieldConfigs]);
+  }, [runtimeForm, fieldConfigs, ktConfigs]);
 
   // ── Field explorer state ──
   const [searchQuery, setSearchQuery] = useState("");
@@ -135,7 +164,8 @@ export function PaperlessDesigner({
         (f) =>
           (f.name ?? f.id).toLowerCase().includes(q) ||
           f.cellReference.toLowerCase().includes(q) ||
-          f.dataType.toLowerCase().includes(q),
+          f.dataType.toLowerCase().includes(q) ||
+          getTypeLabel(f.dataType).toLowerCase().includes(q),
       );
     }
     const sorted = [...result];
@@ -147,7 +177,7 @@ export function PaperlessDesigner({
         sorted.sort((a, b) => a.cellReference.localeCompare(b.cellReference));
         break;
       case "type":
-        sorted.sort((a, b) => a.dataType.localeCompare(b.dataType));
+        sorted.sort((a, b) => getTypeLabel(a.dataType).localeCompare(getTypeLabel(b.dataType)));
         break;
     }
     return sorted;
@@ -672,12 +702,16 @@ export function PaperlessDesigner({
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {selectedFieldId && selectedField ? (
-              <ConfigPanel
-                field={fieldWithConfig(selectedField)}
-                onUpdateConfig={(category, key, value) =>
-                  updateFieldConfig(selectedField.id, category, key, value)
-                }
-              />
+              selectedField.dataType === "KeyboardText" || ktConfigs[selectedField.id] ? (
+                <KeyboardTextPropertyPanel
+                  params={ktConfigs[selectedField.id] ?? DEFAULTS}
+                  onChange={(params) => updateKeyboardTextConfig(selectedField.id, params)}
+                />
+              ) : (
+                <div className="text-xs text-slate-400 text-center mt-4">
+                  No configuration available for this field type
+                </div>
+              )
             ) : (
               <div className="text-xs text-slate-400 text-center mt-4">
                 Select a field to configure
@@ -1148,7 +1182,7 @@ function FieldExplorer({
                 {field.cellReference}
               </span>
               <span className="text-[10px] text-slate-400">
-                {field.dataType}
+                {getTypeLabel(field.dataType)}
               </span>
             </div>
           </div>
@@ -1165,15 +1199,29 @@ function FieldExplorer({
   );
 }
 
+const TYPE_LABELS: Record<string, string> = {
+  number: "Number",
+  date: "Date",
+  checkbox: "Checkbox",
+  signature: "Signature",
+  dropdown: "Dropdown",
+  calculated: "Calculated",
+  KeyboardText: "Keyboard",
+};
+
+function getTypeLabel(type: string): string {
+  return TYPE_LABELS[type] ?? type;
+}
+
 function FieldTypeIcon({ type }: { type: string }) {
   const iconMap: Record<string, { char: string; color: string }> = {
-    text: { char: "T", color: "text-blue-500" },
     number: { char: "#", color: "text-orange-500" },
     date: { char: "D", color: "text-purple-500" },
     checkbox: { char: "\u2713", color: "text-emerald-500" },
     signature: { char: "S", color: "text-rose-500" },
     dropdown: { char: "\u25BC", color: "text-cyan-500" },
     calculated: { char: "\u2211", color: "text-slate-500" },
+    KeyboardText: { char: "K", color: "text-indigo-500" },
   };
   const meta = iconMap[type] ?? { char: "?", color: "text-slate-400" };
   return (
@@ -1186,322 +1234,7 @@ function FieldTypeIcon({ type }: { type: string }) {
   );
 }
 
-/* ═══════════════════════════════════════════════
-   Configuration Panel (Right Sidebar)
-   ═══════════════════════════════════════════════ */
-interface ConfigPanelProps {
-  field: RuntimeField;
-  onUpdateConfig: <K extends keyof FieldConfig, SK extends keyof FieldConfig[K]>(
-    category: K,
-    key: SK,
-    value: FieldConfig[K][SK],
-  ) => void;
-}
 
-function ConfigPanel({ field, onUpdateConfig }: ConfigPanelProps) {
-  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    appearance: false,
-    behavior: false,
-    input: true,
-    layout: false,
-  });
 
-  const toggle = (key: string) =>
-    setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-
-  const cfg = field.config ?? { appearance: {}, behavior: {}, input: {}, layout: {} };
-
-  return (
-    <div className="space-y-1">
-      {/* ── Appearance ── */}
-      <CollapsibleSection
-        label="Appearance"
-        open={openSections.appearance}
-        onToggle={() => toggle("appearance")}
-      >
-        <div className="space-y-2">
-          <ConfigField label="Font Family">
-            <select
-              value={cfg.appearance.fontFamily ?? "Calibri, sans-serif"}
-              onChange={(e) => onUpdateConfig("appearance", "fontFamily", e.target.value)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {[
-                "Calibri, sans-serif",
-                "Arial, sans-serif",
-                "Times New Roman, serif",
-                "Courier New, monospace",
-                "Georgia, serif",
-                "Verdana, sans-serif",
-              ].map((f) => (
-                <option key={f} value={f}>
-                  {f.split(",")[0]}
-                </option>
-              ))}
-            </select>
-          </ConfigField>
-          <ConfigField label="Font Size">
-            <select
-              value={cfg.appearance.fontSize ?? 11}
-              onChange={(e) => onUpdateConfig("appearance", "fontSize", Number(e.target.value))}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {[8, 9, 10, 11, 12, 14, 16, 18, 20, 22, 24, 28, 36, 48, 72].map((s) => (
-                <option key={s} value={s}>
-                  {s}pt
-                </option>
-              ))}
-            </select>
-          </ConfigField>
-          <ConfigField label="Font Weight">
-            <select
-              value={cfg.appearance.fontWeight ?? "normal"}
-              onChange={(e) => onUpdateConfig("appearance", "fontWeight", e.target.value)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {["normal", "bold", "100", "200", "300", "400", "500", "600", "700", "800", "900"].map(
-                (w) => (
-                  <option key={w} value={w}>
-                    {w}
-                  </option>
-                ),
-              )}
-            </select>
-          </ConfigField>
-          <ConfigField label="Text Color">
-            <input
-              type="color"
-              value={cfg.appearance.textColor ?? "#1a1a1a"}
-              onChange={(e) => onUpdateConfig("appearance", "textColor", e.target.value)}
-              className="w-full h-6 px-1 border border-slate-200 rounded-md cursor-pointer"
-            />
-          </ConfigField>
-          <ConfigField label="Background">
-            <input
-              type="color"
-              value={cfg.appearance.backgroundColor ?? "#ffffff"}
-              onChange={(e) => onUpdateConfig("appearance", "backgroundColor", e.target.value)}
-              className="w-full h-6 px-1 border border-slate-200 rounded-md cursor-pointer"
-            />
-          </ConfigField>
-        </div>
-      </CollapsibleSection>
-
-      {/* ── Behavior ── */}
-      <CollapsibleSection
-        label="Behavior"
-        open={openSections.behavior}
-        onToggle={() => toggle("behavior")}
-      >
-        <div className="space-y-2">
-          <ToggleField
-            label="Read Only"
-            checked={cfg.behavior.readOnly ?? false}
-            onChange={(v) => onUpdateConfig("behavior", "readOnly", v)}
-          />
-          <ToggleField
-            label="Required"
-            checked={cfg.behavior.required ?? false}
-            onChange={(v) => onUpdateConfig("behavior", "required", v)}
-          />
-          <ToggleField
-            label="Visible"
-            checked={cfg.behavior.visible ?? true}
-            onChange={(v) => onUpdateConfig("behavior", "visible", v)}
-          />
-          <ToggleField
-            label="Enabled"
-            checked={cfg.behavior.enabled ?? true}
-            onChange={(v) => onUpdateConfig("behavior", "enabled", v)}
-          />
-          <ToggleField
-            label="Multiline"
-            checked={cfg.behavior.multiline ?? false}
-            onChange={(v) => onUpdateConfig("behavior", "multiline", v)}
-          />
-        </div>
-      </CollapsibleSection>
-
-      {/* ── Input ── */}
-      <CollapsibleSection
-        label="Input"
-        open={openSections.input}
-        onToggle={() => toggle("input")}
-      >
-        <div className="space-y-2">
-          <ConfigField label="Keyboard Type">
-            <select
-              value={cfg.input.keyboardType ?? "text"}
-              onChange={(e) => onUpdateConfig("input", "keyboardType", e.target.value as any)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              {["text", "number", "decimal", "email", "phone", "password", "url"].map(
-                (opt) => (
-                  <option key={opt} value={opt}>
-                    {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                  </option>
-                ),
-              )}
-            </select>
-          </ConfigField>
-          <ConfigField label="Character Restriction">
-            <select
-              value={cfg.input.characterRestriction ?? ""}
-              onChange={(e) => onUpdateConfig("input", "characterRestriction", e.target.value || undefined)}
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            >
-              <option value="">None</option>
-              <option value="letters">Letters only</option>
-              <option value="numbers">Numbers only</option>
-              <option value="alphanumeric">Alphanumeric</option>
-              <option value="uppercase">Uppercase only</option>
-              <option value="lowercase">Lowercase only</option>
-            </select>
-          </ConfigField>
-          <ConfigField label="Max Length">
-            <input
-              type="number"
-              min={0}
-              value={cfg.input.maxLength ?? ""}
-              onChange={(e) =>
-                onUpdateConfig("input", "maxLength", e.target.value ? Number(e.target.value) : undefined)
-              }
-              placeholder="No limit"
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            />
-          </ConfigField>
-          <ConfigField label="Min Length">
-            <input
-              type="number"
-              min={0}
-              value={cfg.input.minLength ?? ""}
-              onChange={(e) =>
-                onUpdateConfig("input", "minLength", e.target.value ? Number(e.target.value) : undefined)
-              }
-              placeholder="No minimum"
-              className="w-full text-xs text-slate-700 px-2 py-1 border border-slate-200 rounded-md focus:outline-none focus:border-emerald-400 bg-white"
-            />
-          </ConfigField>
-        </div>
-      </CollapsibleSection>
-
-      {/* ── Layout ── */}
-      <CollapsibleSection
-        label="Layout"
-        open={openSections.layout}
-        onToggle={() => toggle("layout")}
-      >
-        <div className="space-y-2">
-          <ConfigField label="Horizontal">
-            <div className="flex gap-1">
-              {(["left", "center", "right"] as const).map((a) => (
-                <button
-                  key={a}
-                  onClick={() => onUpdateConfig("layout", "horizontalAlign", a)}
-                  className={`flex-1 text-[10px] px-1 py-1 rounded border ${
-                    (cfg.layout.horizontalAlign ?? "left") === a
-                      ? "bg-emerald-100 border-emerald-400 text-emerald-700"
-                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                  }`}
-                >
-                  {a.charAt(0).toUpperCase() + a.slice(1)}
-                </button>
-              ))}
-            </div>
-          </ConfigField>
-          <ConfigField label="Vertical">
-            <div className="flex gap-1">
-              {(["top", "middle", "bottom"] as const).map((a) => (
-                <button
-                  key={a}
-                  onClick={() => onUpdateConfig("layout", "verticalAlign", a)}
-                  className={`flex-1 text-[10px] px-1 py-1 rounded border ${
-                    (cfg.layout.verticalAlign ?? "top") === a
-                      ? "bg-emerald-100 border-emerald-400 text-emerald-700"
-                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
-                  }`}
-                >
-                  {a.charAt(0).toUpperCase() + a.slice(1)}
-                </button>
-              ))}
-            </div>
-          </ConfigField>
-        </div>
-      </CollapsibleSection>
-    </div>
-  );
-}
-
-/* ── Small helpers ── */
-
-function ConfigField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
-      {children}
-    </div>
-  );
-}
-
-function ToggleField({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className="flex items-center justify-between cursor-pointer">
-      <span className="text-xs text-slate-600">{label}</span>
-      <button
-        onClick={() => onChange(!checked)}
-        className={`relative w-8 h-4 rounded-full transition-colors ${
-          checked ? "bg-emerald-500" : "bg-slate-300"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform ${
-            checked ? "translate-x-4" : ""
-          }`}
-        />
-      </button>
-    </label>
-  );
-}
-
-function CollapsibleSection({
-  label,
-  open,
-  onToggle,
-  children,
-}: {
-  label: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="border border-slate-100 rounded-md overflow-hidden">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center justify-between px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors"
-      >
-        <span>{label}</span>
-        <svg
-          className={`w-3 h-3 transition-transform ${open ? "rotate-180" : ""}`}
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-      </button>
-      {open && <div className="px-2.5 pb-2">{children}</div>}
-    </div>
-  );
-}
 
 

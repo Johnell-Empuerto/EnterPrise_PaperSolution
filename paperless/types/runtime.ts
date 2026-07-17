@@ -52,11 +52,8 @@ export interface FieldConfig {
     required?: boolean;
     visible?: boolean;
     enabled?: boolean;
-    multiline?: boolean;
   };
   input: {
-    keyboardType?: "text" | "number" | "decimal" | "email" | "phone" | "password" | "url";
-    characterRestriction?: string;
     maxLength?: number;
     minLength?: number;
   };
@@ -87,7 +84,7 @@ export interface RuntimeField {
   heightRatio: number;
   mergeRange: string | null;
   isMerged: boolean;
-  dataType: "text" | "number" | "date" | "checkbox" | "signature" | "dropdown" | "calculated";
+  dataType: "number" | "date" | "checkbox" | "signature" | "dropdown" | "calculated" | "KeyboardText";
   readOnly: boolean;
   required: boolean;
   alignment: string | null;

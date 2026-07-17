@@ -13,7 +13,6 @@ export interface OverlayRectanglesProps {
 
 /** Color map for overlay types */
 const OVERLAY_COLORS: Record<OverlayType, string> = {
-  textbox: "rgba(59, 130, 246, 0.25)",   // blue
   signature: "rgba(139, 92, 246, 0.25)",  // purple
   checkbox: "rgba(16, 185, 129, 0.25)",   // green
   date: "rgba(245, 158, 11, 0.25)",       // amber
@@ -22,11 +21,11 @@ const OVERLAY_COLORS: Record<OverlayType, string> = {
   barcode: "rgba(249, 115, 22, 0.25)",    // orange
   image: "rgba(168, 85, 247, 0.25)",      // violet
   ocr: "rgba(20, 184, 166, 0.25)",        // teal
+  KeyboardText: "rgba(99, 102, 241, 0.25)", // indigo
   unknown: "rgba(156, 163, 175, 0.25)",   // gray
 };
 
 const OVERLAY_BORDER_COLORS: Record<OverlayType, string> = {
-  textbox: "rgba(59, 130, 246, 0.7)",
   signature: "rgba(139, 92, 246, 0.7)",
   checkbox: "rgba(16, 185, 129, 0.7)",
   date: "rgba(245, 158, 11, 0.7)",
@@ -35,11 +34,11 @@ const OVERLAY_BORDER_COLORS: Record<OverlayType, string> = {
   barcode: "rgba(249, 115, 22, 0.7)",
   image: "rgba(168, 85, 247, 0.7)",
   ocr: "rgba(20, 184, 166, 0.7)",
+  KeyboardText: "rgba(99, 102, 241, 0.7)",
   unknown: "rgba(156, 163, 175, 0.7)",
 };
 
 const OVERLAY_LABELS: Record<OverlayType, string> = {
-  textbox: "TEXT",
   signature: "SIG",
   checkbox: "CHK",
   date: "DATE",
@@ -48,6 +47,7 @@ const OVERLAY_LABELS: Record<OverlayType, string> = {
   barcode: "BAR",
   image: "IMG",
   ocr: "OCR",
+  KeyboardText: "KBD",
   unknown: "???",
 };
 

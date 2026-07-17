@@ -94,7 +94,7 @@ export function OverlayField({ field, pageWidthPx, pageHeightPx, onFocus, debug 
             {field.defaultValue ?? ""}
           </div>
         );
-      case "text":
+      case "KeyboardText":
       default:
         return <TextField field={field} onFocus={onFocus} style={fillStyle} />;
     }

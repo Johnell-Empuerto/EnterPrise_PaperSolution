@@ -23,10 +23,11 @@ function inferOverlayType(commentText: string): OverlayType {
   const lower = commentText.toLowerCase().trim();
 
   const typeMap: Record<string, OverlayType> = {
-    textbox: "textbox",
-    text: "textbox",
-    "text field": "textbox",
-    input: "textbox",
+    textbox: "KeyboardText",
+    text: "KeyboardText",
+    "text field": "KeyboardText",
+    input: "KeyboardText",
+    keyboard: "KeyboardText",
     signature: "signature",
     "sign here": "signature",
     checkbox: "checkbox",
@@ -58,7 +59,7 @@ function inferOverlayType(commentText: string): OverlayType {
     if (lower.includes(keyword)) return type;
   }
 
-  return "textbox"; // Default for form fields
+  return "KeyboardText"; // Default for form fields
 }
 
 /**

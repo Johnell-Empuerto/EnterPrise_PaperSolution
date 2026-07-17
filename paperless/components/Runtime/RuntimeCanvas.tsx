@@ -14,7 +14,7 @@ export interface RuntimeCanvasProps {
   usePixelUnits?: boolean;
 }
 
-const INTERACTIVE_TYPES = new Set(["textbox", "checkbox", "date", "number", "signature"]);
+const INTERACTIVE_TYPES = new Set(["KeyboardText", "checkbox", "date", "number", "signature"]);
 
 export function RuntimeCanvas({
   overlayCollection,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import type { RuntimeForm } from "@/types/runtime";
 import type { OverlayModel, OverlayType } from "@/types/overlay";
 import { RuntimeCanvas } from "./RuntimeCanvas";
@@ -8,6 +8,7 @@ import { PageSurface } from "./PageSurface";
 import { BackgroundLayer } from "./BackgroundLayer";
 import type { RuntimeState } from "./useRuntimeState";
 import { initializeStore, getDefaultStore } from "@/runtime/store";
+import { migrateFieldToKeyboardText } from "@/runtime/config/migration";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
@@ -28,12 +29,15 @@ export function RuntimeFormViewer({
   showOverlay = true,
   showBackground = true,
 }: RuntimeFormViewerProps) {
-  // Initialize the Zustand store with form data on mount/data change
+  // Initialize the Zustand store with form data — only on identity change
+  const initRef = useRef<string | null>(null);
   useEffect(() => {
-    if (runtimeForm) {
-      const store = getDefaultStore();
-      initializeStore(store, runtimeForm);
-    }
+    if (!runtimeForm) return;
+    const key = `${runtimeForm.title}-${runtimeForm.sheets.length}-${runtimeForm.version}`;
+    if (initRef.current === key) return;
+    initRef.current = key;
+    const store = getDefaultStore();
+    initializeStore(store, runtimeForm);
   }, [runtimeForm]);
 
   const sheet = runtimeForm.sheets[currentPage];
@@ -41,7 +45,8 @@ export function RuntimeFormViewer({
 
   const overlaysForSheet = useMemo(() => {
     const result: OverlayModel[] = [];
-    for (const field of sheet.fields) {
+    for (let field of sheet.fields) {
+      field = migrateFieldToKeyboardText(field);
       const type = fieldDataTypeToOverlayType(field.dataType);
       if (!type) continue;
       result.push({
@@ -164,13 +169,14 @@ export function RuntimeFormViewer({
 
 function fieldDataTypeToOverlayType(dataType: string): OverlayType | null {
   const map: Record<string, OverlayType> = {
-    text: "textbox",
     number: "number",
     date: "date",
     checkbox: "checkbox",
     signature: "signature",
-    dropdown: "textbox",
-    calculated: "textbox",
+    KeyboardText: "KeyboardText",
   };
+  if (dataType === "dropdown" || dataType === "calculated") {
+    return "KeyboardText";
+  }
   return map[dataType] ?? null;
 }
