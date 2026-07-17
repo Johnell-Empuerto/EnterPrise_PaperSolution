@@ -9,6 +9,32 @@ import { DEFAULTS } from "@/runtime/config/keyboardTextConfig";
 import { convertLegacyConfigToKtParams, isLegacyTextField } from "@/runtime/config/migration";
 import type { KeyboardTextInputParameters } from "@/runtime/config/keyboardTextConfig";
 
+/**
+ * All PaperLess field types.
+ * The uploaded Excel type is only the initial default — users can switch after upload.
+ */
+const FIELD_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "KeyboardText", label: "Keyboard" },
+  { value: "textByHandwriting", label: "Text by handwriting" },
+  { value: "handwritingNote", label: "Handwriting note" },
+  { value: "freeWhiteboard", label: "Free whiteboard" },
+  { value: "freeDraw", label: "Free draw" },
+  { value: "choiceNumerical", label: "Choice of Numerical number" },
+  { value: "numericalKeyboard", label: "Numerical number keyboard" },
+  { value: "numberOfHours", label: "Number of hours" },
+  { value: "calculationFormula", label: "Calculation formula" },
+  { value: "date", label: "Date" },
+  { value: "calendar", label: "Calendar" },
+  { value: "time", label: "Time" },
+  { value: "timeCalculation", label: "Time calculation" },
+  { value: "singleCheck", label: "Single check" },
+  { value: "multipleCheck", label: "Multiple check" },
+  { value: "radioButton", label: "Radio button" },
+  { value: "dropdown", label: "Dropdown list" },
+  { value: "image", label: "Image" },
+  { value: "signature", label: "Signature" },
+];
+
 export interface PaperlessDesignerProps {
   runtimeForm: RuntimeForm;
   runtime: RuntimeState;
@@ -57,6 +83,8 @@ export function PaperlessDesigner({
   // ── Field configuration overrides (live editing, no persistence) ──
   const [fieldConfigs, setFieldConfigs] = useState<Record<string, FieldConfig>>({});
   const [ktConfigs, setKtConfigs] = useState<Record<string, KeyboardTextInputParameters>>({});
+  // Overridden field type — the uploaded Excel type is the initial default, user can switch
+  const [fieldTypes, setFieldTypes] = useState<Record<string, string>>({});
 
   // DEBUG: Log selection changes
   useEffect(() => {
@@ -67,10 +95,13 @@ export function PaperlessDesigner({
   useEffect(() => {
     if (!selectedField || !isLegacyTextField(selectedField)) return;
     if (ktConfigs[selectedField.id]) return;
+    const params = convertLegacyConfigToKtParams(selectedField.config);
     setKtConfigs((prev) => ({
       ...prev,
-      [selectedField.id]: convertLegacyConfigToKtParams(selectedField.config),
+      [selectedField.id]: params,
     }));
+    // Also set the field type so the dropdown reflects the effective KeyboardText type
+    setFieldTypes((prev) => ({ ...prev, [selectedField.id]: "KeyboardText" }));
   }, [selectedField, ktConfigs]);
 
   const updateFieldConfig = useCallback(
@@ -101,6 +132,10 @@ export function PaperlessDesigner({
     },
     [],
   );
+
+  const updateFieldType = useCallback((fieldId: string, type: string) => {
+    setFieldTypes((prev) => ({ ...prev, [fieldId]: type }));
+  }, []);
 
   // Merge config into a RuntimeField for rendering
   // Deep-merges per category so partial overrides (e.g. only {behavior: {readOnly: true}})
@@ -703,16 +738,42 @@ export function PaperlessDesigner({
           </div>
           <div className="flex-1 overflow-y-auto p-3 space-y-2">
             {selectedFieldId && selectedField ? (
-              selectedField.dataType === "KeyboardText" || ktConfigs[selectedField.id] ? (
-                <KeyboardTextPropertyPanel
-                  params={ktConfigs[selectedField.id] ?? DEFAULTS}
-                  onChange={(params) => updateKeyboardTextConfig(selectedField.id, params)}
-                />
-              ) : (
-                <div className="text-xs text-slate-400 text-center mt-4">
-                  No configuration available for this field type
+              <>
+                {/* ── Type dropdown ── */}
+                <div className="mb-2">
+                  <div className="text-[10px] text-slate-400 uppercase tracking-wide mb-0.5 font-medium">
+                    Type
+                  </div>
+                  <select
+                    value={fieldTypes[selectedField.id] ?? selectedField.dataType}
+                    onChange={(e) => updateFieldType(selectedField.id, e.target.value)}
+                    className="w-full text-xs text-slate-700 px-2 py-1.5 border border-slate-200 rounded-md focus:outline-none focus:border-indigo-400 bg-white"
+                  >
+                    {FIELD_TYPE_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              )
+
+                {/* ── Field configuration panel ── */}
+                {(fieldTypes[selectedField.id] ?? selectedField.dataType) === "KeyboardText" ? (
+                  <KeyboardTextPropertyPanel
+                    params={ktConfigs[selectedField.id] ?? DEFAULTS}
+                    onChange={(params) => updateKeyboardTextConfig(selectedField.id, params)}
+                  />
+                ) : (
+                  <div className="border border-slate-100 rounded-md p-4 text-center">
+                    <div className="text-xs text-slate-400 mb-1">
+                      No configuration available yet.
+                    </div>
+                    <div className="text-[10px] text-slate-300">
+                      Coming soon...
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="text-xs text-slate-400 text-center mt-4">
                 Select a field to configure
