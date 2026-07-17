@@ -17,6 +17,7 @@ export const VERTICAL_ALIGN_LABELS: Record<VerticalAlignment, string> = {
 
 export interface KeyboardTextInputParameters {
   required: boolean;
+  validateOnEditing: boolean;
   readOnly: boolean;
   hidden: boolean;
   lines: number;
@@ -35,6 +36,7 @@ export interface KeyboardTextInputParameters {
 
 export const DEFAULTS: KeyboardTextInputParameters = {
   required: false,
+  validateOnEditing: false,
   readOnly: false,
   hidden: false,
   lines: 1,
@@ -56,6 +58,7 @@ export function parseKeyboardTextInputParameters(
 ): KeyboardTextInputParameters {
   return {
     required: params["Required"] === "1",
+    validateOnEditing: params["ValidateOnEditing"] === "1",
     readOnly: params["ReadOnly"] === "1",
     hidden: params["Hidden"] === "1",
     lines: Math.max(1, parseInt(params["Lines"], 10) || DEFAULTS.lines),
@@ -84,6 +87,7 @@ export function parseKeyboardTextInputParameters(
 export function keyboardTextToInputParametersString(params: KeyboardTextInputParameters): string {
   return [
     `Required=${params.required ? 1 : 0}`,
+    `ValidateOnEditing=${params.validateOnEditing ? 1 : 0}`,
     `ReadOnly=${params.readOnly ? 1 : 0}`,
     `Hidden=${params.hidden ? 1 : 0}`,
     `Lines=${params.lines}`,

@@ -27,6 +27,7 @@ export function convertLegacyConfigToKtParams(config: Record<string, any> | unde
 
   return {
     required: behavior.required ?? false,
+    validateOnEditing: false,
     readOnly: behavior.readOnly ?? false,
     hidden: behavior.hidden === true || behavior.hidden === "1",
     lines: behavior.multiline ? 2 : 1,

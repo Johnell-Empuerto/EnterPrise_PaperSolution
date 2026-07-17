@@ -286,8 +286,36 @@ export function KeyboardTextPropertyPanel({ params, onChange }: KeyboardTextProp
         <Toggle
           label="Required"
           checked={params.required}
-          onChange={(v) => update("required", v)}
+          onChange={(v) => {
+            update("required", v);
+            if (!v) update("validateOnEditing", false);
+          }}
         />
+        {params.required && (
+          <div className="pt-1 pb-0.5">
+            <div className="text-[10px] text-slate-500 leading-tight mb-1">
+              Check mandatory input other than saving as completion
+            </div>
+            <div className="flex gap-1">
+              {[
+                { value: false as const, label: "No (Only saving at completion)" },
+                { value: true as const, label: "Yes" },
+              ].map((opt) => (
+                <button
+                  key={String(opt.value)}
+                  onClick={() => update("validateOnEditing", opt.value)}
+                  className={`flex-1 text-[10px] px-1 py-1 rounded border transition-colors ${
+                    params.validateOnEditing === opt.value
+                      ? "bg-indigo-100 border-indigo-400 text-indigo-700 font-medium"
+                      : "border-slate-200 text-slate-500 hover:bg-slate-50"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <Toggle
           label="Read Only"
           checked={params.readOnly}

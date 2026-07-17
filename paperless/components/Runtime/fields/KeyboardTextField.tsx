@@ -39,7 +39,7 @@ function KeyboardTextFieldInner({
 
   if (kt.hidden) return null;
 
-  const readOnly = propReadOnly ?? kt.readOnly;
+  const readOnly = kt.readOnly || propReadOnly;
   const enabled = !(disabled ?? false);
   const maxLength = kt.maxLength > 0 ? kt.maxLength : undefined;
   const restriction = toCharacterRestriction(kt.inputRestriction);
@@ -124,16 +124,27 @@ function KeyboardTextFieldInner({
     width: "100%",
     height: "100%",
     boxSizing: "border-box",
+    position: "relative",
     overflow: "hidden",
-    border: production
+    borderTop: production
       ? "2px solid rgba(234, 179, 8, 0.6)"
       : "1px solid rgba(59, 130, 246, 0.5)",
+    borderRight: production
+      ? "2px solid rgba(234, 179, 8, 0.6)"
+      : "1px solid rgba(59, 130, 246, 0.5)",
+    borderBottom: production
+      ? "2px solid rgba(234, 179, 8, 0.6)"
+      : "1px solid rgba(59, 130, 246, 0.5)",
+    borderLeft: required && !readOnly
+      ? "3px solid #dc2626"
+      : production
+        ? "2px solid rgba(234, 179, 8, 0.6)"
+        : "1px solid rgba(59, 130, 246, 0.5)",
     borderRadius: "2px",
     background: config?.appearance?.backgroundColor ?? (production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)"),
     transition: "border-color 0.15s, box-shadow 0.15s",
     opacity: enabled ? 1 : 0.5,
     cursor: readOnly ? "default" : "text",
-    ...(required && !readOnly ? { borderLeft: "3px solid #dc2626" } : {}),
   };
 
   const textareaStyle: React.CSSProperties = {
@@ -169,6 +180,22 @@ function KeyboardTextFieldInner({
         style={textareaStyle}
         className="runtime-field runtime-textarea"
       />
+      {required && (
+        <span
+          style={{
+            position: "absolute",
+            bottom: "2px",
+            right: "4px",
+            fontSize: "10px",
+            lineHeight: 1,
+            color: "#dc2626",
+            fontWeight: "bold",
+            pointerEvents: "none",
+          }}
+        >
+          *
+        </span>
+      )}
     </div>
   );
 }
