@@ -166,8 +166,12 @@ function KeyboardTextFieldInner({
     resize: "none",
   };
 
+  const handleContainerDoubleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
+
   return (
-    <div style={containerStyle}>
+    <div style={containerStyle} onDoubleClick={handleContainerDoubleClick}>
       <textarea
         ref={textareaRef}
         value={effectiveValue}
