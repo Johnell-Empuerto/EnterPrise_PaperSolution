@@ -160,7 +160,7 @@ function KeyboardTextFieldInner({
         value={displayValue}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={onBlur}
-        placeholder={placeholder ?? ""}
+        placeholder={kt.placeholder || (placeholder ?? "")}
         maxLength={maxLength}
         readOnly={readOnly}
         disabled={!enabled}
