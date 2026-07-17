@@ -22,7 +22,6 @@ export interface KeyboardTextInputParameters {
   lines: number;
   inputRestriction: InputRestriction;
   maxLength: number;
-  minLength: number;
   align: Align;
   font: string;
   fontSize: number;
@@ -41,7 +40,6 @@ export const DEFAULTS: KeyboardTextInputParameters = {
   lines: 1,
   inputRestriction: "None",
   maxLength: 0,
-  minLength: 0,
   align: "Center",
   font: "Arial",
   fontSize: 11,
@@ -65,7 +63,6 @@ export function parseKeyboardTextInputParameters(
       ? (params["InputRestriction"] as InputRestriction)
       : DEFAULTS.inputRestriction,
     maxLength: Math.max(0, parseInt(params["MaxLength"], 10) || 0),
-    minLength: Math.max(0, parseInt(params["MinLength"], 10) || 0),
     align: (ALIGN_OPTIONS as readonly string[]).includes(params["Align"])
       ? (params["Align"] as Align)
       : DEFAULTS.align,
@@ -92,7 +89,6 @@ export function keyboardTextToInputParametersString(params: KeyboardTextInputPar
     `Lines=${params.lines}`,
     `InputRestriction=${params.inputRestriction}`,
     `MaxLength=${params.maxLength}`,
-    `MinLength=${params.minLength}`,
     `Align=${params.align}`,
     `Font=${params.font}`,
     `FontSize=${params.fontSize}`,

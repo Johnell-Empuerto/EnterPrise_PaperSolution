@@ -11,7 +11,6 @@ import {
   rgbStringToHex,
 } from "@/runtime/config/keyboardTextConfig";
 import { convertLegacyConfigToKtParams } from "@/runtime/config/migration";
-import { shapeText, LINE_HEIGHT_RATIO, MIN_FONT_SIZE_PT, MEASURE_TOLERANCE_PX } from "@/runtime/config/fontShaper";
 
 const RESTRICTION_PATTERNS: Record<string, RegExp> = {
   letters: /^[A-Za-z]*$/,
@@ -19,7 +18,8 @@ const RESTRICTION_PATTERNS: Record<string, RegExp> = {
   alphanumeric: /^[A-Za-z0-9]*$/,
 };
 
-function KeyboardTextFieldInner({
+function KeyboardTextFieldPrototypeInner({
+  overlay,
   value: storeValue,
   onChange,
   onBlur,
@@ -39,6 +39,8 @@ function KeyboardTextFieldInner({
 
   if (kt.hidden) return null;
 
+  const maxLines = Math.max(1, kt.lines);
+  const singleLineMode = maxLines === 1;
   const readOnly = propReadOnly ?? kt.readOnly;
   const enabled = !(disabled ?? false);
   const maxLength = kt.maxLength > 0 ? kt.maxLength : undefined;
@@ -55,10 +57,16 @@ function KeyboardTextFieldInner({
   const hAlign = toHorizontalAlign(kt.align);
   const vAlign = toVerticalAlign(kt.verticalAlignment);
 
+  const LINE_HEIGHT_RATIO = 1.4;
+
   const handleChange = useCallback(
     (raw: string) => {
       if (readOnly || !enabled) return;
       let val = raw;
+
+      if (singleLineMode) {
+        val = val.replace(/\n|\r/g, "");
+      }
 
       if (restriction && RESTRICTION_PATTERNS[restriction]) {
         const pattern = RESTRICTION_PATTERNS[restriction];
@@ -71,52 +79,45 @@ function KeyboardTextFieldInner({
 
       onChange(val || null);
     },
-    [readOnly, enabled, restriction, maxLength, onChange],
+    [readOnly, enabled, singleLineMode, restriction, maxLength, onChange],
   );
 
-  const relayout = useCallback(() => {
+  const positionViaPadding = useCallback(() => {
     const el = textareaRef.current;
     if (!el) return;
 
-    el.style.fontSize = `${fontSize}pt`;
-    el.style.paddingTop = "1px";
-    el.style.paddingBottom = "1px";
+    el.style.paddingTop = "0px";
+    el.style.paddingBottom = "0px";
+
+    const clone = el.cloneNode(true) as HTMLTextAreaElement;
+    clone.value = el.value;
+    clone.style.position = "absolute";
+    clone.style.left = "-9999px";
+    clone.style.top = "0";
+    clone.style.visibility = "hidden";
+    clone.style.height = "auto";
+    clone.style.maxHeight = "none";
+    clone.style.padding = "0px";
+    document.body.appendChild(clone);
+    const contentHeight = clone.scrollHeight;
+    document.body.removeChild(clone);
 
     const totalHeight = el.clientHeight;
-    const basePad = 1;
-    const contentAreaHeight = totalHeight - basePad * 2;
-    const availWidth = el.clientWidth - 6 - MEASURE_TOLERANCE_PX;
 
-    if (availWidth <= 0 || contentAreaHeight <= 0) return;
+    if (contentHeight >= totalHeight) return;
 
-    const result = shapeText(displayValue, {
-      fontFamily,
-      fontWeight,
-      originalFontSizePt: fontSize,
-      minFontSizePt: MIN_FONT_SIZE_PT,
-      lineHeightRatio: LINE_HEIGHT_RATIO,
-      availableWidthPx: availWidth,
-      availableHeightPx: contentAreaHeight,
-    });
-
-    el.style.fontSize = `${result.fontSize}pt`;
-
-    const extra = contentAreaHeight - result.contentHeightPx;
-    if (extra > 0 && vAlign === "middle") {
-      el.style.paddingTop = (basePad + Math.floor(extra / 2)) + "px";
-      el.style.paddingBottom = (basePad + Math.ceil(extra / 2)) + "px";
-    } else if (extra > 0 && vAlign === "bottom") {
-      el.style.paddingTop = (basePad + extra) + "px";
-      el.style.paddingBottom = basePad + "px";
-    } else {
-      el.style.paddingTop = basePad + "px";
-      el.style.paddingBottom = basePad + "px";
+    const extra = totalHeight - contentHeight;
+    if (vAlign === "middle") {
+      el.style.paddingTop = Math.floor(extra / 2) + "px";
+      el.style.paddingBottom = Math.ceil(extra / 2) + "px";
+    } else if (vAlign === "bottom") {
+      el.style.paddingTop = extra + "px";
     }
-  }, [displayValue, fontFamily, fontWeight, fontSize, vAlign]);
+  }, [vAlign]);
 
   useLayoutEffect(() => {
-    relayout();
-  }, [relayout]);
+    positionViaPadding();
+  }, [positionViaPadding, displayValue]);
 
   const containerStyle: React.CSSProperties = {
     width: "100%",
@@ -148,7 +149,7 @@ function KeyboardTextFieldInner({
     textAlign: hAlign as React.CSSProperties["textAlign"],
     padding: "1px 3px",
     lineHeight: LINE_HEIGHT_RATIO,
-    whiteSpace: "pre-wrap",
+    whiteSpace: singleLineMode ? "nowrap" : "pre-wrap",
     overflow: "hidden",
     resize: "none",
   };
@@ -165,10 +166,10 @@ function KeyboardTextFieldInner({
         readOnly={readOnly}
         disabled={!enabled}
         style={textareaStyle}
-        className="runtime-field runtime-textarea"
+        className="runtime-field runtime-textarea-prototype"
       />
     </div>
   );
 }
 
-export const KeyboardTextField = memo(KeyboardTextFieldInner);
+export const KeyboardTextFieldPrototype = memo(KeyboardTextFieldPrototypeInner);

@@ -32,7 +32,6 @@ export function convertLegacyConfigToKtParams(config: Record<string, any> | unde
     lines: behavior.multiline ? 2 : 1,
     inputRestriction,
     maxLength: input.maxLength ?? 0,
-    minLength: input.minLength ?? 0,
     align,
     font: appearance.fontFamily?.split(",")[0]?.trim() ?? DEFAULTS.font,
     fontSize: appearance.fontSize ?? DEFAULTS.fontSize,

@@ -250,13 +250,6 @@ export function KeyboardTextPropertyPanel({ params, onChange }: KeyboardTextProp
 
       {/* ── Input ── */}
       <Section label="Input">
-        <Field label="Lines">
-          <NumberInput
-            value={params.lines}
-            min={1}
-            onChange={(v) => update("lines", Math.max(1, v || 1))}
-          />
-        </Field>
         <Field label="Max Length">
           <NumberInput
             value={params.maxLength}
