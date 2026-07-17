@@ -171,11 +171,6 @@ export default function Home() {
     }
   };
 
-  // ── Print handler ──
-  const handlePrint = useCallback(() => {
-    window.print();
-  }, []);
-
   // ── Reset handler ──
   const handleReset = () => {
     setTemplateId(null);
@@ -285,27 +280,6 @@ export default function Home() {
 
             {hasTemplate && (
               <>
-                <button
-                  onClick={handlePrint}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-500 transition-colors shadow-sm"
-                  title="Print or Save as PDF"
-                >
-                  <svg
-                    className="w-3.5 h-3.5"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor"
-                    strokeWidth={2}
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"
-                    />
-                  </svg>
-                  Print / Save PDF
-                </button>
-
                 {runtime.isDirty() && (
                   <button
                     onClick={handleReset}

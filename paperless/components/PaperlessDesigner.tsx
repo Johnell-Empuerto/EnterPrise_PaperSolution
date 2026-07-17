@@ -473,7 +473,7 @@ export function PaperlessDesigner({
         {/* Left sidebar */}
         <div
           style={{ width: leftWidth, minWidth: 200 }}
-          className="bg-white border-r border-slate-200 flex flex-col overflow-hidden "
+          className="bg-white border-r border-slate-200 flex flex-col overflow-hidden no-print"
         >
           <FieldExplorer
             fields={filteredFields}
@@ -590,8 +590,9 @@ export function PaperlessDesigner({
 
         {/* ── Infinite workspace ── */}
         <div
+          data-workspace
           ref={containerRef}
-          className="flex-1 overflow-hidden relative select-none "
+          className="flex-1 overflow-hidden relative select-none"
           style={{
             backgroundColor: "#e6e6e6",
             cursor: cursorClass,
@@ -616,6 +617,7 @@ export function PaperlessDesigner({
 
           {/* Camera transform: unified translate + scale for smooth pan/zoom */}
           <div
+            data-camera-transform
             style={{
               position: "absolute",
               transform: `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`,
@@ -627,6 +629,7 @@ export function PaperlessDesigner({
           >
             {/* Paper wrapper with rounded corners + clip */}
             <div
+              data-paper-wrapper
               style={{
                 borderRadius: 2,
                 overflow: "hidden",
@@ -647,7 +650,7 @@ export function PaperlessDesigner({
 
           {/* ── Bottom-right overlay: Page navigation + zoom ── */}
           <div
-            className="absolute bottom-4 right-4 flex flex-col gap-2 z-40 select-none"
+            className="absolute bottom-4 right-4 flex flex-col gap-2 z-40 select-none no-print"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Page navigation */}
@@ -729,7 +732,7 @@ export function PaperlessDesigner({
         {/* Right sidebar — Configuration panel */}
         <div
           style={{ width: 280 }}
-          className="bg-white border-l border-slate-200 flex flex-col overflow-hidden"
+          className="bg-white border-l border-slate-200 flex flex-col overflow-hidden no-print"
         >
           <div className="px-3 py-2 border-b border-slate-100">
             <span className="text-xs font-semibold text-slate-700 uppercase tracking-wider">
@@ -833,7 +836,7 @@ function Toolbar({
   onPageSelect,
 }: ToolbarProps) {
   return (
-    <div className="h-12 bg-white border-b border-slate-200 flex items-center px-3 gap-1 shrink-0 select-none">
+    <div className="h-12 bg-white border-b border-slate-200 flex items-center px-3 gap-1 shrink-0 select-none no-print">
       {/* Logo */}
       <div className="flex items-center gap-2 mr-2">
         <div className="w-6 h-6 rounded-md bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-sm">
@@ -1027,6 +1030,8 @@ function Toolbar({
         </svg>
         <span>Background</span>
       </button>
+
+      <div className="w-px h-6 bg-slate-200 mx-1" />
 
       {/* Spacer */}
       <div className="flex-1" />
