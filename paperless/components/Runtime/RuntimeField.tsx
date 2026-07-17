@@ -10,11 +10,12 @@ export interface RuntimeFieldProps {
   overlay: OverlayModel;
   value: string | boolean | null;
   onChange: (value: string | boolean | null) => void;
+  onSelect?: (fieldId: string) => void;
   production?: boolean;
   usePixelUnits?: boolean;
 }
 
-function RuntimeFieldInner({ overlay, production, usePixelUnits }: RuntimeFieldProps) {
+function RuntimeFieldInner({ overlay, production, usePixelUnits, onSelect }: RuntimeFieldProps) {
   const cfg = overlay.config;
   const visible = cfg?.behavior?.visible ?? true;
   const readOnly = cfg?.behavior?.readOnly ?? false;
@@ -65,10 +66,15 @@ function RuntimeFieldInner({ overlay, production, usePixelUnits }: RuntimeFieldP
     }
   };
 
+  const handleClick = () => {
+    onSelect?.(fieldId);
+  };
+
   return (
     <div
       style={fieldStyle}
       data-field-id={fieldId}
+      onClick={handleClick}
     >
       {cfg?.behavior?.required && (
         <span

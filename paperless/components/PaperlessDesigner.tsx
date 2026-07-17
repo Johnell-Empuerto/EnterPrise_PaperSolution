@@ -602,6 +602,7 @@ export function PaperlessDesigner({
                 runtimeForm={mergedForm}
                 runtime={runtime}
                 selectedFieldId={selectedFieldId}
+                onFieldSelect={(id) => setSelectedFieldId(id)}
                 currentPage={currentPage}
                 showOverlay={showOverlay}
                 showBackground={showBackground}

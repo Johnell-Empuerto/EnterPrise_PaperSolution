@@ -8,6 +8,7 @@ export interface RuntimeCanvasProps {
   overlayCollection: OverlayCollection;
   runtimeValues: Record<string, string | boolean | null>;
   onValueChange: (overlayId: string, value: string | boolean | null) => void;
+  onFieldSelect?: (fieldId: string) => void;
   widthPt: number;
   heightPt: number;
   production?: boolean;
@@ -20,6 +21,7 @@ export function RuntimeCanvas({
   overlayCollection,
   runtimeValues,
   onValueChange,
+  onFieldSelect,
   widthPt,
   heightPt,
   production,
@@ -50,6 +52,7 @@ export function RuntimeCanvas({
           overlay={overlay}
           value={runtimeValues[overlay.id] ?? null}
           onChange={(val) => onValueChange(overlay.id, val)}
+          onSelect={onFieldSelect}
           production={production}
           usePixelUnits={usePixelUnits}
         />

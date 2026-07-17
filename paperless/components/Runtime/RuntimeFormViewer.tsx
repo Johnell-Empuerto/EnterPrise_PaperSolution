@@ -16,6 +16,7 @@ export interface RuntimeFormViewerProps {
   runtimeForm: RuntimeForm;
   runtime: RuntimeState;
   selectedFieldId?: string | null;
+  onFieldSelect?: (fieldId: string) => void;
   currentPage?: number;
   showOverlay?: boolean;
   showBackground?: boolean;
@@ -25,6 +26,7 @@ export function RuntimeFormViewer({
   runtimeForm,
   runtime,
   selectedFieldId,
+  onFieldSelect,
   currentPage = 0,
   showOverlay = true,
   showBackground = true,
@@ -105,6 +107,7 @@ export function RuntimeFormViewer({
             overlayCollection={sheetCollection}
             runtimeValues={runtime.values}
             onValueChange={runtime.setValue}
+            onFieldSelect={onFieldSelect}
             widthPt={sheet.pageWidthPx}
             heightPt={sheet.pageHeightPx}
             production
