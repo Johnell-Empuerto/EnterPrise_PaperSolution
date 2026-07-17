@@ -46,7 +46,7 @@ export const DEFAULTS: KeyboardTextInputParameters = {
   defaultFontSize: 11,
   weight: "Normal",
   color: "0,0,0",
-  verticalAlignment: 2,
+  verticalAlignment: 1,
   placeholder: "",
   defaultValue: "",
 };

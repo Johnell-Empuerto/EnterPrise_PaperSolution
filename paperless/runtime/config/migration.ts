@@ -88,7 +88,7 @@ function mapVerticalAlignment(va: string | undefined): 0 | 1 | 2 {
     middle: 1,
     bottom: 2,
   };
-  return va ? (map[va] ?? 2) : 2;
+  return va ? (map[va] ?? 1) : 1;
 }
 
 function mapHorizontalAlign(ha: string | undefined): "Left" | "Center" | "Right" {
