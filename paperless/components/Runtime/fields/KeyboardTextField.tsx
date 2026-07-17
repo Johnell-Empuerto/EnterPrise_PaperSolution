@@ -44,9 +44,10 @@ function KeyboardTextFieldInner({
   const maxLength = kt.maxLength > 0 ? kt.maxLength : undefined;
   const restriction = toCharacterRestriction(kt.inputRestriction);
   const required = propRequired ?? kt.required;
-  const displayValue = (storeValue as string | undefined) ?? kt.defaultValue ?? "";
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dirtyRef = useRef(false);
+  const effectiveValue = (storeValue as string | undefined) ?? (!dirtyRef.current ? (kt.defaultValue ?? "") : "");
 
   const fontFamily = kt.font || DEFAULTS.font;
   const fontSize = kt.fontSize || DEFAULTS.fontSize;
@@ -69,6 +70,7 @@ function KeyboardTextFieldInner({
         val = val.slice(0, maxLength);
       }
 
+      dirtyRef.current = true;
       onChange(val || null);
     },
     [readOnly, enabled, restriction, maxLength, onChange],
@@ -89,7 +91,7 @@ function KeyboardTextFieldInner({
 
     if (availWidth <= 0 || contentAreaHeight <= 0) return;
 
-    const result = shapeText(displayValue, {
+    const result = shapeText(effectiveValue, {
       fontFamily,
       fontWeight,
       originalFontSizePt: fontSize,
@@ -112,7 +114,7 @@ function KeyboardTextFieldInner({
       el.style.paddingTop = basePad + "px";
       el.style.paddingBottom = basePad + "px";
     }
-  }, [displayValue, fontFamily, fontWeight, fontSize, vAlign]);
+  }, [effectiveValue, fontFamily, fontWeight, fontSize, vAlign]);
 
   useLayoutEffect(() => {
     relayout();
@@ -157,7 +159,7 @@ function KeyboardTextFieldInner({
     <div style={containerStyle}>
       <textarea
         ref={textareaRef}
-        value={displayValue}
+        value={effectiveValue}
         onChange={(e) => handleChange(e.target.value)}
         onBlur={onBlur}
         placeholder={kt.placeholder || (placeholder ?? "")}
