@@ -23,6 +23,7 @@ builder.Services.Configure<ExcelCaptureOptions>(
 builder.Services.AddScoped<IExcelCaptureService, ExcelCaptureService>();
 builder.Services.AddScoped<ExcelCaptureService>();
 builder.Services.AddScoped<IFormSaveService, FormSaveService>();
+builder.Services.AddScoped<WorkbookReaderService>();
 builder.Services.AddScoped<XmlGenerator>();
 builder.Services.AddScoped<DatabaseGenerator>();
 builder.Services.AddScoped<WorkbookGenerator>();

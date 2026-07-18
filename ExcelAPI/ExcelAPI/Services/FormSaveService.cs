@@ -16,6 +16,7 @@ namespace ExcelAPI.Services
     public interface IFormSaveService
     {
         Task<FormSaveResult> SaveAsync(FormDefinition form, string outputDirectory, CancellationToken cancellationToken = default);
+        Task<FormSaveResult> OutputExcelAsync(FormDefinition form, string outputDirectory, CancellationToken cancellationToken = default);
     }
 
     public class FormSaveService : IFormSaveService
@@ -64,7 +65,7 @@ namespace ExcelAPI.Services
             _logger.LogInformation("Database objects generated: {SheetCount} sheets, {ClusterCount} clusters",
                 result.DatabaseObjects.Sheets.Count, result.DatabaseObjects.Clusters.Count);
 
-            // 3. Generate Workbook (XLSX)
+            // 3. Generate Workbook (XLSX) — now includes cell values, comments, and _Fields sheet
             cancellationToken.ThrowIfCancellationRequested();
             result.WorkbookPath = Path.Combine(outputDirectory, $"form_{formId}.xlsx");
             result.WorkbookPath = _workbookGenerator.Generate(definition, result.WorkbookPath);
@@ -88,6 +89,31 @@ namespace ExcelAPI.Services
                 result.PdfPath = _pdfGenerator.Generate(definition, firstSheet.Id, result.PdfPath);
                 _logger.LogInformation("PDF saved to {Path}", result.PdfPath);
             }
+
+            return result;
+        }
+
+        /// <summary>
+        /// Generate Output Excel of Form — creates a workbook with cell values,
+        /// field metadata comments, and a hidden _Fields worksheet for republish compatibility.
+        /// This is the legacy "Output Excel of Form" pipeline.
+        /// </summary>
+        /// <param name="definition">The form definition (SheetDefinition.CellValues must be populated).</param>
+        /// <param name="outputDirectory">Directory to save the output workbook.</param>
+        /// <param name="cancellationToken">Cancellation token.</param>
+        public async Task<FormSaveResult> OutputExcelAsync(FormDefinition definition, string outputDirectory, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Directory.CreateDirectory(outputDirectory);
+
+            var formId = Guid.NewGuid().ToString("N");
+            var result = new FormSaveResult();
+
+            // Generate Output Excel workbook — includes structure, cell values, comments, and _Fields sheet
+            cancellationToken.ThrowIfCancellationRequested();
+            result.WorkbookPath = Path.Combine(outputDirectory, $"output_{formId}.xlsx");
+            result.WorkbookPath = _workbookGenerator.Generate(definition, result.WorkbookPath);
+            _logger.LogInformation("Output Excel saved to {Path}", result.WorkbookPath);
 
             return result;
         }

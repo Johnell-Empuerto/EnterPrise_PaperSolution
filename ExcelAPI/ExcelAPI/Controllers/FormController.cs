@@ -21,6 +21,7 @@ namespace ExcelAPI.Controllers
         private readonly RuntimeSerializer _runtimeSerializer;
         private readonly RuntimeCoordinateGenerator _runtimeGenerator;
         private readonly PythonRenderService _pythonRender;
+        private readonly WorkbookReaderService _workbookReaderService;
 
         public FormController(
             IFormSaveService formSaveService,
@@ -31,7 +32,8 @@ namespace ExcelAPI.Controllers
             FormRuntimeBuilder runtimeBuilder,
             RuntimeSerializer runtimeSerializer,
             RuntimeCoordinateGenerator runtimeGenerator,
-            PythonRenderService pythonRender)
+            PythonRenderService pythonRender,
+            WorkbookReaderService workbookReaderService)
         {
             _formSaveService = formSaveService;
             _env = env;
@@ -42,6 +44,7 @@ namespace ExcelAPI.Controllers
             _runtimeSerializer = runtimeSerializer;
             _runtimeGenerator = runtimeGenerator;
             _pythonRender = pythonRender;
+            _workbookReaderService = workbookReaderService;
         }
 
         [HttpPost("save")]
@@ -472,6 +475,205 @@ namespace ExcelAPI.Controllers
             };
 
             return form;
+        }
+
+        /// <summary>
+        /// Upload an Output Excel workbook and reconstruct the FormDefinition.
+        /// This enables the round-trip workflow: Generate → Upload → Edit → Regenerate.
+        /// Reads _Fields sheet, cell comments, page setup, merged cells, styles, and cell values.
+        /// </summary>
+        [HttpPost("upload-excel")]
+        [RequestSizeLimit(50 * 1024 * 1024)]
+        [ProducesResponseType(typeof(ApiResponse<object>), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> UploadExcel([FromForm] IFormFile? file)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "No file uploaded.",
+                    ErrorCode = ErrorCodes.NoFileUploaded
+                });
+            }
+
+            string extension = Path.GetExtension(file.FileName);
+            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { ".xlsx" };
+            if (!allowed.Contains(extension))
+            {
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "Only .xlsx files are supported for upload-excel.",
+                    ErrorCode = ErrorCodes.InvalidFileExtension
+                });
+            }
+
+            // Save uploaded file to temp location
+            string uploadsDir = Path.Combine(_env.ContentRootPath, "Uploads");
+            Directory.CreateDirectory(uploadsDir);
+            string tempPath = Path.Combine(uploadsDir, $"{Guid.NewGuid():N}.xlsx");
+
+            await using (var stream = new FileStream(tempPath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            try
+            {
+                var formDefinition = _workbookReaderService.Read(tempPath, file.FileName);
+
+                if (formDefinition == null)
+                {
+                    return BadRequest(new ApiErrorResponse
+                    {
+                        Message = "Failed to read workbook: file may be corrupt or not a valid Output Excel workbook.",
+                        ErrorCode = ErrorCodes.ExcelProcessingError
+                    });
+                }
+
+                if (formDefinition.Sheets.Count == 0)
+                {
+                    return BadRequest(new ApiErrorResponse
+                    {
+                        Message = "No content sheets found in the workbook.",
+                        ErrorCode = ErrorCodes.ExcelProcessingError
+                    });
+                }
+
+                if (formDefinition.Clusters.Count == 0)
+                {
+                    return BadRequest(new ApiErrorResponse
+                    {
+                        Message = "No field metadata found in workbook: missing both _Fields sheet and cell comments.",
+                        ErrorCode = ErrorCodes.ExcelProcessingError
+                    });
+                }
+
+                // Persist the workbook to Forms/ for round-trip compatibility
+                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
+                Directory.CreateDirectory(formsDir);
+                string persistentFileName = $"{Guid.NewGuid():N}.xlsx";
+                string persistentPath = Path.Combine(formsDir, persistentFileName);
+                System.IO.File.Copy(tempPath, persistentPath, overwrite: true);
+
+                return Ok(new ApiResponse<object>
+                {
+                    Success = true,
+                    Message = $"Workbook read successfully: {formDefinition.Sheets.Count} sheet(s), {formDefinition.Clusters.Count} field(s).",
+                    Data = new
+                    {
+                        formDefinition,
+                        fieldCount = formDefinition.Clusters.Count,
+                        sheetCount = formDefinition.Sheets.Count,
+                        templateId = Path.GetFileNameWithoutExtension(persistentFileName),
+                        workbookDownloadUrl = $"/forms/{persistentFileName}"
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to read uploaded workbook");
+                return StatusCode(500, new ApiErrorResponse
+                {
+                    Message = $"Failed to read workbook: {ex.Message}",
+                    ErrorCode = ErrorCodes.InternalError
+                });
+            }
+            finally
+            {
+                try { if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Output Excel of Form — generates a complete Excel workbook and returns it
+        /// directly as a browser download (legacy ConMas behavior).
+        ///
+        /// The workbook is generated with:
+        ///   - Worksheet structure, merged cells, styles, page setup
+        ///   - User-entered cell values (from SheetDefinition.CellValues)
+        ///   - Cell comments with field metadata (legacy ConMas format)
+        ///   - Hidden _Fields worksheet for republish compatibility
+        ///
+        /// Returns the workbook as a direct file download — no JSON wrapper, no
+        /// intermediate download URL. The content-type is set so the browser
+        /// automatically triggers its normal save/download behavior.
+        ///
+        /// On error, returns a JSON error response.
+        /// </summary>
+        [HttpPost("output-excel")]
+        [RequestSizeLimit(50 * 1024 * 1024)]
+        [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
+        [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
+        public async Task<IActionResult> OutputExcel([FromBody] FormDefinition form)
+        {
+            if (form == null)
+            {
+                return BadRequest(new ApiErrorResponse
+                {
+                    Message = "No form definition provided.",
+                    ErrorCode = ErrorCodes.InvalidRequest
+                });
+            }
+
+            string outputDir = Path.Combine(_env.ContentRootPath, "Output");
+            Directory.CreateDirectory(outputDir);
+
+            string tempPath = Path.Combine(outputDir, $"temp_{Guid.NewGuid():N}.xlsx");
+
+            try
+            {
+                // Generate workbook to temp file
+                var result = await _formSaveService.OutputExcelAsync(form, outputDir);
+
+                tempPath = result.WorkbookPath; // OutputExcelAsync already generates a unique path
+
+                // Read bytes before any cleanup
+                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(tempPath);
+
+                // Extract a user-friendly filename from the workbook title
+                string safeFileName = SanitizeFileName(form.Workbook?.Title ?? "output") + ".xlsx";
+
+                _logger.LogInformation(
+                    "Output Excel generated: {SheetCount} sheet(s), {ClusterCount} cluster(s), {Size} bytes. Returning as direct download: {FileName}",
+                    form.Sheets.Count, form.Clusters.Count, fileBytes.Length, safeFileName);
+
+                return File(
+                    fileBytes,
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    safeFileName);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to generate Output Excel");
+                return StatusCode(500, new ApiErrorResponse
+                {
+                    Message = $"Failed to generate Output Excel: {ex.Message}",
+                    ErrorCode = ErrorCodes.InternalError
+                });
+            }
+            finally
+            {
+                // Clean up temp file
+                try { if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath); } catch { }
+            }
+        }
+
+        /// <summary>
+        /// Sanitize a string for use as a filename — remove or replace invalid characters.
+        /// </summary>
+        private static string SanitizeFileName(string name)
+        {
+            var invalid = Path.GetInvalidFileNameChars();
+            var sanitized = new System.Text.StringBuilder(name.Length);
+            foreach (char c in name)
+            {
+                sanitized.Append(invalid.Contains(c) ? '_' : c);
+            }
+            string result = sanitized.ToString().Trim();
+            return string.IsNullOrWhiteSpace(result) ? "output" : result;
         }
 
         /// <summary>

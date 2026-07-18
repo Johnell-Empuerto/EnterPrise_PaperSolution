@@ -1,12 +1,203 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import type { RuntimeForm } from "@/types/runtime";
+import type { RuntimeForm, RuntimeField } from "@/types/runtime";
 import { useRuntime } from "@/hooks/useRuntime";
 import { useRuntimeState } from "@/components/Runtime";
 import { PaperlessDesigner } from "@/components/PaperlessDesigner";
+import type { FormDefinition, SheetDefinition, ClusterDefinition } from "@/types/formDefinition";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
+
+/**
+ * Convert a FormDefinition (upload-excel response) into a RuntimeForm for the Designer.
+ */
+function formDefinitionToRuntimeForm(fd: FormDefinition, fileName: string): RuntimeForm {
+  const ptToPx = 300 / 72; // 300 DPI → pixels from points
+
+  return {
+    workbookName: fileName,
+    title: fileName,
+    pageWidth: fd.sheets[0]?.backgroundWidth ?? 2550,
+    pageHeight: fd.sheets[0]?.backgroundHeight ?? 3300,
+    scale: 1,
+    dpi: 300,
+    version: fd.workbook?.version ?? "1.0",
+    sheets: fd.sheets.map((s: SheetDefinition, sheetIdx: number) => {
+      const pageW = s.backgroundWidth > 0 ? s.backgroundWidth : Math.round(s.pageSettings.widthPt * ptToPx);
+      const pageH = s.backgroundHeight > 0 ? s.backgroundHeight : Math.round(s.pageSettings.heightPt * ptToPx);
+
+      // Filter clusters belonging to this sheet
+      const sheetClusters = fd.clusters.filter((c: ClusterDefinition) => c.sheetId === s.id);
+
+      return {
+        name: s.name,
+        index: sheetIdx,
+        pageWidthPx: pageW,
+        pageHeightPx: pageH,
+        backgroundImage: null, // Uploaded Excel workbooks don't have background images
+        images: [],
+        shapes: [],
+        printArea: null,
+        fields: sheetClusters.map((c: ClusterDefinition, fi: number) => {
+          const leftPx = Math.round(c.leftPt * ptToPx);
+          const topPx = Math.round(c.topPt * ptToPx);
+          const widthPx = Math.round(c.widthPt * ptToPx);
+          const heightPx = Math.round(c.heightPt * ptToPx);
+          const isMerged = c.cellAddress.includes(":");
+          // Read existing value from cellValues
+          const key = c.cellAddress.includes(":") ? c.cellAddress.split(":")[0] : c.cellAddress;
+          const existingValue = s.cellValues?.[key] ?? "";
+
+          return {
+            id: c.clusterId,
+            name: c.name,
+            cellReference: c.cellAddress,
+            row: 0,
+            column: 0,
+            leftPx,
+            topPx,
+            widthPx,
+            heightPx,
+            leftRatio: pageW > 0 ? leftPx / pageW : 0,
+            topRatio: pageH > 0 ? topPx / pageH : 0,
+            widthRatio: pageW > 0 ? widthPx / pageW : 0,
+            heightRatio: pageH > 0 ? heightPx / pageH : 0,
+            mergeRange: isMerged ? c.cellAddress : null,
+            isMerged,
+            dataType: mapClusterType(c.type),
+            readOnly: c.readonly,
+            required: c.inputParameters?.["required"] === "true",
+            alignment: null,
+            font: null,
+            fontSize: 0,
+            bold: false,
+            fontColor: null,
+            backgroundColor: null,
+            border: null,
+            placeholder: null,
+            defaultValue: existingValue || null,
+            maxLength: 0,
+            tabIndex: fi,
+            config: {
+              appearance: {},
+              behavior: { readOnly: c.readonly },
+              input: {},
+              layout: {},
+            },
+          };
+        }),
+      };
+    }),
+  };
+}
+
+/** Map a cluster type from FormDefinition to RuntimeField dataType */
+function mapClusterType(type: string): RuntimeField["dataType"] {
+  const t = (type ?? "").toLowerCase();
+  if (t.includes("keyboard") || t.includes("text") || t === "") return "KeyboardText";
+  if (t.includes("number") || t.includes("numeric")) return "number";
+  if (t.includes("date") || t.includes("calendar")) return "date";
+  if (t.includes("check") || t.includes("bool")) return "checkbox";
+  if (t.includes("sign")) return "signature";
+  if (t.includes("dropdown") || t.includes("select") || t.includes("list")) return "dropdown";
+  if (t.includes("calc") || t.includes("formula")) return "calculated";
+  return "KeyboardText";
+}
+
+/**
+ * Build a FormDefinition from the current RuntimeForm + runtime values for export.
+ */
+function runtimeFormToFormDefinition(
+  runtimeForm: RuntimeForm,
+  fieldValues: Record<string, string | boolean | null>,
+  dpi: number,
+): FormDefinition {
+  const ptFactor = 72 / dpi;
+
+  return {
+    workbook: {
+      title: runtimeForm.title ?? runtimeForm.workbookName,
+      author: "",
+      created: new Date().toISOString(),
+      modified: new Date().toISOString(),
+      version: "1.0",
+      description: `Exported from PaperLess Designer: ${runtimeForm.workbookName}`,
+    },
+    sheets: runtimeForm.sheets.map((sheet, idx) => ({
+      id: `sheet_${idx}`,
+      name: sheet.name ?? `Page ${idx + 1}`,
+      index: idx,
+      pageSettings: {
+        paperSize: "Letter",
+        orientation: "portrait",
+        widthPt: Math.round(sheet.pageWidthPx * ptFactor),
+        heightPt: Math.round(sheet.pageHeightPx * ptFactor),
+        leftMargin: 70,
+        topMargin: 70,
+        rightMargin: 70,
+        bottomMargin: 70,
+        centerHorizontally: false,
+        centerVertically: false,
+        zoom: 100,
+        fitToPagesWide: 0,
+        fitToPagesTall: 0,
+      },
+      printArea: null,
+      backgroundImage: null,
+      backgroundWidth: sheet.pageWidthPx,
+      backgroundHeight: sheet.pageHeightPx,
+      thumbnail: null,
+      rowHeights: {},
+      columnWidths: {},
+      mergedCells: [],
+      freezePane: null,
+      cellStyles: {},
+      cellValues: (() => {
+        const vals: Record<string, string> = {};
+        for (const field of sheet.fields) {
+          const addr = field.cellReference.includes(":")
+            ? field.cellReference.split(":")[0]
+            : field.cellReference;
+          const val = fieldValues[field.id];
+          if (val !== null && val !== undefined && val !== "") {
+            vals[addr] = String(val);
+          }
+        }
+        return vals;
+      })(),
+      metadata: {},
+    })),
+    clusters: runtimeForm.sheets.flatMap((sheet, idx) =>
+      sheet.fields.map((field, fi) => ({
+        clusterId: field.id ?? `f${idx}_${fi}`,
+        name: field.name ?? field.id,
+        type: field.dataType ?? "KeyboardText",
+        sheetId: `sheet_${idx}`,
+        cellAddress: field.cellReference,
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: 0,
+        leftPt: Math.round(field.leftPx * ptFactor * 100) / 100,
+        topPt: Math.round(field.topPx * ptFactor * 100) / 100,
+        widthPt: Math.round(field.widthPx * ptFactor * 100) / 100,
+        heightPt: Math.round(field.heightPx * ptFactor * 100) / 100,
+        inputParameters: {},
+        visibility: "visible",
+        readonly: field.readOnly ?? false,
+        remarks: field.name ?? "",
+        functions: [],
+        metadata: {
+          isMerged: String(field.isMerged ?? false),
+          mergeAddress: field.mergeRange ?? "",
+        },
+      })),
+    ),
+    images: [],
+    metadata: { sourceFile: runtimeForm.workbookName },
+  };
+}
 
 function mapPreviewType(
   type: string,
@@ -50,9 +241,19 @@ export default function Home() {
   // ── Runtime state — manages field values ──
   const runtime = useRuntimeState();
 
+  // ── Export state ──
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
+  const [exportSuccess, setExportSuccess] = useState<string | null>(null);
+
+  // ── Upload Excel state (for the round-trip upload-excel flow) ──
+  const [uploadExcelLoading, setUploadExcelLoading] = useState(false);
+  const [uploadExcelError, setUploadExcelError] = useState<string | null>(null);
+
   // ── UI state ──
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadExcelInputRef = useRef<HTMLInputElement>(null);
 
   // ── Upload handler ──
   const handleUpload = async () => {
@@ -190,6 +391,134 @@ export default function Home() {
     handleReset();
     setTimeout(() => fileInputRef.current?.click(), 100);
   }, []);
+
+  // ── Upload Excel handler — POST /api/form/upload-excel → reconstruct form ──
+  const handleUploadExcel = useCallback(async (file: File) => {
+    setUploadExcelLoading(true);
+    setUploadExcelError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch(`${API_BASE_URL}/api/form/upload-excel`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.message || `HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const fd = result.data.formDefinition as FormDefinition;
+      if (!fd || !fd.sheets || fd.sheets.length === 0) {
+        throw new Error("No sheets found in the uploaded workbook.");
+      }
+
+      setTemplateName(file.name);
+      runtime.reset();
+
+      // Convert FormDefinition → RuntimeForm and set it
+      const converted = formDefinitionToRuntimeForm(fd, file.name);
+
+      // Pre-populate the runtime store with existing values from cellValues
+      for (const sheet of fd.sheets) {
+        for (const cluster of fd.clusters.filter(c => c.sheetId === sheet.id)) {
+          const key = cluster.cellAddress.includes(":")
+            ? cluster.cellAddress.split(":")[0]
+            : cluster.cellAddress;
+          const val = sheet.cellValues?.[key];
+          if (val && val.trim()) {
+            runtime.setValue(cluster.clusterId, val);
+          }
+        }
+      }
+
+      setRuntimeForm(converted);
+      setExportSuccess(null);
+      setExportError(null);
+    } catch (err) {
+      setUploadExcelError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploadExcelLoading(false);
+      if (uploadExcelInputRef.current) {
+        uploadExcelInputRef.current.value = "";
+      }
+    }
+  }, [runtime, setRuntimeForm]);
+
+  // ── Export Excel handler — POST /api/form/output-excel → direct browser download ──
+  const handleExportExcel = useCallback(async () => {
+    if (!runtimeForm) {
+      setExportError("No form loaded.");
+      return;
+    }
+
+    setExporting(true);
+    setExportError(null);
+    setExportSuccess(null);
+
+    try {
+      const formDef = runtimeFormToFormDefinition(runtimeForm, runtime.values, 300);
+
+      const response = await fetch(`${API_BASE_URL}/api/form/output-excel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formDef),
+      });
+
+      // Check if the response is JSON (error) or binary (success)
+      const contentType = response.headers.get("content-type") ?? "";
+
+      if (!response.ok || contentType.includes("application/json")) {
+        // Error response — parse JSON for the error message
+        let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
+        try {
+          const errResult = await response.clone().json();
+          errorMsg = errResult.message ?? errorMsg;
+        } catch {}
+        throw new Error(errorMsg);
+      }
+
+      // Success — response is the workbook binary directly
+      const blob = await response.blob();
+
+      // Extract filename from Content-Disposition header, or use a default
+      const disposition = response.headers.get("content-disposition") ?? "";
+      let fileName = `${runtimeForm.workbookName.replace(/\.\w+$/, "")}_output.xlsx`;
+      const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+      if (match && match[1]) {
+        fileName = match[1].replace(/['"]/g, "");
+      }
+
+      // Trigger browser download
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+
+      setExportSuccess("Workbook exported successfully!");
+      setTimeout(() => setExportSuccess(null), 3000);
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : "Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }, [runtimeForm, runtime.values]);
+
+  // ── Hidden file input for the Upload Excel button ──
+  const handleUploadExcelFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      handleUploadExcel(file);
+    }
+  }, [handleUploadExcel]);
 
   // ── Drag and drop handlers ──
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -538,6 +867,19 @@ export default function Home() {
               templateName={templateName}
               onReset={handleReset}
               onUploadClick={handleUploadClick}
+              onUploadExcel={() => uploadExcelInputRef.current?.click()}
+              onExportExcel={handleExportExcel}
+              exporting={exporting}
+              exportError={exportError}
+              exportSuccess={exportSuccess}
+            />
+            {/* Hidden file input for Upload Excel */}
+            <input
+              ref={uploadExcelInputRef}
+              type="file"
+              accept=".xlsx"
+              className="hidden"
+              onChange={handleUploadExcelFileSelected}
             />
           </div>
         )}

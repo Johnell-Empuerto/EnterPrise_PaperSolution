@@ -41,6 +41,16 @@ export interface PaperlessDesignerProps {
   templateName: string;
   onReset: () => void;
   onUploadClick: () => void;
+  /** Callback for uploading a previously-generated Output Excel workbook */
+  onUploadExcel: () => void;
+  /** Callback for exporting the current form as an Output Excel workbook */
+  onExportExcel: () => void;
+  /** Whether an export is in progress */
+  exporting?: boolean;
+  /** Export error message, if any */
+  exportError?: string | null;
+  /** Export success message, if any */
+  exportSuccess?: string | null;
 }
 
 type ZoomMode = "fit-page" | "fit-width" | "custom";
@@ -51,6 +61,11 @@ export function PaperlessDesigner({
   templateName,
   onReset,
   onUploadClick,
+  onUploadExcel,
+  onExportExcel,
+  exporting = false,
+  exportError,
+  exportSuccess,
 }: PaperlessDesignerProps) {
   // ── Multi-page navigation ──
   const [currentPage, setCurrentPage] = useState(0);
@@ -456,6 +471,11 @@ export function PaperlessDesigner({
         onGoNext={goNext}
         onReset={onReset}
         onUploadClick={onUploadClick}
+        onUploadExcel={onUploadExcel}
+        onExportExcel={onExportExcel}
+        exporting={exporting}
+        exportError={exportError}
+        exportSuccess={exportSuccess}
         onZoomIn={zoomIn}
         onZoomOut={zoomOut}
         onZoom100={zoom100}
@@ -802,6 +822,11 @@ interface ToolbarProps {
   onGoNext: () => void;
   onReset: () => void;
   onUploadClick: () => void;
+  onUploadExcel: () => void;
+  onExportExcel: () => void;
+  exporting?: boolean;
+  exportError?: string | null;
+  exportSuccess?: string | null;
   onZoomIn: () => void;
   onZoomOut: () => void;
   onZoom100: () => void;
@@ -824,6 +849,11 @@ function Toolbar({
   onGoNext,
   onReset,
   onUploadClick,
+  onUploadExcel,
+  onExportExcel,
+  exporting = false,
+  exportError,
+  exportSuccess,
   onZoomIn,
   onZoomOut,
   onZoom100,
@@ -894,6 +924,45 @@ function Toolbar({
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onUploadExcel}
+        title="Upload Excel (round-trip)"
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 21h3.75m-6.75-8.25V21m15-8.25V21m-9-3.75h4.5M21 3h-4.5M3 5.25v.75m0 0h15"
+            />
+          </svg>
+        }
+      />
+      <ToolbarButton
+        onClick={onExportExcel}
+        title="Export Excel"
+        disabled={exporting}
+        icon={
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
             />
           </svg>
         }
@@ -1097,8 +1166,29 @@ function Toolbar({
         onSelect={onPageSelect}
       />
 
+      {/* Export status indicator */}
+      {exporting && (
+        <span className="flex items-center gap-1 text-xs text-indigo-600 ml-2">
+          <svg className="animate-spin w-3 h-3" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          Exporting...
+        </span>
+      )}
+      {exportSuccess && !exporting && (
+        <span className="text-xs text-emerald-600 ml-2 font-medium">
+          {exportSuccess}
+        </span>
+      )}
+      {exportError && !exporting && (
+        <span className="text-xs text-red-500 ml-2">
+          {exportError}
+        </span>
+      )}
+
       {/* Template name */}
-      <span className="text-xs text-slate-400 truncate max-w-[160px] ml-2">
+      <span className="text-xs text-slate-400 truncate max-w-[120px] ml-1">
         {templateName}
       </span>
     </div>
@@ -1140,20 +1230,25 @@ function ToolbarButton({
   title,
   icon,
   active,
+  disabled,
 }: {
   onClick: () => void;
   title: string;
   icon: React.ReactNode;
   active?: boolean;
+  disabled?: boolean;
 }) {
   return (
     <button
       onClick={onClick}
       title={title}
+      disabled={disabled}
       className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors ${
-        active
-          ? "bg-emerald-100 text-emerald-700"
-          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        disabled
+          ? "text-slate-300 cursor-not-allowed"
+          : active
+            ? "bg-emerald-100 text-emerald-700"
+            : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
       }`}
     >
       {icon}
