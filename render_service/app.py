@@ -1,4 +1,5 @@
 import sys, os, traceback
+import asyncio
 import tempfile
 import shutil
 from pathlib import Path
@@ -12,6 +13,7 @@ from render_service.models import RenderRequest, RenderResponse
 from render_service.renderer import render, render_with_fields
 from render_service.excel_cluster_reader import read_fields
 from render_service.upload_coordinate_generator import generate_coordinates, generate_coordinates_and_preview
+from render_service.render_queue import get_queue
 
 app = FastAPI(title='PaperLess Render Service', version='1.0.0')
 
@@ -27,15 +29,42 @@ app.add_middleware(
 )
 
 
+# ── Queue lifecycle ─────────────────────────────────────────────────────
+
+@app.on_event('startup')
+async def startup():
+    get_queue().start()
+    print('[app] Render queue started')
+
+
+@app.on_event('shutdown')
+async def shutdown():
+    get_queue().shutdown()
+    print('[app] Render queue shutdown')
+
+
 @app.get('/health')
 def health():
-    return {'status': 'ok'}
+    queue = get_queue()
+    metrics = queue.get_metrics()
+    return {
+        'status': 'ok',
+        'queue': metrics,
+    }
 
 
 @app.post('/render/runtime', response_model=RenderResponse)
 def render_runtime(req: RenderRequest):
     try:
-        return render(template_id=req.template_id, xlsx_path=req.xlsx_path, output_dir=req.output_dir)
+        # Queue the entire render operation to prevent concurrent COM access
+        return get_queue().submit(
+            render,
+            template_id=req.template_id,
+            xlsx_path=req.xlsx_path,
+            output_dir=req.output_dir,
+        )
+    except TimeoutError:
+        raise HTTPException(status_code=503, detail="Render queue timeout.")
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
@@ -52,6 +81,9 @@ async def upload_runtime(file: UploadFile = File(...)):
 
     No database lookup is performed — field definitions come entirely
     from the uploaded file.
+
+    Phase X.38: All COM operations are submitted through the global
+    RenderQueue to prevent concurrent Excel access.
     """
     tmp_dir = tempfile.mkdtemp(prefix="ple_upload_")
     try:
@@ -61,10 +93,14 @@ async def upload_runtime(file: UploadFile = File(...)):
         with open(xlsx_path, "wb") as f:
             f.write(content)
 
-        # Read cluster metadata from the workbook
+        # Read cluster metadata from the workbook (queued — COM)
         print(f"[upload] Reading cluster metadata from: {xlsx_path}")
         try:
-            fields = read_fields(xlsx_path)
+            loop = asyncio.get_running_loop()
+            fields = await loop.run_in_executor(
+                None,
+                lambda: get_queue().submit(read_fields, xlsx_path),
+            )
         except Exception as e:
             error_msg = str(e)
             print(f"[upload] Cluster read failed: {error_msg}")
@@ -118,12 +154,17 @@ async def upload_runtime(file: UploadFile = File(...)):
             )
         print(f"[upload] Found {len(fields)} fields from workbook metadata")
 
-        # Render using the upload path (no DB, no calibration)
+        # Render using the upload path (queued — COM via xlsx_to_pdf)
         try:
-            result = render_with_fields(
-                fields=fields,
-                xlsx_path=xlsx_path,
-                dpi=300,
+            loop = asyncio.get_running_loop()
+            result = await loop.run_in_executor(
+                None,
+                lambda: get_queue().submit(
+                    render_with_fields,
+                    fields=fields,
+                    xlsx_path=xlsx_path,
+                    dpi=300,
+                ),
             )
         except Exception as e:
             print(f"[upload] Render failed: {e}")
@@ -150,6 +191,9 @@ async def upload_coordinates(file: UploadFile = File(...)):
     Implements the exact MakeCluster → ExportPdf → GetAddress → normalize
     pipeline from the original ConMas Designer.
 
+    Phase X.38: Coordinates generation uses COM extensively (MakeCluster,
+    PDF export).  The entire operation is submitted through the RenderQueue.
+
     Returns field definitions with normalized ratios (left_ratio, top_ratio,
     right_ratio, bottom_ratio) ready for database storage.
 
@@ -164,7 +208,11 @@ async def upload_coordinates(file: UploadFile = File(...)):
             f.write(content)
 
         print(f"[upload/coordinates] Generating coordinates for: {file.filename}")
-        fields = generate_coordinates(xlsx_path)
+        loop = asyncio.get_running_loop()
+        fields = await loop.run_in_executor(
+            None,
+            lambda: get_queue().submit(generate_coordinates, xlsx_path),
+        )
 
         if not fields:
             raise HTTPException(
@@ -202,6 +250,10 @@ async def upload_preview(
 
     This is a PREVIEW-ONLY endpoint — nothing is saved to the database.
 
+    Phase X.38: Preview generation uses COM extensively (MakeCluster, PDF
+    export, sanitization).  The entire operation is submitted through the
+    RenderQueue.
+
     Pipeline:
       1. Generate coordinates via MakeCluster → ExportPdf → pixel scan (ConMas)
       2. Render original workbook as PDF → 300 DPI PNG for background
@@ -223,9 +275,17 @@ async def upload_preview(
 
         out_dir = output_dir or tmp_dir
         output_id = Path(file.filename or "upload").stem
-        # Single COM session: matches original ConMas architecture
-        result = generate_coordinates_and_preview(
-            xlsx_path, output_dir=out_dir, output_id=output_id
+
+        # Run through the queue (COM-heavy operation)
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: get_queue().submit(
+                generate_coordinates_and_preview,
+                xlsx_path,
+                output_dir=out_dir,
+                output_id=output_id,
+            ),
         )
 
         pages = result.get("pages", [])

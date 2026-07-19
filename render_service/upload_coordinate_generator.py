@@ -95,12 +95,28 @@ def _identify_clusters_from_comments(xlsx_path: str):
     Phase X.16 proved that ws.Comments returns the exact same comment set as
     per-cell cell.Comment scan, but 2.8x faster (no UsedRange traversal).
 
+    Phase X.38: Uses the queue's persistent Excel when available.
+
     Returns list of dicts with cellAddr, name, type, input_parameter.
     Returns [] if no comments found.
     """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
+    # ── Phase X.38: Use queue's persistent Excel if available ──────
+    queue_excel = get_queue_excel()
+    if queue_excel is not None:
+        wb = queue_excel.Workbooks.Open(os.path.abspath(xlsx_path))
+        try:
+            return _read_comments_native(wb)
+        finally:
+            try:
+                wb.Close(False)
+            except Exception:
+                pass
+
+    # ── Original behavior: create own Excel ────────────────────────
     pythoncom.CoInitialize()
     try:
         excel = win32com.client.Dispatch("Excel.Application")
@@ -109,65 +125,7 @@ def _identify_clusters_from_comments(xlsx_path: str):
         clusters = []
         try:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-            for ws in wb.Worksheets:
-                try:
-                    # Skip worksheets with no comments (fast Count property)
-                    if ws.Comments.Count == 0:
-                        continue
-                except Exception:
-                    # Fallback: try per-cell scan if Comments API unavailable
-                    try:
-                        used = ws.UsedRange
-                        if used is None:
-                            continue
-                        lr = used.Row + used.Rows.Count - 1
-                        lc = used.Column + used.Columns.Count - 1
-                        for row in range(1, lr + 1):
-                            for col in range(1, lc + 1):
-                                try:
-                                    cell = ws.Cells(row, col)
-                                    comment = cell.Comment
-                                    if comment is None:
-                                        continue
-                                    ma = cell.MergeArea
-                                    addr = str(ma.Address)
-                                    text = str(comment.Text())
-                                    lines = text.replace("\r\n", "\n").split("\n")
-                                    clusters.append({
-                                        "cellAddr": addr,
-                                        "name": lines[0].strip() if lines else "",
-                                        "type": lines[1].strip() if len(lines) > 1 else "Text",
-                                        "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
-                                    })
-                                except Exception:
-                                    continue
-                    except Exception:
-                        pass
-                    continue
-
-                for comment in ws.Comments:
-                    try:
-                        parent_range = comment.Parent  # Range the comment is attached to
-                    except Exception:
-                        continue
-                    if parent_range is None:
-                        continue
-                    try:
-                        merged = parent_range.MergeArea
-                        addr = str(merged.Address)
-                    except Exception:
-                        addr = str(parent_range.Address)
-                    try:
-                        text = str(comment.Text())
-                    except Exception:
-                        text = ""
-                    lines = text.replace("\r\n", "\n").split("\n")
-                    clusters.append({
-                        "cellAddr": addr,
-                        "name": lines[0].strip() if lines else "",
-                        "type": lines[1].strip() if len(lines) > 1 else "Text",
-                        "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
-                    })
+            clusters = _read_comments_native(wb)
             wb.Close(False)
         finally:
             try:
@@ -177,6 +135,75 @@ def _identify_clusters_from_comments(xlsx_path: str):
         return clusters
     finally:
         pythoncom.CoUninitialize()
+
+
+def _read_comments_native(wb):
+    """Read cell comments from an already-opened workbook.
+
+    Uses Comments.Count to skip empty sheets, then iterates via
+    ws.Comments for a 2.8x speed improvement over per-cell scanning.
+
+    Returns list of dicts with cellAddr, name, type, input_parameter.
+    """
+    clusters = []
+    for ws in wb.Worksheets:
+        try:
+            if ws.Comments.Count == 0:
+                continue
+        except Exception:
+            try:
+                used = ws.UsedRange
+                if used is None:
+                    continue
+                lr = used.Row + used.Rows.Count - 1
+                lc = used.Column + used.Columns.Count - 1
+                for row in range(1, lr + 1):
+                    for col in range(1, lc + 1):
+                        try:
+                            cell = ws.Cells(row, col)
+                            comment = cell.Comment
+                            if comment is None:
+                                continue
+                            ma = cell.MergeArea
+                            addr = str(ma.Address)
+                            text = str(comment.Text())
+                            lines = text.replace("\r\n", "\n").split("\n")
+                            clusters.append({
+                                "cellAddr": addr,
+                                "name": lines[0].strip() if lines else "",
+                                "type": lines[1].strip() if len(lines) > 1 else "Text",
+                                "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
+                            })
+                        except Exception:
+                            continue
+            except Exception:
+                pass
+            continue
+
+        for comment in ws.Comments:
+            try:
+                parent_range = comment.Parent
+            except Exception:
+                continue
+            if parent_range is None:
+                continue
+            try:
+                merged = parent_range.MergeArea
+                addr = str(merged.Address)
+            except Exception:
+                addr = str(parent_range.Address)
+            try:
+                text = str(comment.Text())
+            except Exception:
+                text = ""
+            lines = text.replace("\r\n", "\n").split("\n")
+            clusters.append({
+                "cellAddr": addr,
+                "name": lines[0].strip() if lines else "",
+                "type": lines[1].strip() if len(lines) > 1 else "Text",
+                "input_parameter": "\n".join(lines[2:]).strip() if len(lines) > 2 else "",
+            })
+    return clusters
 
 
 def _identify_clusters_from_fields_sheet(xlsx_path: str):
@@ -185,12 +212,28 @@ def _identify_clusters_from_fields_sheet(xlsx_path: str):
     The _Fields sheet has columns:
       A=Address, B=FieldId, C=FieldName, D=FieldType, E=SheetName, ...
 
+    Phase X.38: Uses the queue's persistent Excel when available.
+
     Returns list of dicts with cellAddr, name, type, input_parameter.
     Returns [] if no _Fields sheet or no data rows.
     """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
+    # ── Phase X.38: Use queue's persistent Excel if available ──────
+    queue_excel = get_queue_excel()
+    if queue_excel is not None:
+        wb = queue_excel.Workbooks.Open(os.path.abspath(xlsx_path))
+        try:
+            return _read_fields_sheet_data(wb)
+        finally:
+            try:
+                wb.Close(False)
+            except Exception:
+                pass
+
+    # ── Original behavior: create own Excel ────────────────────────
     pythoncom.CoInitialize()
     try:
         excel = win32com.client.Dispatch("Excel.Application")
@@ -199,51 +242,7 @@ def _identify_clusters_from_fields_sheet(xlsx_path: str):
         clusters = []
         try:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-            fields_sheet = None
-            for i in range(1, wb.Sheets.Count + 1):
-                if wb.Sheets(i).Name == "_Fields":
-                    fields_sheet = wb.Sheets(i)
-                    break
-            if fields_sheet is None:
-                return []
-
-            lr = fields_sheet.UsedRange.Rows.Count
-            if lr < 2:
-                return []
-
-            for row in range(2, lr + 1):
-                cell_addr = None
-                try:
-                    v = fields_sheet.Cells(row, 1).Value
-                    if v is not None:
-                        cell_addr = str(v).strip()
-                except Exception:
-                    pass
-                if not cell_addr or not CELL_ADDR_RE.match(cell_addr):
-                    continue
-
-                field_name = ""
-                try:
-                    v = fields_sheet.Cells(row, 3).Value
-                    if v is not None:
-                        field_name = str(v).strip()
-                except Exception:
-                    pass
-
-                field_type = "Text"
-                try:
-                    v = fields_sheet.Cells(row, 4).Value
-                    if v is not None:
-                        field_type = str(v).strip()
-                except Exception:
-                    pass
-
-                clusters.append({
-                    "cellAddr": cell_addr,
-                    "name": field_name,
-                    "type": field_type,
-                    "input_parameter": "",
-                })
+            clusters = _read_fields_sheet_data(wb)
             wb.Close(False)
         finally:
             try:
@@ -253,6 +252,61 @@ def _identify_clusters_from_fields_sheet(xlsx_path: str):
         return clusters
     finally:
         pythoncom.CoUninitialize()
+
+
+def _read_fields_sheet_data(wb):
+    """Read cluster metadata from the _Fields sheet in an already-opened workbook.
+
+    Returns list of dicts with cellAddr, name, type, input_parameter.
+    Returns [] if no _Fields sheet or no data rows.
+    """
+    clusters = []
+    fields_sheet = None
+    for i in range(1, wb.Sheets.Count + 1):
+        if wb.Sheets(i).Name == "_Fields":
+            fields_sheet = wb.Sheets(i)
+            break
+    if fields_sheet is None:
+        return []
+
+    lr = fields_sheet.UsedRange.Rows.Count
+    if lr < 2:
+        return []
+
+    for row in range(2, lr + 1):
+        cell_addr = None
+        try:
+            v = fields_sheet.Cells(row, 1).Value
+            if v is not None:
+                cell_addr = str(v).strip()
+        except Exception:
+            pass
+        if not cell_addr or not CELL_ADDR_RE.match(cell_addr):
+            continue
+
+        field_name = ""
+        try:
+            v = fields_sheet.Cells(row, 3).Value
+            if v is not None:
+                field_name = str(v).strip()
+        except Exception:
+            pass
+
+        field_type = "Text"
+        try:
+            v = fields_sheet.Cells(row, 4).Value
+            if v is not None:
+                field_type = str(v).strip()
+        except Exception:
+            pass
+
+        clusters.append({
+            "cellAddr": cell_addr,
+            "name": field_name,
+            "type": field_type,
+            "input_parameter": "",
+        })
+    return clusters
 
 
 def _identify_clusters(xlsx_path: str) -> list[dict]:
@@ -280,6 +334,8 @@ def sanitize_workbook(xlsx_path: str, clusters: list[dict]) -> str:
     Fills cluster cells with BLACK, all other cells WHITE.
     Removes borders, shapes, headers, footers, cell values.
 
+    Phase X.38: Uses the queue's persistent Excel when available.
+
     Args:
         xlsx_path: Path to original workbook.
         clusters: List of dicts with cellAddr to fill black.
@@ -289,81 +345,46 @@ def sanitize_workbook(xlsx_path: str, clusters: list[dict]) -> str:
     """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
+    tmp_dir = tempfile.mkdtemp(prefix="ple_sanitize_")
+    sanitized_path = os.path.join(tmp_dir, "sanitized.xlsx")
+
+    # Build set of cluster ranges for quick lookup
+    cluster_addrs = set()
+    for c in clusters:
+        addr = c["cellAddr"]
+        cluster_addrs.add(addr.upper().replace(" ", ""))
+
+    # ── Phase X.38: Use queue's persistent Excel if available ──────
+    queue_excel = get_queue_excel()
+    if queue_excel is not None:
+        try:
+            wb = queue_excel.Workbooks.Open(os.path.abspath(xlsx_path))
+            try:
+                _do_sanitize(wb, cluster_addrs)
+                wb.SaveAs(os.path.abspath(sanitized_path))
+                wb.Close(False)
+            except Exception:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise
+        except Exception:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            raise
+        return sanitized_path
+
+    # ── Original behavior: create own Excel ────────────────────────
     pythoncom.CoInitialize()
     try:
         excel = win32com.client.Dispatch("Excel.Application")
         excel.DisplayAlerts = False
         excel.Visible = False
 
-        tmp_dir = tempfile.mkdtemp(prefix="ple_sanitize_")
-        sanitized_path = os.path.join(tmp_dir, "sanitized.xlsx")
-
-        # Build set of cluster ranges for quick lookup
-        cluster_addrs = set()
-        sheet_clusters = {}
-        for c in clusters:
-            addr = c["cellAddr"]
-            cluster_addrs.add(addr.upper().replace(" ", ""))
-            sheet_name = c.get("sheetName", "")
-            if sheet_name not in sheet_clusters:
-                sheet_clusters[sheet_name] = []
-            sheet_clusters[sheet_name].append(addr)
-
         try:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-
-            for ws in wb.Worksheets:
-                # Optimization D: Only delete shapes when shapes exist
-                try:
-                    if ws.Shapes.Count > 0:
-                        for shape in list(ws.Shapes):
-                            shape.Delete()
-                except Exception:
-                    pass
-
-                # Optimization C: Skip PageSetup clearing
-
-                used = ws.UsedRange
-                if used is None:
-                    continue
-
-                lr = used.Row + used.Rows.Count - 1
-                lc = used.Column + used.Columns.Count - 1
-
-                # Optimization B: Batch fill entire UsedRange white
-                try:
-                    used.Interior.Color = 0xFFFFFF
-                except Exception:
-                    pass
-
-                # Optimization A: Batch clear all cell values
-                try:
-                    used.ClearContents()
-                except Exception:
-                    pass
-
-                xlNone = -4142
-
-                # Fill only cluster cells black
-                for addr in cluster_addrs:
-                    try:
-                        rng = ws.Range(addr)
-                        rng.Interior.Color = 1  # Black
-                        rng.Value = ""
-                    except Exception:
-                        pass
-
-                # Clear borders across the full range
-                try:
-                    clear_range = ws.Range(ws.Cells(1, 1), ws.Cells(lr, lc))
-                    clear_range.Borders.LineStyle = xlNone
-                except Exception:
-                    pass
-
+            _do_sanitize(wb, cluster_addrs)
             wb.SaveAs(os.path.abspath(sanitized_path))
             wb.Close(False)
-
         except Exception:
             shutil.rmtree(tmp_dir, ignore_errors=True)
             raise
@@ -378,42 +399,98 @@ def sanitize_workbook(xlsx_path: str, clusters: list[dict]) -> str:
         pythoncom.CoUninitialize()
 
 
+def _do_sanitize(wb, cluster_addrs: set):
+    """Perform workbook sanitization on an already-opened workbook.
+
+    Fills cluster cells black, all others white.  Removes shapes,
+    cell values, and borders.
+    """
+    xlNone = -4142
+    for ws in wb.Worksheets:
+        try:
+            if ws.Shapes.Count > 0:
+                for shape in list(ws.Shapes):
+                    shape.Delete()
+        except Exception:
+            pass
+
+        used = ws.UsedRange
+        if used is None:
+            continue
+
+        lr = used.Row + used.Rows.Count - 1
+        lc = used.Column + used.Columns.Count - 1
+
+        try:
+            used.Interior.Color = 0xFFFFFF
+        except Exception:
+            pass
+
+        try:
+            used.ClearContents()
+        except Exception:
+            pass
+
+        for addr in cluster_addrs:
+            try:
+                rng = ws.Range(addr)
+                rng.Interior.Color = 1
+                rng.Value = ""
+            except Exception:
+                pass
+
+        try:
+            clear_range = ws.Range(ws.Cells(1, 1), ws.Cells(lr, lc))
+            clear_range.Borders.LineStyle = xlNone
+        except Exception:
+            pass
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Phase B — Export sanitized workbook to PDF via Excel COM
 # ──────────────────────────────────────────────────────────────────────────────
 
 def export_sanitized_pdf(sanitized_path: str) -> str:
-    """Export sanitized workbook to PDF via Excel COM ExportAsFixedFormat."""
+    """Export sanitized workbook to PDF via Excel COM ExportAsFixedFormat.
+
+    Phase X.38: Uses the queue's persistent Excel when available.
+    """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
+    tmp_dir = tempfile.mkdtemp(prefix="ple_export_pdf_")
+    pdf_path = os.path.join(tmp_dir, "sanitized.pdf")
+
+    # ── Phase X.38: Use queue's persistent Excel if available ──────
+    queue_excel = get_queue_excel()
+    if queue_excel is not None:
+        try:
+            wb = queue_excel.Workbooks.Open(os.path.abspath(sanitized_path))
+            try:
+                _delete_metadata_sheets(wb)
+                ws = wb.ActiveSheet
+                ws.ExportAsFixedFormat(0, os.path.abspath(pdf_path), 0, 0, True)
+                wb.Close(False)
+            except Exception:
+                shutil.rmtree(tmp_dir, ignore_errors=True)
+                raise
+        except Exception:
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+            raise
+        return pdf_path
+
+    # ── Original behavior: create own Excel ────────────────────────
     pythoncom.CoInitialize()
     try:
         excel = win32com.client.Dispatch("Excel.Application")
         excel.DisplayAlerts = False
         excel.Visible = False
 
-        tmp_dir = tempfile.mkdtemp(prefix="ple_export_pdf_")
-        pdf_path = os.path.join(tmp_dir, "sanitized.pdf")
-
         try:
             wb = excel.Workbooks.Open(os.path.abspath(sanitized_path))
-
-            # Delete metadata sheets to avoid multi-page PDF
-            for i in range(wb.Sheets.Count, 0, -1):
-                name = ""
-                try:
-                    name = wb.Sheets(i).Name
-                except Exception:
-                    pass
-                if name in ("_Fields", "_RawData"):
-                    wb.Sheets(i).Delete()
-
+            _delete_metadata_sheets(wb)
             ws = wb.ActiveSheet
-
-            # Preserve original page setup — do NOT modify Zoom, FitToPages, or margins
-            # The sanitized PDF must be geometrically identical to the original workbook PDF
-            # so that pixel-scanned coordinates align with the background image.
             ws.ExportAsFixedFormat(0, os.path.abspath(pdf_path), 0, 0, True)
             wb.Close(False)
         except Exception:
@@ -428,6 +505,18 @@ def export_sanitized_pdf(sanitized_path: str) -> str:
         return pdf_path
     finally:
         pythoncom.CoUninitialize()
+
+
+def _delete_metadata_sheets(wb):
+    """Delete metadata sheets (_Fields, _RawData) from an opened workbook."""
+    for i in range(wb.Sheets.Count, 0, -1):
+        name = ""
+        try:
+            name = wb.Sheets(i).Name
+        except Exception:
+            pass
+        if name in ("_Fields", "_RawData"):
+            wb.Sheets(i).Delete()
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -940,6 +1029,7 @@ def generate_coordinates_and_preview(
     """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
     # Performance instrumentation
     _pt = []
@@ -961,13 +1051,19 @@ def generate_coordinates_and_preview(
         # ════════════════════════════════════════════════════
         # PHASE A: SINGLE COM SESSION (everything)
         # ════════════════════════════════════════════════════
-        pythoncom.CoInitialize()
-        _stage_mark("COM: CoInitialize")
-        try:
+        queue_excel = get_queue_excel()
+        if queue_excel is not None:
+            excel = queue_excel
+            own_excel = False
+        else:
+            pythoncom.CoInitialize()
+            _stage_mark("COM: CoInitialize")
             excel = win32com.client.Dispatch("Excel.Application")
             excel.DisplayAlerts = False
             excel.Visible = False
-            _stage_mark("Excel Launch")
+            own_excel = True
+        _stage_mark("Excel Launch")
+        try:
             try:
                 wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
                 _stage_mark("Workbook Open")
@@ -1137,15 +1233,20 @@ def generate_coordinates_and_preview(
                 _stage_mark("Export Sanitized PDF (all sheets)")
 
             finally:
-                # Always quit Excel to prevent orphaned processes
                 try:
-                    excel.Quit()
+                    wb.Close(False)
                 except Exception:
                     pass
-                _stage_mark("Excel Quit")
+                if own_excel:
+                    try:
+                        excel.Quit()
+                    except Exception:
+                        pass
+                    _stage_mark("Excel Quit")
         finally:
-            pythoncom.CoUninitialize()
-            _stage_mark("COM: CoUninitialize")
+            if own_excel:
+                pythoncom.CoUninitialize()
+                _stage_mark("COM: CoUninitialize")
 
         # ════════════════════════════════════════════════════
         # PHASE B: NON-COM OPERATIONS (pixel scan per-page)

@@ -109,8 +109,6 @@ namespace ExcelAPI.Runtime
             RenderCell cell, RenderSheet sheet,
             SkiaSharp.SKRect bounds, int tabIndex, int dpi, int pageIndex = 1)
         {
-            double ptsToPx = dpi / 72.0;
-
             string? mergeRange = null;
             if (cell.MergeIndex.HasValue && cell.MergeIndex.Value >= 0
                 && cell.MergeIndex.Value < sheet.Merges.Count)

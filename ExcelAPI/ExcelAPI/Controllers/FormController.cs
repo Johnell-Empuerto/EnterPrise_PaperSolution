@@ -1,10 +1,12 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using ExcelAPI.Models;
-using ExcelAPI.Services;
+using ExcelAPI.Application;
+using ExcelAPI.Designer.Analysis;
 using ExcelAPI.Runtime;
 using ExcelAPI.Rendering;
 using SkiaSharp;
+using WbDef = ExcelAPI.Models.WorkbookDefinition;
 
 namespace ExcelAPI.Controllers
 {
@@ -16,35 +18,29 @@ namespace ExcelAPI.Controllers
         private readonly IWebHostEnvironment _env;
         private readonly IOptions<ExcelCaptureOptions> _options;
         private readonly ILogger<FormController> _logger;
-        private readonly OpenXmlParser _xmlParser;
-        private readonly FormRuntimeBuilder _runtimeBuilder;
-        private readonly RuntimeSerializer _runtimeSerializer;
         private readonly RuntimeCoordinateGenerator _runtimeGenerator;
         private readonly PythonRenderService _pythonRender;
         private readonly WorkbookReaderService _workbookReaderService;
+        private readonly ISessionWorkbookStore _sessionStore;
 
         public FormController(
             IFormSaveService formSaveService,
             IWebHostEnvironment env,
             IOptions<ExcelCaptureOptions> options,
             ILogger<FormController> logger,
-            OpenXmlParser xmlParser,
-            FormRuntimeBuilder runtimeBuilder,
-            RuntimeSerializer runtimeSerializer,
             RuntimeCoordinateGenerator runtimeGenerator,
             PythonRenderService pythonRender,
-            WorkbookReaderService workbookReaderService)
+            WorkbookReaderService workbookReaderService,
+            ISessionWorkbookStore sessionStore)
         {
             _formSaveService = formSaveService;
             _env = env;
             _options = options;
             _logger = logger;
-            _xmlParser = xmlParser;
-            _runtimeBuilder = runtimeBuilder;
-            _runtimeSerializer = runtimeSerializer;
             _runtimeGenerator = runtimeGenerator;
             _pythonRender = pythonRender;
             _workbookReaderService = workbookReaderService;
+            _sessionStore = sessionStore;
         }
 
         [HttpPost("save")]
@@ -135,43 +131,41 @@ namespace ExcelAPI.Controllers
 
             try
             {
-                // Use existing service to capture, then convert result to FormDefinition
-                // Pass templateId as fileId so the PNG filename matches — single source of truth.
-                var captureService = HttpContext.RequestServices.GetRequiredService<Services.Interfaces.IExcelCaptureService>();
+                // Capture via COM — always produces InternalWorkbookDefinition (Stage 9)
+                var captureService = HttpContext.RequestServices.GetRequiredService<Designer.Capture.IExcelCaptureService>();
                 var captureResult = await captureService.CapturePrintAreaAsync(filePath, templateId);
 
-                // Convert capture result to FormDefinition
-                var formDefinition = ConvertCaptureToForm(captureResult, file.FileName);
+                // Convert to FormDefinition via WbDef canonical converter (always available)
+                var formDefinition = WbDef.WorkbookDefinitionConverter.ToFormDefinition(
+                    captureResult.InternalWorkbookDefinition!);
 
-                // Persist the workbook in Forms/ so the Runtime endpoint can find it later
-                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-                Directory.CreateDirectory(formsDir);
-                string persistentPath = Path.Combine(formsDir, uniqueFileName);
-                if (System.IO.File.Exists(filePath))
-                {
-                    System.IO.File.Move(filePath, persistentPath, overwrite: true);
-                }
+                // Apply IO-specific operations (thumbnail, bg persistence)
+                if (captureResult.InternalWorkbookDefinition != null)
+                    ApplyFormDefinitionIO(formDefinition, captureResult);
 
-                // Preview URL — use the ImageUrl returned by CapturePrintAreaAsync.
-                // Because we passed templateId as fileId, this is now /preview/page_{templateId}.png.
+                // Phase 5.2: Save the original workbook into the session store.
+                // The browser will only receive a sessionId — no filenames.
+                var session = _sessionStore.CreateSession(filePath, file.FileName);
+                string sessionId = session.SessionId;
+
+                // Save runtime.json alongside the original workbook in the session folder
+                string sessionDir = Path.GetDirectoryName(session.WorkbookPath) ?? Path.Combine(_env.ContentRootPath, "Forms");
+                int pngWidth = captureResult.Page?.Width ?? 0;
+                int pngHeight = captureResult.Page?.Height ?? 0;
+                _runtimeGenerator.SaveFromWbDef(captureResult, sessionId, sessionDir, file.FileName,
+                    pngWidth, pngHeight, formDefinition?.Sheets?.FirstOrDefault()?.BackgroundImage ?? captureResult.ImageUrl ?? "");
+
+                // Clean up the temp upload file — the session store has a copy
+                try { if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath); } catch { }
+
+                // Preview URL
                 string previewUrl = captureResult.ImageUrl ?? $"/preview/page_{templateId}.png";
-
-                // Determine the persistent background image URL
-                // Priority: Forms copy (persistent) > preview (temporary)
-                string bgUrl = formDefinition?.Sheets?.FirstOrDefault()?.BackgroundImage
-                    ?? previewUrl;
-
-                // Persist COM field rectangles as the single source of truth for Runtime overlay.
-                // This eliminates OpenXML coordinate recalculation on every GET /api/form/runtime/{id}.
-                // Pass the background image URL so the frontend can load the exact image used
-                // during coordinate computation.
-                _runtimeGenerator.SaveMetadata(captureResult, templateId, formsDir, file.FileName, bgUrl);
 
                 return Ok(new
                 {
                     success = true,
                     message = $"Excel file processed. {captureResult.Fields.Count} field(s) detected.",
-                    templateId,
+                    sessionId,
                     previewUrl,
                     data = formDefinition
                 });
@@ -179,7 +173,6 @@ namespace ExcelAPI.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Failed to process Excel file for form definition");
-                // Clean up temp file on error
                 try { if (System.IO.File.Exists(filePath)) System.IO.File.Delete(filePath); } catch { }
                 return BadRequest(new ApiErrorResponse
                 {
@@ -227,7 +220,10 @@ namespace ExcelAPI.Controllers
                     return StatusCode(502, new { success = false, message = "Python preview service returned an error or is unavailable." });
                 }
 
-                // Map multi-page response
+                // Phase 5.2: Save the original workbook into the session store.
+                var session = _sessionStore.CreateSession(xlsxPath, file.FileName);
+                string sessionId = session.SessionId;
+
                 var pageResults = (pythonResult.Pages ?? new List<PythonPreviewPageResult>())
                     .Select((p, pageIndex) =>
                     {
@@ -258,7 +254,12 @@ namespace ExcelAPI.Controllers
                     })
                     .ToList();
 
-                return Ok(new { success = true, pages = pageResults });
+                return Ok(new
+                {
+                    success = true,
+                    sessionId,
+                    pages = pageResults
+                });
             }
             catch (Exception ex)
             {
@@ -271,61 +272,22 @@ namespace ExcelAPI.Controllers
             }
         }
 
-        private FormDefinition ConvertCaptureToForm(Models.CaptureResult capture, string fileName)
+        /// <summary>
+        /// Apply IO-specific operations on the FormDefinition: thumbnail generation
+        /// and background image persistence. These are side-effect operations that
+        /// the WbDef converter cannot perform (it is a pure data mapping).
+        /// </summary>
+        private void ApplyFormDefinitionIO(FormDefinition form, Models.CaptureResult capture)
         {
-            const double dpi = 300.0;
-            const double pointsToPixels = dpi / 72.0;
+            if (form.Sheets.Count == 0) return;
 
+            var sheet = form.Sheets[0];
             int bgWidth = capture.Page?.Width ?? 0;
             int bgHeight = capture.Page?.Height ?? 0;
+            sheet.BackgroundWidth = bgWidth;
+            sheet.BackgroundHeight = bgHeight;
 
-            // Build page settings from capture debug info, with sensible defaults
-            var pageSettings = new PageSettings
-            {
-                PaperSize = "Letter",
-                Orientation = "portrait",
-                WidthPt = 612,
-                HeightPt = 792,
-                LeftMargin = 70,
-                TopMargin = 70,
-                RightMargin = 70,
-                BottomMargin = 70,
-                CenterHorizontally = false,
-                CenterVertically = false,
-                Zoom = 100
-            };
-
-            if (capture.PageSetup != null)
-            {
-                pageSettings.WidthPt = capture.PageSetup.PageWidthPt > 0
-                    ? capture.PageSetup.PageWidthPt : pageSettings.WidthPt;
-                pageSettings.HeightPt = capture.PageSetup.PageHeightPt > 0
-                    ? capture.PageSetup.PageHeightPt : pageSettings.HeightPt;
-                pageSettings.LeftMargin = capture.PageSetup.LeftMargin > 0
-                    ? capture.PageSetup.LeftMargin : pageSettings.LeftMargin;
-                pageSettings.TopMargin = capture.PageSetup.TopMargin > 0
-                    ? capture.PageSetup.TopMargin : pageSettings.TopMargin;
-                pageSettings.CenterHorizontally = capture.PageSetup.CenterHorizontally;
-                pageSettings.CenterVertically = capture.PageSetup.CenterVertically;
-                pageSettings.Zoom = capture.PageSetup.Zoom > 0
-                    ? capture.PageSetup.Zoom : pageSettings.Zoom;
-                pageSettings.FitToPagesWide = capture.PageSetup.FitToPagesWide;
-                pageSettings.FitToPagesTall = capture.PageSetup.FitToPagesTall;
-            }
-
-            // Build print area info from the actual captured page dimensions
-            var printArea = new PrintAreaInfo
-            {
-                Address = "",
-                LeftPt = 0,
-                TopPt = 0,
-                WidthPt = bgWidth > 0 ? bgWidth / pointsToPixels : 0,
-                HeightPt = bgHeight > 0 ? bgHeight / pointsToPixels : 0,
-                Cols = 0,
-                Rows = 0
-            };
-
-            // Generate a thumbnail as a base64 data URL (small downscaled version)
+            // Generate a thumbnail as a base64 data URL
             string? thumbnail = null;
             if (!string.IsNullOrEmpty(capture.ImageUrl))
             {
@@ -334,8 +296,8 @@ namespace ExcelAPI.Controllers
                     string previewFolder = Path.Combine(_env.ContentRootPath,
                         _options.Value.PreviewDirectory);
                     string rawUrl = capture.ImageUrl.TrimStart('/');
-                        if (rawUrl.StartsWith("preview/"))
-                            rawUrl = rawUrl.Substring("preview/".Length);
+                    if (rawUrl.StartsWith("preview/"))
+                        rawUrl = rawUrl.Substring("preview/".Length);
                     string previewFileName = Path.GetFileName(rawUrl);
                     string previewPath = Path.Combine(previewFolder, previewFileName);
 
@@ -346,7 +308,6 @@ namespace ExcelAPI.Controllers
                         fs.CopyTo(ms);
                         byte[] imageBytes = ms.ToArray();
 
-                        // Downscale for thumbnail (max 200px wide)
                         using var srcBitmap = SkiaSharp.SKBitmap.Decode(imageBytes);
                         if (srcBitmap != null)
                         {
@@ -372,6 +333,7 @@ namespace ExcelAPI.Controllers
                     _logger.LogWarning(ex, "Failed to generate thumbnail for preview image");
                 }
             }
+            sheet.Thumbnail = thumbnail;
 
             // Persist the preview image to a permanent form-owned copy
             string? persistedBgUrl = capture.ImageUrl;
@@ -385,8 +347,8 @@ namespace ExcelAPI.Controllers
                     string previewFolder = Path.Combine(_env.ContentRootPath,
                         _options.Value.PreviewDirectory);
                     string rawUrl = capture.ImageUrl.TrimStart('/');
-                        if (rawUrl.StartsWith("preview/"))
-                            rawUrl = rawUrl.Substring("preview/".Length);
+                    if (rawUrl.StartsWith("preview/"))
+                        rawUrl = rawUrl.Substring("preview/".Length);
                     string previewFileName2 = Path.GetFileName(rawUrl);
                     string srcPath = Path.Combine(previewFolder, previewFileName2);
 
@@ -403,78 +365,7 @@ namespace ExcelAPI.Controllers
                     _logger.LogWarning(ex, "Failed to persist background image, using temporary");
                 }
             }
-
-            var form = new FormDefinition
-            {
-                Workbook = new WorkbookMetadata
-                {
-                    Title = Path.GetFileNameWithoutExtension(fileName),
-                    Author = "",
-                    Created = DateTime.Now.ToString("o"),
-                    Modified = DateTime.Now.ToString("o"),
-                    Version = "1.0",
-                    Description = $"Imported from {fileName}"
-                },
-                Sheets = new List<SheetDefinition>
-                {
-                    new SheetDefinition
-                    {
-                        Id = "sheet_0",
-                        Name = "Sheet1",
-                        Index = 0,
-                        PageSettings = pageSettings,
-                        PrintArea = printArea,
-                        BackgroundImage = persistedBgUrl,
-                        BackgroundWidth = bgWidth,
-                        BackgroundHeight = bgHeight,
-                        Thumbnail = thumbnail,
-                        RowHeights = new Dictionary<int, double>(),
-                        ColumnWidths = new Dictionary<int, double>(),
-                        MergedCells = new List<MergedCellInfo>(),
-                        FreezePane = null,
-                        CellStyles = new Dictionary<string, CellStyleInfo>(),
-                        CellValues = new Dictionary<string, string>()
-                    }
-                },
-                Clusters = capture.Fields.Select(f => new ClusterDefinition
-                {
-                    ClusterId = f.Id,
-                    Name = $"field_{f.Cell}",
-                    Type = f.Type.ToLower(),
-                    SheetId = "sheet_0",
-                    CellAddress = f.Cell,
-                    Left = Math.Round(f.Left, 1),
-                    Right = Math.Round(f.Left + f.Width, 1),
-                    Top = Math.Round(f.Top, 1),
-                    Bottom = Math.Round(f.Top + f.Height, 1),
-                    LeftPt = f.ExcelLeft,
-                    TopPt = f.ExcelTop,
-                    WidthPt = f.ExcelWidthPt > 0 ? f.ExcelWidthPt : Math.Round(f.Width / pointsToPixels, 2),
-                    HeightPt = f.ExcelHeightPt > 0 ? f.ExcelHeightPt : Math.Round(f.Height / pointsToPixels, 2),
-                    InputParameters = new Dictionary<string, string>
-                    {
-                        ["type"] = f.Type,
-                        ["comment"] = f.Comment
-                    },
-                    Visibility = "visible",
-                    Readonly = false,
-                    Remarks = f.Comment,
-                    Functions = new List<string>(),
-                    Metadata = new Dictionary<string, string>
-                    {
-                        ["isMerged"] = f.IsMerged.ToString(),
-                        ["mergeAddress"] = f.MergeAddress ?? ""
-                    }
-                }).ToList(),
-                Images = new List<ImageDefinition>(),
-                Metadata = new Dictionary<string, string>
-                {
-                    ["sourceFile"] = fileName,
-                    ["capturedAt"] = DateTime.Now.ToString("o")
-                }
-            };
-
-            return form;
+            sheet.BackgroundImage = persistedBgUrl;
         }
 
         /// <summary>
@@ -509,7 +400,6 @@ namespace ExcelAPI.Controllers
                 });
             }
 
-            // Save uploaded file to temp location
             string uploadsDir = Path.Combine(_env.ContentRootPath, "Uploads");
             Directory.CreateDirectory(uploadsDir);
             string tempPath = Path.Combine(uploadsDir, $"{Guid.NewGuid():N}.xlsx");
@@ -550,12 +440,9 @@ namespace ExcelAPI.Controllers
                     });
                 }
 
-                // Persist the workbook to Forms/ for round-trip compatibility
-                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-                Directory.CreateDirectory(formsDir);
-                string persistentFileName = $"{Guid.NewGuid():N}.xlsx";
-                string persistentPath = Path.Combine(formsDir, persistentFileName);
-                System.IO.File.Copy(tempPath, persistentPath, overwrite: true);
+                // Phase 5.2: Save the workbook into the session store.
+                var session = _sessionStore.CreateSession(tempPath, file.FileName);
+                string sessionId = session.SessionId;
 
                 return Ok(new ApiResponse<object>
                 {
@@ -564,10 +451,9 @@ namespace ExcelAPI.Controllers
                     Data = new
                     {
                         formDefinition,
+                        sessionId,
                         fieldCount = formDefinition.Clusters.Count,
-                        sheetCount = formDefinition.Sheets.Count,
-                        templateId = Path.GetFileNameWithoutExtension(persistentFileName),
-                        workbookDownloadUrl = $"/forms/{persistentFileName}"
+                        sheetCount = formDefinition.Sheets.Count
                     }
                 });
             }
@@ -588,76 +474,254 @@ namespace ExcelAPI.Controllers
 
         /// <summary>
         /// Output Excel of Form — generates a complete Excel workbook and returns it
-        /// directly as a browser download (legacy ConMas behavior).
+        /// directly as a browser download.
         ///
-        /// The workbook is generated with:
-        ///   - Worksheet structure, merged cells, styles, page setup
-        ///   - User-entered cell values (from SheetDefinition.CellValues)
-        ///   - Cell comments with field metadata (legacy ConMas format)
-        ///   - Hidden _Fields worksheet for republish compatibility
-        ///
-        /// Returns the workbook as a direct file download — no JSON wrapper, no
-        /// intermediate download URL. The content-type is set so the browser
-        /// automatically triggers its normal save/download behavior.
-        ///
-        /// On error, returns a JSON error response.
+        /// Phase 4.6: DEPRECATED. The canonical save path is POST /api/form/save-edited
+        /// which uses WorkbookValueWriter instead of the legacy COM WorkbookGenerator.
+        /// This endpoint exists only for backward compatibility with old clients.
         /// </summary>
+        [Obsolete("Use POST /api/form/save-edited instead. This endpoint is deprecated and will return 410 Gone.")]
         [HttpPost("output-excel")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        [ProducesResponseType(StatusCodes.Status410Gone)]
+        public IActionResult OutputExcel()
+        {
+            _logger.LogWarning("[DEPRECATED] POST /api/form/output-excel called — use POST /api/form/save-edited instead.");
+            return StatusCode(410, new ApiErrorResponse
+            {
+                Message = "This endpoint is deprecated. Use POST /api/form/save-edited instead.",
+                ErrorCode = ErrorCodes.InvalidRequest
+            });
+        }
+
+        /// <summary>
+        /// Save edited field values back into the original Excel workbook (Phase 4.4 / 5.2).
+        ///
+        /// Accepts a WorkbookDefinition with edited field values and sessionId.
+        /// The sessionId is used to resolve the original workbook from the server's
+        /// session store (TempWorkbooks/{sessionId}/original.xlsx).
+        ///
+        /// The browser never needs to track filenames — the server owns the workbook.
+        ///
+        /// Pipeline:
+        ///   WorkbookDefinition + sessionId (from frontend)
+        ///     ↓
+        ///   SessionWorkbookStore.ResolveWorkbookPath(sessionId)
+        ///     ↓
+        ///   WorkbookValueWriter.WriteValues()  ← CANONICAL PATH
+        ///     ↓
+        ///   WorkbookDiffValidator.Compare()    ← AUTO-VALIDATION
+        ///     ↓
+        ///   Edited workbook download
+        /// </summary>
+        [HttpPost("save-edited")]
         [RequestSizeLimit(50 * 1024 * 1024)]
         [ProducesResponseType(typeof(FileContentResult), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status400BadRequest)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
-        public async Task<IActionResult> OutputExcel([FromBody] FormDefinition form)
+        public async Task<IActionResult> SaveEdited([FromBody] WbDef.WorkbookDefinition wbDef)
         {
-            if (form == null)
+            if (wbDef == null)
             {
                 return BadRequest(new ApiErrorResponse
                 {
-                    Message = "No form definition provided.",
+                    Message = "No workbook definition provided.",
                     ErrorCode = ErrorCodes.InvalidRequest
                 });
             }
 
-            string outputDir = Path.Combine(_env.ContentRootPath, "Output");
-            Directory.CreateDirectory(outputDir);
+            // Phase 5.2: Resolve the original workbook from the session store.
+            // The sessionId is the only thing the browser needs to remember.
+            string sessionId = wbDef.SessionId;
+            string? sourcePath = null;
 
-            string tempPath = Path.Combine(outputDir, $"temp_{Guid.NewGuid():N}.xlsx");
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                sourcePath = _sessionStore.ResolveWorkbookPath(sessionId);
+                if (sourcePath == null)
+                {
+                    return StatusCode(410, new ApiErrorResponse
+                    {
+                        Message = "The editing session has expired. Please upload the workbook again.",
+                        ErrorCode = ErrorCodes.InvalidRequest
+                    });
+                }
+            }
+            else
+            {
+                // Backward compatibility: fallback to SourceFileName (deprecated)
+                if (!string.IsNullOrEmpty(wbDef.SourceFileName))
+                {
+                    string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
+                    sourcePath = Path.Combine(formsDir, wbDef.SourceFileName);
+                    if (!System.IO.File.Exists(sourcePath))
+                    {
+                        sourcePath = null;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(sourcePath))
+                {
+                    return BadRequest(new ApiErrorResponse
+                    {
+                        Message = "No session or source workbook found. Please upload the workbook first.",
+                        ErrorCode = ErrorCodes.InvalidRequest
+                    });
+                }
+
+                _logger.LogWarning("[DEPRECATED] SaveEdited called without sessionId — fallback to SourceFileName '{File}'", wbDef.SourceFileName);
+            }
 
             try
             {
-                // Generate workbook to temp file
-                var result = await _formSaveService.OutputExcelAsync(form, outputDir);
+                _logger.LogInformation("========== SAVE PIPELINE ==========");
+                _logger.LogInformation("Controller: POST /api/form/save-edited");
+                _logger.LogInformation("SessionId: {SessionId}", sessionId);
+                _logger.LogInformation("SourcePath: {Path}", sourcePath);
+                _logger.LogInformation("Workbook: {Title}", wbDef.Info?.Title ?? "(untitled)");
+                _logger.LogInformation("Sheets: {Count}, Fields with values: {Fields}",
+                    wbDef.Sheets.Count,
+                    wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value))));
+                _logger.LogInformation("WorkbookGenerator invoked: FALSE");
+                _logger.LogInformation("WorkbookValueWriter invoked: TRUE");
 
-                tempPath = result.WorkbookPath; // OutputExcelAsync already generates a unique path
+                // ── DIAGNOSTIC: Log incoming WbDef payload structure (Investigation 2/3) ──
+                _logger.LogInformation("========== PAYLOAD DIAGNOSTIC ==========");
+                _logger.LogInformation("SessionId present: {Has}", !string.IsNullOrEmpty(sessionId));
+                _logger.LogInformation("SourceFileName present (deprecated): {Has}", !string.IsNullOrEmpty(wbDef.SourceFileName));
+                _logger.LogInformation("Sheet count: {Count}", wbDef.Sheets.Count);
+                _logger.LogInformation("Total fields: {Total}", wbDef.Sheets.Sum(s => s.Fields.Count));
+                _logger.LogInformation("Total fields with non-empty values: {WithVal}",
+                    wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value))));
 
-                // Read bytes before any cleanup
-                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(tempPath);
+                foreach (var diagSheet in wbDef.Sheets)
+                {
+                    int nonEmpty = diagSheet.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value));
+                    int empty = diagSheet.Fields.Count(f => string.IsNullOrWhiteSpace(f.Value));
+                    _logger.LogInformation("  Sheet '{Name}': {Total} fields ({NonEmpty} with values, {Empty} empty)",
+                        diagSheet.Name, diagSheet.Fields.Count, nonEmpty, empty);
 
-                // Extract a user-friendly filename from the workbook title
-                string safeFileName = SanitizeFileName(form.Workbook?.Title ?? "output") + ".xlsx";
+                    // Log first 20 non-empty field details
+                    foreach (var f in diagSheet.Fields.Where(f => !string.IsNullOrWhiteSpace(f.Value)).Take(20))
+                    {
+                        _logger.LogInformation("    Field: cell={Addr}, name='{Name}', type={Type}, value='{Val}', id={Id}",
+                            f.Cell?.Address ?? "?", f.Name ?? "?", f.Type.ToString(), f.Value, f.Id ?? "?");
+                    }
+
+                    // Also log first 5 empty fields to verify model binding catches them
+                    foreach (var f in diagSheet.Fields.Where(f => string.IsNullOrWhiteSpace(f.Value)).Take(5))
+                    {
+                        _logger.LogInformation("    EMPTY Field: cell={Addr}, name='{Name}', type={Type}, id={Id}",
+                            f.Cell?.Address ?? "?", f.Name ?? "?", f.Type.ToString(), f.Id ?? "?");
+                    }
+
+                    if (diagSheet.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value)) == 0)
+                    {
+                        _logger.LogWarning("[DIAG] Sheet '{Name}' has ZERO non-empty field values!", diagSheet.Name);
+                    }
+                }
+
+                if (wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value))) == 0)
+                {
+                    _logger.LogError("[DIAG] CRITICAL: ALL fields have empty values. " +
+                        "No cells will be written. Possible model binding mismatch: " +
+                        "frontend runtimeFormToWorkbookDefinition may map fields with wrong property names. " +
+                        "Check: values[f.id] mapping → must match backend FieldDefinition.Name");
+                }
+
+                _logger.LogInformation("========== PAYLOAD DIAGNOSTIC END ==========");
+
+                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
+                Directory.CreateDirectory(formsDir);
+
+                var result = await _formSaveService.SaveEditedValuesAsync(wbDef, formsDir, sourcePath);
+
+                byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(result.WorkbookPath);
+                string safeFileName = SanitizeFileName(wbDef.Info?.Title ?? "edited") + ".xlsx";
 
                 _logger.LogInformation(
-                    "Output Excel generated: {SheetCount} sheet(s), {ClusterCount} cluster(s), {Size} bytes. Returning as direct download: {FileName}",
-                    form.Sheets.Count, form.Clusters.Count, fileBytes.Length, safeFileName);
+                    "Edited workbook saved: {CellsWritten} cells, {Size} bytes. Download: {FileName}",
+                    result.CellsWritten, fileBytes.Length, safeFileName);
+
+                // Add validation results as a response header for the frontend
+                if (result.ValidationResult != null)
+                {
+                    var validationJson = System.Text.Json.JsonSerializer.Serialize(new
+                    {
+                        passed = result.ValidationResult.Passed,
+                        cellsWritten = result.CellsWritten,
+                        sheetCountChanged = result.ValidationResult.SheetCountChanges,
+                        styleChanges = result.ValidationResult.StyleChanges,
+                        mergeChanges = result.ValidationResult.MergeChanges,
+                        pageSetupChanges = result.ValidationResult.PageSetupChanges,
+                        formulaChanges = result.ValidationResult.FormulaChanges,
+                        namedRangeChanges = result.ValidationResult.DefinedNameChanges,
+                        editableValueChanges = result.ValidationResult.EditableValueChanges,
+                        totalDiffs = result.ValidationResult.TotalDifferences
+                    });
+                    var encoded = Convert.ToBase64String(
+                        System.Text.Encoding.UTF8.GetBytes(validationJson));
+                    Response.Headers.Append("X-Validation-Results", encoded);
+                }
+
+                _logger.LogInformation("========== SAVE PIPELINE END ==========");
 
                 return File(
                     fileBytes,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     safeFileName);
             }
-            catch (Exception ex)
+            catch (WorkbookFidelityException fidelityEx)
             {
-                _logger.LogError(ex, "Failed to generate Output Excel");
-                return StatusCode(500, new ApiErrorResponse
+                _logger.LogError("VALIDATION FAILED: {Message}", fidelityEx.Message);
+
+                var validationData = new
                 {
-                    Message = $"Failed to generate Output Excel: {ex.Message}",
-                    ErrorCode = ErrorCodes.InternalError
+                    passed = false,
+                    totalStructuralDifferences = fidelityEx.ValidationResult.TotalDifferences,
+                    sheetCountChanged = fidelityEx.ValidationResult.SheetCountChanges,
+                    styleChanges = fidelityEx.ValidationResult.StyleChanges,
+                    fontChanges = fidelityEx.ValidationResult.FontChanges,
+                    fillChanges = fidelityEx.ValidationResult.FillChanges,
+                    borderChanges = fidelityEx.ValidationResult.BorderChanges,
+                    alignmentChanges = fidelityEx.ValidationResult.AlignmentChanges,
+                    numberFormatChanges = fidelityEx.ValidationResult.NumberFormatChanges,
+                    mergeChanges = fidelityEx.ValidationResult.MergeChanges,
+                    printSetupChanges = fidelityEx.ValidationResult.PageSetupChanges,
+                    pageMarginChanges = fidelityEx.ValidationResult.PageMarginChanges,
+                    freezePaneChanges = fidelityEx.ValidationResult.FreezePaneChanges,
+                    rowHeightChanges = fidelityEx.ValidationResult.RowHeightChanges,
+                    columnWidthChanges = fidelityEx.ValidationResult.ColumnWidthChanges,
+                    hiddenRowChanges = fidelityEx.ValidationResult.HiddenRowChanges,
+                    hiddenColumnChanges = fidelityEx.ValidationResult.HiddenColumnChanges,
+                    drawingChanges = fidelityEx.ValidationResult.DrawingChanges,
+                    imageChanges = fidelityEx.ValidationResult.ImageChanges,
+                    commentChanges = fidelityEx.ValidationResult.CommentChanges,
+                    hyperlinkChanges = fidelityEx.ValidationResult.HyperlinkChanges,
+                    dataValidationChanges = fidelityEx.ValidationResult.DataValidationChanges,
+                    conditionalFormattingChanges = fidelityEx.ValidationResult.ConditionalFormattingChanges,
+                    formulaChanges = fidelityEx.ValidationResult.FormulaChanges,
+                    definedNameChanges = fidelityEx.ValidationResult.DefinedNameChanges,
+                    editableValueChanges = fidelityEx.ValidationResult.EditableValueChanges,
+                    details = fidelityEx.ValidationResult.Details,
+                    rowEdits = fidelityEx.ValidationResult.EditableChangedCells
+                };
+
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = "Workbook fidelity validation failed. The edited workbook is not structurally identical to the original. No file has been returned.",
+                    validation = validationData
                 });
             }
-            finally
+            catch (Exception ex)
             {
-                // Clean up temp file
-                try { if (System.IO.File.Exists(tempPath)) System.IO.File.Delete(tempPath); } catch { }
+                _logger.LogError(ex, "Failed to save edited workbook");
+                return StatusCode(500, new ApiErrorResponse
+                {
+                    Message = $"Failed to save edited workbook: {ex.Message}",
+                    ErrorCode = ErrorCodes.InternalError
+                });
             }
         }
 
@@ -679,10 +743,8 @@ namespace ExcelAPI.Controllers
         /// <summary>
         /// Get the runtime form definition for a previously saved template.
         /// Uses Excel COM geometry from persisted .runtime.json (single source of truth).
-        /// Falls back to OpenXML coordinate pipeline only if COM metadata doesn't exist.
-        /// Returns JSON consumable by the Next.js frontend for the Yellow Editable Overlay.
         /// </summary>
-        /// <param name="templateId">Template ID / XLSX filename (without extension).</param>
+        /// <param name="templateId">Template ID / session ID / XLSX filename (without extension).</param>
         [HttpGet("runtime/{templateId}")]
         [ProducesResponseType(typeof(ApiResponse<RuntimeForm>), StatusCodes.Status200OK)]
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status404NotFound)]
@@ -690,11 +752,11 @@ namespace ExcelAPI.Controllers
         {
             try
             {
-                _logger.LogInformation("[RUNTIME] Stage 1: Looking for COM metadata for ID={TemplateId}", templateId);
+                _logger.LogInformation("[RUNTIME] Loading COM metadata for ID={TemplateId}", templateId);
 
                 string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
 
-                // Try COM metadata first — single source of truth for field coordinates
+                // Load COM metadata — single source of truth for field coordinates
                 var comRuntime = _runtimeGenerator.LoadMetadata(templateId, formsDir);
                 if (comRuntime != null)
                 {
@@ -710,58 +772,16 @@ namespace ExcelAPI.Controllers
                     });
                 }
 
-                // Fallback: OpenXML coordinate pipeline (legacy templates without .runtime.json)
-                _logger.LogInformation("[RUNTIME] Fallback: Finding template file for ID={TemplateId}", templateId);
-
-                string xlsxPath = FindTemplateFile(templateId);
-                if (xlsxPath == null)
+                _logger.LogWarning("[RUNTIME] No runtime metadata found for template {TemplateId}", templateId);
+                return NotFound(new ApiErrorResponse
                 {
-                    _logger.LogWarning("[RUNTIME] Template not found: {TemplateId}", templateId);
-                    return NotFound(new ApiErrorResponse
-                    {
-                        Message = $"Template not found: {templateId}",
-                        ErrorCode = ErrorCodes.InvalidRequest
-                    });
-                }
-
-                _logger.LogInformation("[RUNTIME] Fallback: Parsing workbook at {Path}", xlsxPath);
-                var workbook = _xmlParser.Parse(xlsxPath);
-
-                _logger.LogInformation("[RUNTIME] Fallback: Parsed {Count} sheet(s)", workbook.Sheets.Count);
-                if (workbook.Sheets.Count == 0)
-                {
-                    return NotFound(new ApiErrorResponse
-                    {
-                        Message = "No sheets found in workbook",
-                        ErrorCode = ErrorCodes.InvalidRequest
-                    });
-                }
-
-                _logger.LogInformation("[RUNTIME] Fallback: Loading runtime metadata for coordinate alignment");
-                var (originXPt, originYPt, actualScaleX, actualScaleY) = LoadRuntimeMetadata(templateId);
-
-                _logger.LogInformation(
-                    "[RUNTIME] Fallback: Using origin=({OX:F1},{OY:F1})pt scale=({SX:F6},{SY:F6})px/pt",
-                    originXPt, originYPt, actualScaleX, actualScaleY);
-
-                int dpi = actualScaleX > 0 ? (int)Math.Round(actualScaleX * 72.0) : 300;
-                var runtimeForm = _runtimeBuilder.Build(workbook, dpi, originXPt, originYPt);
-
-                _logger.LogInformation("[RUNTIME] Fallback: Runtime built — {SheetCount} sheet(s), {FieldCount} field(s)",
-                    runtimeForm.Sheets.Count,
-                    runtimeForm.Sheets.Sum(s => s.Fields.Count));
-
-                return Ok(new ApiResponse<RuntimeForm>
-                {
-                    Success = true,
-                    Message = $"Runtime form built: {runtimeForm.Sheets.Count} sheet(s), {runtimeForm.Sheets.Sum(s => s.Fields.Count)} field(s)",
-                    Data = runtimeForm
+                    Message = $"Runtime metadata not found for template: {templateId}. The template must be uploaded via POST /api/form/from-excel first.",
+                    ErrorCode = ErrorCodes.InvalidRequest
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[RUNTIME] FAILED at stage: {Message}\n{StackTrace}",
-                    ex.Message, ex.ToString());
+                _logger.LogError(ex, "[RUNTIME] FAILED: {Message}\n{StackTrace}", ex.Message, ex.ToString());
                 return StatusCode(500, new
                 {
                     success = false,
@@ -770,84 +790,6 @@ namespace ExcelAPI.Controllers
                     exceptionType = ex.GetType().FullName,
                     stackTrace = ex.ToString()
                 });
-            }
-        }
-
-        /// <summary>
-        /// Find a template XLSX file by ID, searching known directories.
-        /// </summary>
-        private string? FindTemplateFile(string templateId)
-        {
-            string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-            string uploadsDir = Path.Combine(_env.ContentRootPath, _options.Value.UploadDirectory);
-
-            // Try exact filename match
-            string[] searchDirs = [formsDir, uploadsDir];
-            foreach (var dir in searchDirs)
-            {
-                if (!Directory.Exists(dir)) continue;
-
-                var files = Directory.GetFiles(dir, "*.xlsx");
-                foreach (var file in files)
-                {
-                    string name = Path.GetFileNameWithoutExtension(file);
-                    if (string.Equals(name, templateId, StringComparison.OrdinalIgnoreCase))
-                        return file;
-                }
-            }
-
-            // Try prefix match (templateId might be a GUID prefix)
-            foreach (var dir in searchDirs)
-            {
-                if (!Directory.Exists(dir)) continue;
-
-                var files = Directory.GetFiles(dir, "*.xlsx");
-                foreach (var file in files)
-                {
-                    string name = Path.GetFileNameWithoutExtension(file);
-                    if (name.StartsWith(templateId, StringComparison.OrdinalIgnoreCase))
-                        return file;
-                }
-            }
-
-            return null;
-        }
-
-        /// <summary>
-        /// Loads runtime metadata using the legacy coordinate algorithm.
-        /// Returns origin offsets in points and actual pixel scales.
-        /// Falls back to (0,0,0,0) if no metadata file exists (legacy templates).
-        /// </summary>
-        private (double originXPt, double originYPt, double actualScaleX, double actualScaleY) LoadRuntimeMetadata(string templateId)
-        {
-            try
-            {
-                string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
-                string metaPath = Path.Combine(formsDir, $"{templateId}.meta.json");
-
-                if (!System.IO.File.Exists(metaPath))
-                {
-                    _logger.LogInformation("[RUNTIME] No metadata file found at {Path}, using defaults", metaPath);
-                    return (0, 0, 0, 0);
-                }
-
-                string json = System.IO.File.ReadAllText(metaPath);
-                using var doc = System.Text.Json.JsonDocument.Parse(json);
-                var root = doc.RootElement;
-
-                double printedOriginX = root.TryGetProperty("printedOriginX", out var ox) ? ox.GetDouble() : 0;
-                double printedOriginY = root.TryGetProperty("printedOriginY", out var oy) ? oy.GetDouble() : 0;
-                double actualScaleX = root.TryGetProperty("actualScaleX", out var sx) ? sx.GetDouble() : 0;
-                double actualScaleY = root.TryGetProperty("actualScaleY", out var sy) ? sy.GetDouble() : 0;
-
-                double originXPt = actualScaleX > 0 ? printedOriginX / actualScaleX : 0;
-                double originYPt = actualScaleY > 0 ? printedOriginY / actualScaleY : 0;
-
-                return (originXPt, originYPt, actualScaleX, actualScaleY);
-            }
-            catch
-            {
-                return (0, 0, 0, 0);
             }
         }
     }

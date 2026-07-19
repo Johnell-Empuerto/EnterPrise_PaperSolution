@@ -1,0 +1,61 @@
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\app.py:34: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event('startup')
+C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\app.py:40: DeprecationWarning: 
+        on_event is deprecated, use lifespan event handlers instead.
+
+        Read more about it in the
+        [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+        
+  @app.on_event('shutdown')
+INFO:     Started server process [3208]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:5091 (Press CTRL+C to quit)
+[queue] Render queue started
+[app] Render queue started
+[worker] Worker started, initializing Excel...
+[worker] Excel initialized and published to queue
+INFO:     127.0.0.1:57564 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50062 - "GET /health HTTP/1.1" 200 OK
+Traceback (most recent call last):
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\pdf_converter.py", line 63, in xlsx_to_pdf
+    wb = queue_excel.Workbooks.Open(os.path.abspath(xlsx_path))
+         ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\AppData\Roaming\Python\Python311\site-packages\win32com\client\dynamic.py", line 631, in __getattr__
+    raise AttributeError(f"{self._username_}.{attr}")
+AttributeError: Excel.Application.Workbooks
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\render_queue.py", line 260, in _process_job
+    job.result = job.fn(*job.args, **job.kwargs)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\renderer.py", line 131, in render_with_fields
+    return _fields_to_response(fields, wb, xlsx_path, template_id, output_dir, dpi)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\renderer.py", line 165, in _fields_to_response
+    pdf_path_for_dims = xlsx_to_pdf(xlsx_path, output_dir=tmp_dir)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\MCF-JOHNELLEEMPUERTO\Documents\Johnell\PaperLess Enterprise\render_service\pdf_converter.py", line 69, in xlsx_to_pdf
+    raise RuntimeError(f"Excel COM PDF export failed: {e}") from e
+RuntimeError: Excel COM PDF export failed: Excel.Application.Workbooks
+[upload] Reading cluster metadata from: C:\Users\MCF-JO~1\AppData\Local\Temp\ple_upload_7fmqyxj0\test.xlsx
+[queue] Job c9097c2c queued | size=1
+[worker] Processing read_fields | job=c9097c2c
+[worker] Completed read_fields | job=c9097c2c | wait=0ms | render=723ms
+[upload] Found 6 fields from workbook metadata
+[queue] Job c8376780 queued | size=1
+[worker] Processing render_with_fields | job=c8376780
+[renderer] Reading workbook: C:\Users\MCF-JO~1\AppData\Local\Temp\ple_upload_7fmqyxj0\test.xlsx
+[renderer] Using 6 externally provided field definitions
+[renderer] Converting to PDF via Excel COM (ExportAsFixedFormat)...
+[worker] FAILED render_with_fields | job=c8376780: Excel COM PDF export failed: Excel.Application.Workbooks
+[upload] Render failed: Excel COM PDF export failed: Excel.Application.Workbooks
+INFO:     127.0.0.1:53227 - "POST /upload HTTP/1.1" 500 Internal Server Error
+INFO:     127.0.0.1:57564 - "GET /health HTTP/1.1" 200 OK

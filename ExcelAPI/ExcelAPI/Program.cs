@@ -1,10 +1,6 @@
-﻿using ExcelAPI.LegacyEngine;
+using ExcelAPI.Application;
+using ExcelAPI.Designer.Legacy;
 using ExcelAPI.Models;
-using ExcelAPI.Services;
-using ExcelAPI.Services.Interfaces;
-using ExcelAPI.Generators;
-using ExcelAPI.Rendering;
-using ExcelAPI.Runtime;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -19,81 +15,26 @@ builder.Services.AddOpenApi();
 builder.Services.Configure<ExcelCaptureOptions>(
     builder.Configuration.GetSection(ExcelCaptureOptions.SectionName));
 
-// Register application services
-builder.Services.AddScoped<IExcelCaptureService, ExcelCaptureService>();
-builder.Services.AddScoped<ExcelCaptureService>();
-builder.Services.AddScoped<IFormSaveService, FormSaveService>();
-builder.Services.AddScoped<WorkbookReaderService>();
-builder.Services.AddScoped<XmlGenerator>();
-builder.Services.AddScoped<DatabaseGenerator>();
-builder.Services.AddScoped<WorkbookGenerator>();
-builder.Services.AddScoped<PreviewGenerator>();
-builder.Services.AddScoped<PdfGenerator>();
+// ─────────────────────────────────────────────────────
+// Module registrations (organized by architectural layer)
+// ─────────────────────────────────────────────────────
 
-// Register Phase 19 Legacy Engine (rebuild of original PaperLess publishing pipeline)
+// Designer — Excel COM-dependent services (Capture + Generation)
+builder.Services.AddDesigner();
+
+// Legacy Engine — reverse-engineered ConMas publishing pipeline (COM-bound)
 builder.Services.AddLegacyEngine(debugEnabled: true);
 
-// Register FormLess rendering core
-builder.Services.AddSingleton<OpenXmlParser>();
-builder.Services.AddSingleton<GeometryBuilder>();
-builder.Services.AddSingleton<PageGeometryResolver>();
-builder.Services.AddSingleton<MarginResolver>();
-builder.Services.AddSingleton<ScalingResolver>();
-builder.Services.AddSingleton<PrintLayoutEngine>();
-builder.Services.AddSingleton<CoordinateEngine>();
-builder.Services.AddSingleton<CellGeometryEngine>();
-builder.Services.AddSingleton<FillEngine>();
-builder.Services.AddSingleton<GridlineLayer>();
-builder.Services.AddSingleton<BorderEngine>();
+// Rendering — OpenXML parsing, SkiaSharp rendering pipeline (no COM)
+builder.Services.AddRendering();
 
-// Register IRenderLayer implementations (order = render order)
-builder.Services.AddSingleton<IRenderLayer, FillEngine>();
-builder.Services.AddSingleton<IRenderLayer, GridlineLayer>();
-builder.Services.AddSingleton<IRenderLayer, BorderEngine>();
-builder.Services.AddSingleton<IRenderLayer, TextEngine>();
+// Runtime — form building, field detection, serialization (no COM)
+builder.Services.AddRuntime();
 
-// Register Text Rendering Engine (Phase 11C / M4)
-builder.Services.AddSingleton<FontResolver>();
-builder.Services.AddSingleton<TextLayoutEngine>();
-builder.Services.AddSingleton<TextEngine>();
+// Application — shared services, generators, orchestration (no COM)
+builder.Services.AddApplication();
 
-// Register Style Resolution Engine (Phase 11E)
-builder.Services.AddSingleton<ThemeResolver>();
-builder.Services.AddSingleton<ColorResolver>();
-builder.Services.AddSingleton<StyleCache>();
-builder.Services.AddSingleton<StyleResolver>();
-
-// Register Image & Shape Engine (Phase 11F)
-builder.Services.AddSingleton<DrawingParser>();
-builder.Services.AddSingleton<ImageResolver>();
-builder.Services.AddSingleton<ImageEngine>();
-builder.Services.AddSingleton<ShapeResolver>();
-builder.Services.AddSingleton<ShapeEngine>();
-
-// Register IRenderLayer for images and shapes (Layer 5 = images, Layer 6 = shapes)
-builder.Services.AddSingleton<IRenderLayer, ImageEngine>();
-builder.Services.AddSingleton<IRenderLayer, ShapeEngine>();
-
-// Register Production Export Engine (Phase 11G)
-builder.Services.AddSingleton<ExportOptions>();
-builder.Services.AddSingleton<PageRenderer>();
-builder.Services.AddSingleton<ExportCoordinator>();
-
-// Register Form Runtime Engine (Phase 11I)
-builder.Services.AddSingleton<FieldTypeResolver>();
-builder.Services.AddSingleton<FieldDetector>();
-builder.Services.AddSingleton<FormRuntimeBuilder>();
-builder.Services.AddSingleton<RuntimeSerializer>();
-
-// Register CoordinateTransformer for printed page origin calculation (Phase 36)
-builder.Services.AddSingleton<CoordinateTransformer>();
-
-// Register COM Runtime Coordinate Generator (Phase 12)
-// Persists and loads Excel COM field rectangles as the single source of truth.
-// Eliminates OpenXML coordinate recalculation on every Runtime GET request.
-builder.Services.AddSingleton<RuntimeCoordinateGenerator>();
-
-// Register Python Rendering Service (Phase 47)
+// Python Rendering Service — HTTP client to external renderer
 // NOTE: Use ONLY AddHttpClient, NOT AddSingleton.
 // AddSingleton would override the typed HttpClient registration from
 // AddHttpClient, causing the client to use the default 100-second timeout
@@ -102,12 +43,6 @@ builder.Services.AddHttpClient<PythonRenderService>(client =>
 {
     client.Timeout = TimeSpan.FromMinutes(5);
 });
-
-// RendererCoordinator depends on IEnumerable<IRenderLayer>
-builder.Services.AddSingleton<RendererCoordinator>();
-
-// Register background cleanup service
-builder.Services.AddHostedService<PreviewCleanupService>();
 
 // Configure CORS to allow requests from the Next.js frontend
 builder.Services.AddCors(options =>

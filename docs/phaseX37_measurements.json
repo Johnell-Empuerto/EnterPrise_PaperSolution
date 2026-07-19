@@ -1,0 +1,116 @@
+{
+  "test1_snapshot": {
+    "excel_count": 4,
+    "processes": [
+      {
+        "pid": 8696,
+        "rss_mb": 32.21,
+        "handles": 1620,
+        "created": "15:54:01"
+      },
+      {
+        "pid": 21848,
+        "rss_mb": 31.32,
+        "handles": 1651,
+        "created": "15:17:51"
+      },
+      {
+        "pid": 23400,
+        "rss_mb": 11.73,
+        "handles": 657,
+        "created": "13:01:16"
+      },
+      {
+        "pid": 27740,
+        "rss_mb": 305.91,
+        "handles": 20646,
+        "created": "15:17:30"
+      }
+    ]
+  },
+  "test2_stability": {
+    "success": 10,
+    "failed": 0,
+    "iterations": 10,
+    "avg_time": 11.52,
+    "min_time": 7.211,
+    "max_time": 20.224,
+    "median": 13.027,
+    "p95": 20.224,
+    "p99": 20.224,
+    "all_timings": [
+      20.224,
+      14.743,
+      13.027,
+      7.211,
+      7.22,
+      7.307,
+      7.771,
+      7.771,
+      15.948,
+      13.975
+    ]
+  },
+  "test3_concurrency_2": {
+    "concurrent": 2,
+    "success": 2,
+    "failed": 0,
+    "avg_time": 14.347,
+    "wall_time": 14.372,
+    "excel_before": 4,
+    "excel_after": 4,
+    "excel_leaked": false
+  },
+  "test3_concurrency_5": {
+    "concurrent": 5,
+    "success": 1,
+    "failed": 4,
+    "avg_time": 6.856,
+    "wall_time": 11.343,
+    "excel_before": 4,
+    "excel_after": 4,
+    "excel_leaked": false
+  },
+  "test5a_nonexistent": {
+    "returned_error": true,
+    "excel_leaked": false
+  },
+  "test5b_corrupted": {
+    "returned_error": true,
+    "excel_leaked": false
+  },
+  "test5c_api_health": {
+    "healthy": true
+  },
+  "test5d_still_works": {
+    "works": true,
+    "excel_after": 4
+  },
+  "test6_temp_cleanup": {
+    "renders_executed": 3,
+    "ple_dirs_before": 0,
+    "ple_dirs_after": 0,
+    "pdfs_before": 1,
+    "pdfs_after": 1,
+    "pngs_before": 81,
+    "pngs_after": 81,
+    "ple_dirs_leaked": 0
+  },
+  "test8_formtest.xlsx": {
+    "sheet1_margins": "L=0.7, T=0.75",
+    "sheet2_printOptions": "H=1, V=1",
+    "sheet2_margins": "L=0.70866141732283472, T=0.74803149606299213",
+    "sheet2_pageSetup": "orient=portrait",
+    "has_print_area": true,
+    "sheet_count": 2
+  },
+  "test8_test_conmas_output.xlsx": {
+    "sheet1_margins": "L=0.7, T=0.75",
+    "sheet2_printOptions": "H=1, V=1",
+    "sheet2_margins": "L=0.70866141732283472, T=0.74803149606299213",
+    "sheet2_pageSetup": "orient=portrait",
+    "sheet3_margins": "L=0.7, T=0.75",
+    "has_print_area": true,
+    "sheet_count": 3
+  }
+}

@@ -7,6 +7,27 @@ import { useRuntimeState } from "@/components/Runtime";
 import { PaperlessDesigner } from "@/components/PaperlessDesigner";
 import type { FormDefinition, SheetDefinition, ClusterDefinition } from "@/types/formDefinition";
 
+// ── WorkbookDefinition type for save-edited flow (Phase 5.2) ──
+interface WbDefField {
+  cell: { address: string; rowIndex: number };
+  name: string;
+  type: string;
+  value: string | null;
+}
+
+interface WbDefSheet {
+  name: string;
+  index: number;
+  fields: WbDefField[];
+}
+
+interface WbDef {
+  info: { title: string };
+  sourceFileName: string;
+  sessionId: string;
+  sheets: WbDefSheet[];
+}
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5090";
 
 /**
@@ -105,100 +126,6 @@ function mapClusterType(type: string): RuntimeField["dataType"] {
   return "KeyboardText";
 }
 
-/**
- * Build a FormDefinition from the current RuntimeForm + runtime values for export.
- */
-function runtimeFormToFormDefinition(
-  runtimeForm: RuntimeForm,
-  fieldValues: Record<string, string | boolean | null>,
-  dpi: number,
-): FormDefinition {
-  const ptFactor = 72 / dpi;
-
-  return {
-    workbook: {
-      title: runtimeForm.title ?? runtimeForm.workbookName,
-      author: "",
-      created: new Date().toISOString(),
-      modified: new Date().toISOString(),
-      version: "1.0",
-      description: `Exported from PaperLess Designer: ${runtimeForm.workbookName}`,
-    },
-    sheets: runtimeForm.sheets.map((sheet, idx) => ({
-      id: `sheet_${idx}`,
-      name: sheet.name ?? `Page ${idx + 1}`,
-      index: idx,
-      pageSettings: {
-        paperSize: "Letter",
-        orientation: "portrait",
-        widthPt: Math.round(sheet.pageWidthPx * ptFactor),
-        heightPt: Math.round(sheet.pageHeightPx * ptFactor),
-        leftMargin: 70,
-        topMargin: 70,
-        rightMargin: 70,
-        bottomMargin: 70,
-        centerHorizontally: false,
-        centerVertically: false,
-        zoom: 100,
-        fitToPagesWide: 0,
-        fitToPagesTall: 0,
-      },
-      printArea: null,
-      backgroundImage: null,
-      backgroundWidth: sheet.pageWidthPx,
-      backgroundHeight: sheet.pageHeightPx,
-      thumbnail: null,
-      rowHeights: {},
-      columnWidths: {},
-      mergedCells: [],
-      freezePane: null,
-      cellStyles: {},
-      cellValues: (() => {
-        const vals: Record<string, string> = {};
-        for (const field of sheet.fields) {
-          const addr = field.cellReference.includes(":")
-            ? field.cellReference.split(":")[0]
-            : field.cellReference;
-          const val = fieldValues[field.id];
-          if (val !== null && val !== undefined && val !== "") {
-            vals[addr] = String(val);
-          }
-        }
-        return vals;
-      })(),
-      metadata: {},
-    })),
-    clusters: runtimeForm.sheets.flatMap((sheet, idx) =>
-      sheet.fields.map((field, fi) => ({
-        clusterId: field.id ?? `f${idx}_${fi}`,
-        name: field.name ?? field.id,
-        type: field.dataType ?? "KeyboardText",
-        sheetId: `sheet_${idx}`,
-        cellAddress: field.cellReference,
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        leftPt: Math.round(field.leftPx * ptFactor * 100) / 100,
-        topPt: Math.round(field.topPx * ptFactor * 100) / 100,
-        widthPt: Math.round(field.widthPx * ptFactor * 100) / 100,
-        heightPt: Math.round(field.heightPx * ptFactor * 100) / 100,
-        inputParameters: {},
-        visibility: "visible",
-        readonly: field.readOnly ?? false,
-        remarks: field.name ?? "",
-        functions: [],
-        metadata: {
-          isMerged: String(field.isMerged ?? false),
-          mergeAddress: field.mergeRange ?? "",
-        },
-      })),
-    ),
-    images: [],
-    metadata: { sourceFile: runtimeForm.workbookName },
-  };
-}
-
 function mapPreviewType(
   type: string,
 ):
@@ -240,6 +167,9 @@ export default function Home() {
 
   // ── Runtime state — manages field values ──
   const runtime = useRuntimeState();
+
+  // ── Session ID from upload — server owns the workbook, browser only tracks this ──
+  const [sessionId, setSessionId] = useState<string | null>(null);
 
   // ── Export state ──
   const [exporting, setExporting] = useState(false);
@@ -292,6 +222,11 @@ export default function Home() {
       }
 
       setTemplateName(uploadFile.name);
+
+      // Phase 5.2: Store sessionId — server owns the workbook
+      if (result.sessionId) {
+        setSessionId(result.sessionId);
+      }
 
       // Convert preview response to RuntimeForm format (multi-page)
       const pageList = result.pages ?? [];
@@ -379,6 +314,7 @@ export default function Home() {
     setUploadFile(null);
     setUploading(false);
     setUploadError(null);
+    setSessionId(null);
     runtime.reset();
     setRuntimeForm(null);
     if (fileInputRef.current) {
@@ -420,6 +356,11 @@ export default function Home() {
       setTemplateName(file.name);
       runtime.reset();
 
+      // Phase 5.2: Store sessionId — server owns the workbook
+      if (result.data?.sessionId) {
+        setSessionId(result.data.sessionId);
+      }
+
       // Convert FormDefinition → RuntimeForm and set it
       const converted = formDefinitionToRuntimeForm(fd, file.name);
 
@@ -449,10 +390,41 @@ export default function Home() {
     }
   }, [runtime, setRuntimeForm]);
 
-  // ── Export Excel handler — POST /api/form/output-excel → direct browser download ──
-  const handleExportExcel = useCallback(async () => {
-    if (!runtimeForm) {
-      setExportError("No form loaded.");
+  // ── Convert RuntimeForm → WorkbookDefinition for save-edited flow (Phase 5.2) ──
+  const runtimeFormToWorkbookDefinition = useCallback((
+    form: RuntimeForm,
+    values: Record<string, string | boolean | null>,
+    sid: string,
+  ): WbDef => {
+    return {
+      info: { title: form.workbookName ?? "Untitled" },
+      sourceFileName: sid,
+      sessionId: sid,
+      sheets: form.sheets.map((sheet, si) => ({
+        name: sheet.name ?? `Page ${si + 1}`,
+        index: si,
+        fields: sheet.fields
+          .filter(f => {
+            const val = values[f.id];
+            return val !== null && val !== undefined && val !== "";
+          })
+          .map(f => ({
+            cell: {
+              address: f.cellReference?.split(":")[0] ?? "A1",
+              rowIndex: parseInt(f.cellReference?.match(/\d+/)?.[0] ?? "1"),
+            },
+            name: f.name ?? f.id,
+            type: f.dataType ?? "KeyboardText",
+            value: String(values[f.id] ?? ""),
+          })),
+      })),
+    };
+  }, []);
+
+  // ── Save edited — POST /api/form/save-edited → WorkbookValueWriter (Phase 5.2) ──
+  const handleSaveEdited = useCallback(async () => {
+    if (!runtimeForm || !sessionId) {
+      setExportError(sessionId ? "No form loaded." : "No session found. Please upload the workbook first.");
       return;
     }
 
@@ -461,19 +433,17 @@ export default function Home() {
     setExportSuccess(null);
 
     try {
-      const formDef = runtimeFormToFormDefinition(runtimeForm, runtime.values, 300);
+      const wbDef = runtimeFormToWorkbookDefinition(runtimeForm, runtime.values, sessionId);
 
-      const response = await fetch(`${API_BASE_URL}/api/form/output-excel`, {
+      const response = await fetch(`${API_BASE_URL}/api/form/save-edited`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formDef),
+        body: JSON.stringify(wbDef),
       });
 
-      // Check if the response is JSON (error) or binary (success)
       const contentType = response.headers.get("content-type") ?? "";
 
       if (!response.ok || contentType.includes("application/json")) {
-        // Error response — parse JSON for the error message
         let errorMsg = `HTTP ${response.status}: ${response.statusText}`;
         try {
           const errResult = await response.clone().json();
@@ -482,18 +452,24 @@ export default function Home() {
         throw new Error(errorMsg);
       }
 
-      // Success — response is the workbook binary directly
-      const blob = await response.blob();
+      // Log validation results from response header
+      const validationHeader = response.headers.get("X-Validation-Results");
+      if (validationHeader) {
+        try {
+          const validation = JSON.parse(atob(validationHeader));
+          console.log("[SAVE-EDITED] Workbook validation results:", validation);
+        } catch {}
+      }
 
-      // Extract filename from Content-Disposition header, or use a default
+      // Download the workbook
+      const blob = await response.blob();
       const disposition = response.headers.get("content-disposition") ?? "";
-      let fileName = `${runtimeForm.workbookName.replace(/\.\w+$/, "")}_output.xlsx`;
+      let fileName = `${runtimeForm.workbookName.replace(/\.\w+$/, "")}_edited.xlsx`;
       const match = disposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
       if (match && match[1]) {
         fileName = match[1].replace(/['"]/g, "");
       }
 
-      // Trigger browser download
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = blobUrl;
@@ -503,14 +479,30 @@ export default function Home() {
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
 
-      setExportSuccess("Workbook exported successfully!");
+      setExportSuccess("Workbook saved successfully! Values written into original workbook.");
+      runtime.markAllClean();
       setTimeout(() => setExportSuccess(null), 3000);
     } catch (err) {
-      setExportError(err instanceof Error ? err.message : "Export failed");
+      setExportError(err instanceof Error ? err.message : "Save failed");
     } finally {
       setExporting(false);
     }
-  }, [runtimeForm, runtime.values]);
+  }, [runtimeForm, runtime.values, sessionId, runtimeFormToWorkbookDefinition, runtime]);
+
+  // ── Export Excel handler — Phase 5.2: save-edited is the ONLY path ──
+  const handleExportExcel = useCallback(async () => {
+    if (!runtimeForm) {
+      setExportError("No form loaded.");
+      return;
+    }
+
+    if (!sessionId) {
+      setExportError("No session found. Please upload the workbook first.");
+      return;
+    }
+
+    return handleSaveEdited();
+  }, [runtimeForm, sessionId, handleSaveEdited]);
 
   // ── Hidden file input for the Upload Excel button ──
   const handleUploadExcelFileSelected = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

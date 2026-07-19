@@ -5,6 +5,7 @@ namespace ExcelAPI.Models
         public WorkbookMetadata Workbook { get; set; } = new();
         public List<SheetDefinition> Sheets { get; set; } = new();
         public List<ClusterDefinition> Clusters { get; set; } = new();
+        public PageSettings? FieldsPageSettings { get; set; }
         public List<ImageDefinition> Images { get; set; } = new();
         public Dictionary<string, string> Metadata { get; set; } = new();
     }

@@ -1,0 +1,326 @@
+{
+  "Test1_Inputs": {
+    "pass": true
+  },
+  "Test2_Comparisons": [
+    {
+      "page": 1,
+      "dims": "2550x3300",
+      "max": 56.0,
+      "avg": 0.0007,
+      "diff2": 177,
+      "pct": 0.000701
+    },
+    {
+      "page": 2,
+      "dims": "2550x3300",
+      "max": 255.0,
+      "avg": 4.9635,
+      "diff2": 675936,
+      "pct": 2.677504
+    },
+    {
+      "page": 3,
+      "dims": "2550x3300",
+      "max": 255.0,
+      "avg": 5.0444,
+      "diff2": 679062,
+      "pct": 2.689887
+    },
+    {
+      "page": 4,
+      "dims": "2550x3300",
+      "max": 255.0,
+      "avg": 2.8419,
+      "diff2": 377424,
+      "pct": 1.495045
+    },
+    {
+      "page": 5,
+      "dims": "2550x3300",
+      "max": 255.0,
+      "avg": 1.7223,
+      "diff2": 224532,
+      "pct": 0.889412
+    },
+    {
+      "page": 6,
+      "dims": "2550x3300",
+      "max": 255.0,
+      "avg": 1.9681,
+      "diff2": 257607,
+      "pct": 1.020428
+    },
+    {
+      "page": "G2vG1",
+      "dims": "2550x3300",
+      "max": 0.0,
+      "avg": 0.0,
+      "diff2": 0,
+      "pct": 0.0
+    },
+    {
+      "page": "OrigvCM",
+      "dims": "2550x3300",
+      "max": 0.0,
+      "avg": 0.0,
+      "diff2": 0,
+      "pct": 0.0
+    }
+  ],
+  "Test3_Overlay": [
+    {
+      "page": 1,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    },
+    {
+      "page": 2,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    },
+    {
+      "page": 3,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    },
+    {
+      "page": 4,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    },
+    {
+      "page": 5,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    },
+    {
+      "page": 6,
+      "left.px": 0,
+      "right.px": 0,
+      "top.px": 0,
+      "bottom.px": 0,
+      "left.mm": 0.0,
+      "right.mm": 0.0,
+      "top.mm": 0.0,
+      "bottom.mm": 0.0,
+      "pass": true
+    }
+  ],
+  "Test4_Geometry": {
+    "Original": {
+      "dim": "A1:D12",
+      "merge": "5",
+      "ch": "1",
+      "cv": "1",
+      "m_left": 51.02,
+      "m_right": 51.02,
+      "m_top": 53.86,
+      "m_bottom": 53.86,
+      "m_header": 22.68,
+      "m_footer": 22.68,
+      "orient": "portrait",
+      "names": [
+        "Sheet1!$A$1:$D$12"
+      ],
+      "row_count": 9,
+      "col_count": 0
+    },
+    "ConMas": {
+      "dim": "A1:D12",
+      "merge": "5",
+      "ch": "1",
+      "cv": "1",
+      "m_left": 51.02,
+      "m_right": 51.02,
+      "m_top": 53.86,
+      "m_bottom": 53.86,
+      "m_header": 22.68,
+      "m_footer": 22.68,
+      "orient": "portrait",
+      "names": [
+        "Sheet1!$A$1:$D$12"
+      ],
+      "row_count": 9,
+      "col_count": 0
+    },
+    "Generated1": {
+      "dim": "A1:D12",
+      "merge": "5",
+      "ch": "1",
+      "cv": "1",
+      "m_left": 51.02,
+      "m_right": 51.02,
+      "m_top": 53.86,
+      "m_bottom": 53.86,
+      "m_header": 21.6,
+      "m_footer": 21.6,
+      "orient": "portrait",
+      "names": [
+        "Sheet1!$A$1:$D$12"
+      ],
+      "row_count": 12,
+      "col_count": 0
+    },
+    "Generated2": {
+      "dim": "A1:D12",
+      "merge": "5",
+      "ch": "1",
+      "cv": "1",
+      "m_left": 51.02,
+      "m_right": 51.02,
+      "m_top": 53.86,
+      "m_bottom": 53.86,
+      "m_header": 21.6,
+      "m_footer": 21.6,
+      "orient": "portrait",
+      "names": [
+        "Sheet1!$A$1:$D$12"
+      ],
+      "row_count": 12,
+      "col_count": 0
+    }
+  },
+  "Test5_Content": {
+    "note": "pytesseract not available - quadrant analysis only",
+    "avg_deviation": 0.0007
+  },
+  "Test6_Artifacts": [
+    {
+      "page": 1,
+      "noise": 13,
+      "sig": 9,
+      "h_streaks": 0,
+      "v_streaks": 0,
+      "class": "COSMETIC"
+    },
+    {
+      "page": 2,
+      "noise": 6470,
+      "sig": 196728,
+      "h_streaks": 125,
+      "v_streaks": 0,
+      "class": "MAJOR"
+    },
+    {
+      "page": 3,
+      "noise": 6274,
+      "sig": 198599,
+      "h_streaks": 109,
+      "v_streaks": 0,
+      "class": "MAJOR"
+    },
+    {
+      "page": 4,
+      "noise": 3332,
+      "sig": 111354,
+      "h_streaks": 52,
+      "v_streaks": 0,
+      "class": "MAJOR"
+    },
+    {
+      "page": 5,
+      "noise": 1804,
+      "sig": 66560,
+      "h_streaks": 24,
+      "v_streaks": 0,
+      "class": "MAJOR"
+    },
+    {
+      "page": 6,
+      "noise": 2062,
+      "sig": 76505,
+      "h_streaks": 16,
+      "v_streaks": 0,
+      "class": "MAJOR"
+    }
+  ],
+  "Test7_Idempotency": {
+    "Generated1": {
+      "max": 0.0,
+      "avg": 0.0,
+      "identical": true
+    },
+    "Generated2": {
+      "max": 0.0,
+      "avg": 0.0,
+      "identical": true
+    }
+  },
+  "Test8_Performance": {
+    "excel_processes": [
+      {
+        "pid": 8696,
+        "name": "EXCEL.EXE",
+        "age_sec": 399.1
+      },
+      {
+        "pid": 21848,
+        "name": "EXCEL.EXE",
+        "age_sec": 2568.9
+      },
+      {
+        "pid": 23400,
+        "name": "ExcelAPI.exe",
+        "age_sec": 10764.3
+      },
+      {
+        "pid": 27240,
+        "name": "EXCEL.EXE",
+        "age_sec": 394.9
+      },
+      {
+        "pid": 27740,
+        "name": "EXCEL.EXE",
+        "age_sec": 2590.8
+      }
+    ],
+    "xlsx_Original": 12830,
+    "xlsx_ConMas": 16784,
+    "xlsx_Generated1": 19221,
+    "xlsx_Generated2": 19123,
+    "pdf_Original": 5838,
+    "pdf_ConMas": 44510,
+    "pdf_Generated1": 47297,
+    "pdf_Generated2": 47297,
+    "png_Original": 35879,
+    "png_ConMas": 35879,
+    "png_Generated1": 36179,
+    "png_Generated2": 36179
+  }
+}

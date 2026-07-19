@@ -1,7 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using ExcelAPI.Models;
-using ExcelAPI.Services;
+using ExcelAPI.Application;
+using ExcelAPI.Designer.Capture;
 using ExcelAPI.Runtime;
 
 namespace ExcelAPI.Controllers
@@ -103,9 +104,14 @@ namespace ExcelAPI.Controllers
                     System.IO.File.Move(filePath, persistentPath, overwrite: true);
                 }
 
-                // Persist runtime metadata for the existing /api/form/runtime/{id} endpoint
+                // Persist runtime metadata using WorkbookDefinition path (Phase 3.6)
+                // SaveFromWbDef prefers InternalWorkbookDefinition when available.
+                // Falls back to legacy CaptureResult path for pre-WbDef templates.
                 string bgUrl = $"/preview/page_{templateId}.png";
-                _runtimeGenerator.SaveMetadata(captureResult, templateId, formsDir, file.FileName, bgUrl);
+                int pageW = captureResult.Page?.Width ?? 0;
+                int pageH = captureResult.Page?.Height ?? 0;
+                _runtimeGenerator.SaveFromWbDef(captureResult, templateId, formsDir, file.FileName,
+                    pageW, pageH, bgUrl);
 
                 // Build the clean response model
                 var response = BuildResponse(captureResult, templateId, file.FileName);

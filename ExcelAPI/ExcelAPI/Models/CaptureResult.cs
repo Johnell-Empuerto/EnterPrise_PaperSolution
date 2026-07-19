@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace ExcelAPI.Models
 {
     /// <summary>
@@ -17,5 +19,13 @@ namespace ExcelAPI.Models
 
         /// <summary>Page setup debug information for verifying coordinate alignment (temporary).</summary>
         public PageSetupDebug? PageSetup { get; set; }
+
+        /// <summary>
+        /// Canonical WorkbookDefinition produced during capture.
+        /// This is the internal source of truth — not serialized to API responses.
+        /// Migrating services should prefer this over raw Fields/PageSetup access.
+        /// </summary>
+        [JsonIgnore(Condition = JsonIgnoreCondition.Always)]
+        public WorkbookDefinition.WorkbookDefinition? InternalWorkbookDefinition { get; set; }
     }
 }

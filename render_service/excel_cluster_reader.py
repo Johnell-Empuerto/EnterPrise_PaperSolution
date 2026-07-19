@@ -82,13 +82,36 @@ def read_fields(xlsx_path: str) -> list[FieldDef]:
     Uses the proven coordinate pipeline for ratio computation so the
     resulting FieldDef objects match the database schema exactly.
 
+    Phase X.38: When the global RenderQueue has a persistent Excel instance,
+    this function uses it (no new Excel created).  Otherwise falls back to
+    creating its own Excel.Application (original behavior).
+
     Returns:
         List[FieldDef] compatible with the existing renderer.
     """
     import pythoncom
     import win32com.client
+    from render_service.render_queue import get_queue_excel
 
-    # Initialize COM for this thread (required in async contexts)
+    # ── Phase X.38: Use queue's persistent Excel if available ──────
+    queue_excel = get_queue_excel()
+    if queue_excel is not None:
+        wb = queue_excel.Workbooks.Open(os.path.abspath(xlsx_path))
+        try:
+            fields = _read_fields_sheet(wb, xlsx_path)
+            if fields:
+                return fields
+            fields = _read_comments(wb, xlsx_path)
+            if fields:
+                return fields
+            return []
+        finally:
+            try:
+                wb.Close(False)
+            except Exception:
+                pass
+
+    # ── Original behavior: create own Excel ────────────────────────
     pythoncom.CoInitialize()
     try:
         excel = win32com.client.Dispatch("Excel.Application")
@@ -96,17 +119,12 @@ def read_fields(xlsx_path: str) -> list[FieldDef]:
         excel.Visible = False
         try:
             wb = excel.Workbooks.Open(os.path.abspath(xlsx_path))
-
-            # ── Try primary source: hidden _Fields sheet ────────────────
             fields = _read_fields_sheet(wb, xlsx_path)
             if fields:
                 return fields
-
-            # ── Fallback: cell comments ─────────────────────────────────
             fields = _read_comments(wb, xlsx_path)
             if fields:
                 return fields
-
             return []
         finally:
             excel.Quit()
