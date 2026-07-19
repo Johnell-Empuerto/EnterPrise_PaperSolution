@@ -3,6 +3,7 @@ using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.Extensions.Logging;
 using WbDef = ExcelAPI.Models.WorkbookDefinition;
+using System.Security.Cryptography;
 
 namespace ExcelAPI.Application
 {
@@ -46,27 +47,34 @@ namespace ExcelAPI.Application
             // Copy the original workbook so we never modify the source
             System.IO.File.Copy(sourceXlsxPath, outputPath, overwrite: true);
 
-            // ── DIAGNOSTIC: Save original workbook.xml and styles.xml before OpenXml SDK touches them ──
-            // DocumentFormat.OpenXml is known to mutate workbook.xml (calcPr, bookViews, etc.)
-            // when opening in read-write mode, even if no workbook-level changes are made.
-            // We'll restore these after the SDK closes.
-            byte[] originalWorkbookXml = Array.Empty<byte>();
-            string partUriWorkbook = "xl/workbook.xml";
+            // ── DIAGNOSTIC: Save ALL original ZIP entries before OpenXml SDK touches them ──
+            // Phase 5.2.3: Comprehensive metadata preservation.
+            // DocumentFormat.OpenXml is known to mutate workbook.xml, styles.xml, theme,
+            // relationships, content types, and other parts when opening in read-write mode,
+            // even if no structural changes are made. We save every ZIP entry before the SDK
+            // opens the file, then restore all unmodified parts after the SDK closes.
+            //
+            // Intentionally modified entries (NOT restored):
+            //   - xl/worksheets/sheet*.xml  (cell values changed)
+            //   - xl/sharedStrings.xml      (new strings added)
+            var originalZipEntries = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
             try
             {
                 using var origPkg = System.IO.Compression.ZipFile.OpenRead(outputPath);
-                var wbEntry = origPkg.GetEntry("xl/workbook.xml");
-                if (wbEntry != null)
+                foreach (var entry in origPkg.Entries)
                 {
+                    var name = entry.FullName;
                     using var ms = new MemoryStream();
-                    wbEntry.Open().CopyTo(ms);
-                    originalWorkbookXml = ms.ToArray();
-                    _logger.LogInformation("[DIAG] Saved original workbook.xml ({Len} bytes)", originalWorkbookXml.Length);
+                    entry.Open().CopyTo(ms);
+                    originalZipEntries[name] = ms.ToArray();
                 }
+                _logger.LogInformation("[PRESERVE] Saved {Count} original ZIP entries before SDK", originalZipEntries.Count);
+                foreach (var kvp in originalZipEntries.OrderBy(k => k.Key))
+                    _logger.LogInformation("  Saved entry: {Name} ({Len} bytes)", kvp.Key, kvp.Value.Length);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "[DIAG] Could not pre-save workbook.xml");
+                _logger.LogWarning(ex, "[PRESERVE] Could not pre-save ZIP entries");
             }
 
             int totalCellsWritten = 0;
@@ -325,57 +333,149 @@ namespace ExcelAPI.Application
                 _logger.LogWarning(ex, "[DIAG] Post-write verification failed");
             }
 
-            // ── RESTORE: Put back the original workbook.xml ──
-            // The OpenXml SDK mutates workbook.xml (calcPr, bookViews, etc.) even when
-            // no workbook-level changes are made. We restore the original to prevent
-            // WorkbookDiffValidator from flagging WorkbookXmlChanges.
-            if (originalWorkbookXml.Length > 0)
+            // ── SHA256 DIAGNOSTIC: Log workbook.xml hashes before restore ──
+            // Phase 5.2.4: Log original hash, current (SDK-mutated) hash before restore,
+            // and final hash after restore to verify restore succeeded.
             {
+                byte[] origWbXml = originalZipEntries.TryGetValue("xl/workbook.xml", out var owb) ? owb : Array.Empty<byte>();
+                string origHash = origWbXml.Length > 0 ? ComputeSha256ForLogging(origWbXml) : "(no original)";
+                string beforeHash = "(unavailable)";
                 try
                 {
-                    // Read the current (SDK-modified) workbook.xml
-                    byte[] currentWorkbookXml;
-                    using (var pkg = System.IO.Compression.ZipFile.OpenRead(outputPath))
+                    using var prePkg = System.IO.Compression.ZipFile.OpenRead(outputPath);
+                    var preEntry = prePkg.GetEntry("xl/workbook.xml");
+                    if (preEntry != null)
                     {
-                        var entry = pkg.GetEntry("xl/workbook.xml");
-                        if (entry != null)
+                        using var ms = new MemoryStream();
+                        preEntry.Open().CopyTo(ms);
+                        beforeHash = ComputeSha256ForLogging(ms.ToArray());
+                    }
+                }
+                catch { }
+                _logger.LogInformation("[SHA256] workbook.xml before restore: original={Orig}, current={Before}", origHash, beforeHash);
+            }
+
+            // ── RESTORE: Put back ALL original ZIP entries except intentionally modified ones ──
+            // Phase 5.2.3: Comprehensive metadata preservation.
+            // The OpenXml SDK mutates many parts (workbook.xml, styles.xml, theme,
+            // relationships, content types, etc.) even when no structural changes are made.
+            // We restore every original byte to prevent WorkbookDiffValidator from flagging
+            // false positives.
+            //
+            // Entries NOT restored (intentionally modified):
+            //   - xl/worksheets/sheet*.xml  (cell values changed)
+            //   - xl/sharedStrings.xml      (new strings added)
+            if (originalZipEntries.Count > 0)
+            {
+                int restoredCount = 0;
+                int unchangedCount = 0;
+                int skippedModified = 0;
+                bool workbookXmlWasRestored = false;
+
+                try
+                {
+                    using var pkg = System.IO.Compression.ZipFile.Open(outputPath, System.IO.Compression.ZipArchiveMode.Update);
+
+                    foreach (var kvp in originalZipEntries.OrderBy(e => e.Key))
+                    {
+                        string entryName = kvp.Key;
+                        byte[] originalBytes = kvp.Value;
+
+                        // Skip entries that were intentionally modified
+                        bool isWorksheet = entryName.StartsWith("xl/worksheets/sheet", StringComparison.OrdinalIgnoreCase);
+                        bool isSharedStrings = entryName.Equals("xl/sharedstrings.xml", StringComparison.OrdinalIgnoreCase)
+                            || entryName.Equals("xl/sharedStrings.xml", StringComparison.OrdinalIgnoreCase);
+                        if (isWorksheet || isSharedStrings)
+                        {
+                            skippedModified++;
+                            _logger.LogInformation("[RESTORE] Skipped '{Name}' — intentionally modified", entryName);
+                            continue;
+                        }
+
+                        // Get current bytes from the edited zip
+                        var currentEntry = pkg.GetEntry(entryName);
+                        byte[] currentBytes;
+                        if (currentEntry != null)
                         {
                             using var ms = new MemoryStream();
-                            entry.Open().CopyTo(ms);
-                            currentWorkbookXml = ms.ToArray();
+                            currentEntry.Open().CopyTo(ms);
+                            currentBytes = ms.ToArray();
                         }
                         else
                         {
-                            currentWorkbookXml = originalWorkbookXml;
+                            currentBytes = Array.Empty<byte>();
+                        }
+
+                        // Compare — only restore if actually different
+                        if (currentBytes.Length != originalBytes.Length ||
+                            !currentBytes.AsSpan().SequenceEqual(originalBytes.AsSpan()))
+                        {
+                            // Replace with original
+                            if (currentEntry != null)
+                            {
+                                currentEntry.Delete();
+                            }
+                            var newEntry = pkg.CreateEntry(entryName);
+                            using var writer = newEntry.Open();
+                            writer.Write(originalBytes, 0, originalBytes.Length);
+                            restoredCount++;
+                            _logger.LogInformation("[RESTORE] Restored '{Name}' ({Len} bytes)", entryName, originalBytes.Length);
+                            if (entryName.Equals("xl/workbook.xml", StringComparison.OrdinalIgnoreCase))
+                                workbookXmlWasRestored = true;
+                        }
+                        else
+                        {
+                            unchangedCount++;
+                            _logger.LogInformation("[RESTORE] Unchanged '{Name}' ({Len} bytes) — no restore needed", entryName, originalBytes.Length);
                         }
                     }
 
-                    // Compare — only restore if actually different
-                    if (!currentWorkbookXml.AsSpan().SequenceEqual(originalWorkbookXml.AsSpan()))
-                    {
-                        // Replace workbook.xml with original
-                        using var pkg = System.IO.Compression.ZipFile.Open(outputPath, System.IO.Compression.ZipArchiveMode.Update);
-                        var wbEntry = pkg.GetEntry("xl/workbook.xml");
-                        if (wbEntry != null)
-                        {
-                            wbEntry.Delete();
-                            var newEntry = pkg.CreateEntry("xl/workbook.xml");
-                            using var writer = newEntry.Open();
-                            writer.Write(originalWorkbookXml, 0, originalWorkbookXml.Length);
-                            _logger.LogInformation("[RESTORE] Restored original workbook.xml ({Len} bytes) — SDK mutation prevented", originalWorkbookXml.Length);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogInformation("[RESTORE] workbook.xml unchanged — no restoration needed");
-                    }
+                    _logger.LogInformation("[RESTORE] Summary: {Restored} restored, {Unchanged} unchanged, {Skipped} skipped (intentionally modified). workbook.xml restored={WbXml}",
+                        restoredCount, unchangedCount, skippedModified, workbookXmlWasRestored ? "YES" : "NO — check if it was unchanged or missing");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "[RESTORE] Could not restore original workbook.xml");
+                    _logger.LogWarning(ex, "[RESTORE] Could not restore original ZIP entries");
                 }
             }
 
+            // ── SHA256 DIAGNOSTIC: Log workbook.xml hash AFTER restore ──
+            // Verify the restore actually succeeded by comparing final hash vs original hash.
+            {
+                byte[] origWbXml = originalZipEntries.TryGetValue("xl/workbook.xml", out var owb) ? owb : Array.Empty<byte>();
+                string origHash = origWbXml.Length > 0 ? ComputeSha256ForLogging(origWbXml) : "(no original)";
+                string afterHash = "(unavailable)";
+                try
+                {
+                    using var postPkg = System.IO.Compression.ZipFile.OpenRead(outputPath);
+                    var postEntry = postPkg.GetEntry("xl/workbook.xml");
+                    if (postEntry != null)
+                    {
+                        using var ms = new MemoryStream();
+                        postEntry.Open().CopyTo(ms);
+                        afterHash = ComputeSha256ForLogging(ms.ToArray());
+                    }
+                }
+                catch { }
+                bool hashesMatch = origHash == afterHash;
+                _logger.LogInformation("[SHA256] workbook.xml after restore: original={Orig}, final={After}, match={Match}",
+                    origHash, afterHash, hashesMatch ? "YES ✅" : "NO ❌");
+                if (!hashesMatch && origWbXml.Length > 0)
+                    _logger.LogWarning("[SHA256] workbook.xml RESTORE FAILED! Original hash does not match final hash.");
+            }
+
+            // ── PIPELINE ORDERING VERIFICATION (Phase 5.2.4, Step 3) ──
+            // After this point, NO code should write back into the ZIP.
+            // The restore step is the LAST operation that modifies the output file.
+            // Pipeline order:
+            //   1. File.Copy(source, output) — copy original
+            //   2. Pre-save ZIP entries (originalZipEntries) — read all original bytes
+            //   3. SpreadsheetDocument.Open(output, true) — SDK opens & modifies
+            //   4. Write cell values (intentionally modifies worksheets + shared strings)
+            //   5. SpreadsheetDocument.Dispose — SDK writes its version to disk
+            //   6. RestoreOriginalEntries (ZIP loop) — overwrites SDK-mutated entries with originals
+            //   7. SHA256 verification (post-restore) — verifies restore succeeded
+            //   8. [HERE] — logging and return only. No writes to output ZIP after this point.
             _logger.LogInformation("========== WRITE VALUES END ==========");
             _logger.LogInformation("Summary: {Total} cells written to {Output}", totalCellsWritten, outputPath);
             _logger.LogInformation("  Fields received (total): {FTotal}", totalFieldsReceived);
@@ -436,6 +536,16 @@ namespace ExcelAPI.Application
         {
             return field.Type == WbDef.FieldType.Number
                 || field.Type == WbDef.FieldType.Calculated;
+        }
+
+        /// <summary>
+        /// Compute SHA256 hex string for diagnostic logging.
+        /// </summary>
+        private static string ComputeSha256ForLogging(byte[] data)
+        {
+            using var sha = SHA256.Create();
+            var hash = sha.ComputeHash(data);
+            return BitConverter.ToString(hash).Replace("-", "").ToLowerInvariant();
         }
     }
 }

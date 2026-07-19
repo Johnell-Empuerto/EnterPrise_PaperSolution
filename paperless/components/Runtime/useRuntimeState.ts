@@ -13,6 +13,7 @@ export interface RuntimeState {
   reset: () => void;
   exportJson: () => string;
   isDirty: () => boolean;
+  markAllClean: () => void;
 }
 
 /**
@@ -59,6 +60,10 @@ export function useRuntimeState(): RuntimeState {
     return store.getState().isDirty();
   }, [store]);
 
+  const markAllClean = useCallback(() => {
+    store.getState().markAllClean();
+  }, [store]);
+
   return {
     values,
     dirty,
@@ -67,5 +72,6 @@ export function useRuntimeState(): RuntimeState {
     reset,
     exportJson,
     isDirty,
+    markAllClean,
   };
 }

@@ -1015,7 +1015,9 @@ namespace ExcelAPI.Application
                 }
             }
 
-            // Workbook.xml root element
+            // Workbook.xml root element — ELEMENT-BY-ELEMENT XPath Comparison
+            // Phase 5.2.4: Instead of comparing the entire XML blob, we compare
+            // each child element individually and log the EXACT XPath of any difference.
             var origWbXml = origWbPart.Workbook;
             var editWbXml = editWbPart.Workbook;
             var origWbClone = origWbXml?.CloneNode(true) as Workbook;
@@ -1029,11 +1031,31 @@ namespace ExcelAPI.Application
                 origWbClone.RemoveAllChildren<WorkbookProtection>();
                 editWbClone.RemoveAllChildren<WorkbookProtection>();
 
-                if (!XmlEquals(origWbClone, editWbClone))
+                // Phase 5.2.4: Element-by-element comparison with XPath logging
+                var origChildren = origWbClone.ChildElements.ToList();
+                var editChildren = editWbClone.ChildElements.ToList();
+
+                bool anyWbDiff = false;
+                int maxChildren = Math.Max(origChildren.Count, editChildren.Count);
+                for (int ci = 0; ci < maxChildren; ci++)
                 {
-                    result.WorkbookXmlChanges++;
-                    result.Details.Add($"Workbook.xml (non-sheet content) differs\n  Orig: {FormatXmlSnippet(origWbClone.OuterXml)}\n  Edit: {FormatXmlSnippet(editWbClone.OuterXml)}");
+                    string xpath = "/workbook/" + (ci < origChildren.Count ? origChildren[ci].LocalName
+                        : ci < editChildren.Count ? editChildren[ci].LocalName : $"child[{ci}]");
+                    string origOuter = ci < origChildren.Count ? origChildren[ci].OuterXml : "(missing)";
+                    string editOuter = ci < editChildren.Count ? editChildren[ci].OuterXml : "(missing)";
+
+                    if (origOuter != editOuter)
+                    {
+                        anyWbDiff = true;
+                        result.Details.Add($"Workbook.xml difference:\n" +
+                            $"  XPath: {xpath}\n" +
+                            $"  Original: {origOuter}\n" +
+                            $"  Edited:   {editOuter}");
+                    }
                 }
+
+                if (anyWbDiff)
+                    result.WorkbookXmlChanges++;
             }
 
             // External Links
