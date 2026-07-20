@@ -40,6 +40,19 @@ from CoordinateEngine.utils.file_utils import parse_range
 DPI = 300
 PT_TO_PX = DPI / 72.0
 
+# Phase 6.3: Legacy ConMas configuration sheet names
+# These worksheets contain designer metadata, NOT printable content.
+# They must be excluded from the printable worksheet pipeline exactly
+# as the original ConMas Designer did (Algorithm A — Reserved Names).
+CONFIGURATION_SHEET_NAMES = frozenset({
+    "_Fields",
+    "_RawData",
+    "ExcelOutputSetting",
+    "DesignerConfig",
+    "PaperLessConfig",
+    "ConMasConfig",
+})
+
 BLACK_THRESHOLD = 64
 WHITE_THRESHOLD = 192
 MIN_RECT_SIZE = 6
@@ -509,14 +522,42 @@ def export_sanitized_pdf(sanitized_path: str) -> str:
 
 def _delete_metadata_sheets(wb):
     """Delete metadata sheets (_Fields, _RawData) from an opened workbook."""
+    # PHASE 6.1 DIAGNOSTIC: Before deletion
+    names_before = []
+    for di in range(1, wb.Sheets.Count + 1):
+        try:
+            names_before.append(str(wb.Sheets(di).Name))
+        except Exception:
+            names_before.append("<ERROR>")
+    print(f"  [_delete_metadata_sheets] BEFORE: {names_before}")
+
+    to_delete = []
     for i in range(wb.Sheets.Count, 0, -1):
         name = ""
         try:
             name = wb.Sheets(i).Name
         except Exception:
             pass
-        if name in ("_Fields", "_RawData"):
+        if name in CONFIGURATION_SHEET_NAMES:
+            print(f"  [_delete_metadata_sheets] Deleting metadata sheet: '{name}'")
+            to_delete.append(i)
+
+    for i in to_delete:
+        try:
             wb.Sheets(i).Delete()
+            print(f"  [_delete_metadata_sheets] Deleted: '{i}'")
+        except Exception as e:
+            print(f"  [_delete_metadata_sheets] Delete FAILED for sheet {i}: {e}")
+            pass
+
+    # PHASE 6.3: After deletion summary
+    names_after = []
+    for di in range(1, wb.Sheets.Count + 1):
+        try:
+            names_after.append(str(wb.Sheets(di).Name))
+        except Exception:
+            names_after.append("<ERROR>")
+    print(f"  [_delete_metadata_sheets] Remaining sheets: {names_after}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1074,14 +1115,105 @@ def generate_coordinates_and_preview(
                 # Excel.Quit(). COM proxies become stale after CoUninitialize().
                 visible_sheets = []
                 visible_sheet_names = []
+                # ── PHASE 6.1 DIAGNOSTIC: Full worksheet analysis ──
+                print("=" * 50)
+                print("WORKBOOK DIAGNOSTIC")
+                print("=" * 50)
+                print(f"Workbook: {os.path.basename(xlsx_path)}")
+                print(f"Total Worksheets: {wb.Sheets.Count}")
+                print()
+                for ws_i_idx in range(1, wb.Sheets.Count + 1):
+                    try:
+                        ws_i = wb.Sheets(ws_i_idx)
+                        ws_name = str(ws_i.Name)
+                        ws_visible = "UNKNOWN"
+                        try:
+                            v = ws_i.Visible
+                            if v == -1:
+                                ws_visible = "VISIBLE"
+                            elif v == 0:
+                                ws_visible = "HIDDEN"
+                            elif v == 2:
+                                ws_visible = "VERY_HIDDEN"
+                            else:
+                                ws_visible = str(v)
+                        except Exception:
+                            pass
+                        ws_print_area = "NONE"
+                        try:
+                            pa = ws_i.PageSetup.PrintArea
+                            if pa:
+                                ws_print_area = str(pa)[:60]
+                        except Exception:
+                            pass
+                        ws_comments = 0
+                        try:
+                            ws_comments = ws_i.Comments.Count
+                        except Exception:
+                            pass
+                        is_config = "YES" if ws_name in ("_Fields", "ExcelOutputSetting", "_RawData", "DesignerConfig", "PaperLessConfig", "ConMasConfig") else "NO"
+                        print(f"  Sheet #{ws_i_idx}")
+                        print(f"    Name:         {ws_name}")
+                        print(f"    Visible:      {ws_visible}")
+                        print(f"    PrintArea:    {ws_print_area}")
+                        print(f"    Comments:     {ws_comments}")
+                        print(f"    ConfigSheet:  {is_config}")
+                        will_be_page = "UNKNOWN"
+                        try:
+                            if ws_visible == "VISIBLE":
+                                if is_config == "YES":
+                                    will_be_page = "YES (CURRENTLY LEAKING)"
+                                else:
+                                    will_be_page = "YES"
+                            else:
+                                will_be_page = "NO (hidden)"
+                        except Exception:
+                            pass
+                        print(f"    Will Be Page: {will_be_page}")
+                        print()
+                    except Exception as e:
+                        print(f"  Sheet #{ws_i_idx}: ERROR: {e}")
+                        print()
+
+                # ── PHASE 6.3: Collect printable worksheets ──
+                # Legacy ConMas behavior: filter by BOTH visibility AND reserved name.
+                # Visibility alone is insufficient because ExcelOutputSetting is VISIBLE.
+                # Algorithm A (Reserved Worksheet Names) — proven by Phase 6.2 forensic investigation.
+                visible_sheets = []
+                visible_sheet_names = []
+                skipped_config_sheets = []
                 for ws in wb.Worksheets:
                     try:
                         if ws.Visible != -1:  # -1 = xlSheetVisible
                             continue
                     except Exception:
                         pass
+                    try:
+                        ws_name = ws.Name
+                    except Exception:
+                        continue
+                    # Phase 6.3: Skip reserved configuration sheets
+                    if ws_name in CONFIGURATION_SHEET_NAMES:
+                        print(f"  [FILTER] Sheet '{ws_name}': SKIPPED (configuration sheet)")
+                        skipped_config_sheets.append(ws_name)
+                        continue
                     visible_sheets.append(ws)
-                    visible_sheet_names.append(ws.Name)
+                    visible_sheet_names.append(ws_name)
+
+                # ── PHASE 6.3: Printable worksheets summary ──
+                print(f"==================================================")
+                print(f"Printable Worksheets Summary")
+                print(f"==================================================")
+                print(f"Total printable: {len(visible_sheet_names)}")
+                for vs_name in visible_sheet_names:
+                    print(f"  INCLUDED: {vs_name}")
+                if skipped_config_sheets:
+                    print(f"Skipped (configuration):")
+                    for scs in skipped_config_sheets:
+                        print(f"  EXCLUDED: {scs}")
+                else:
+                    print(f"No configuration sheets skipped.")
+                print(f"==================================================")
                 _stage_mark("Collect Visible Sheets")
 
                 # ── Step 2: Export original PDF (background) ──
@@ -1212,17 +1344,33 @@ def generate_coordinates_and_preview(
 
                 # ── Step 4: Delete metadata sheets & export sanitized PDF ──
                 # Export ALL worksheets so the PDF has one page per visible sheet.
+                # Phase 6.3: Delete ALL configuration sheets, not just _Fields/_RawData
                 for i in range(wb.Sheets.Count, 0, -1):
                     try:
                         name = wb.Sheets(i).Name
                     except Exception:
                         name = ""
-                    if name in ("_Fields", "_RawData"):
-                        wb.Sheets(i).Delete()
+                    if name in CONFIGURATION_SHEET_NAMES:
+                        print(f"  [SANITIZE EXPORT] Deleting config sheet: '{name}'")
+                        try:
+                            wb.Sheets(i).Delete()
+                        except Exception as e:
+                            print(f"  [SANITIZE EXPORT] Failed to delete '{name}': {e}")
+                            pass
 
                 pdf_dir = tempfile.mkdtemp(prefix="ple_pdf_")
                 tmp_dirs.append(pdf_dir)
                 pdf_path = os.path.join(pdf_dir, "sanitized.pdf")
+
+                # ── PHASE 6.3: PDF Export diagnostics ──
+                remaining_names = []
+                for ri in range(1, wb.Sheets.Count + 1):
+                    try:
+                        remaining_names.append(str(wb.Sheets(ri).Name))
+                    except Exception:
+                        remaining_names.append("<ERROR>")
+                print(f"  [PDF EXPORT] Worksheets being exported ({len(remaining_names)}): {remaining_names}")
+                print(f"  [PDF EXPORT] Expected PDF pages: {len(remaining_names)}")
 
                 # Export ALL worksheets (workbook-level export)
                 # IgnorePrintAreas=False matches ConMas default
@@ -1230,6 +1378,20 @@ def generate_coordinates_and_preview(
                     0, os.path.abspath(pdf_path),
                     0, 0, False,
                 )
+
+                # Verify PDF page count
+                import fitz
+                try:
+                    ver_doc = fitz.open(pdf_path)
+                    actual_pages = len(ver_doc)
+                    ver_doc.close()
+                    print(f"  [PDF EXPORT] Actual PDF pages generated: {actual_pages}")
+                    if actual_pages != len(remaining_names):
+                        print(f"  [PDF EXPORT] WARNING: PDF page count ({actual_pages}) differs from"
+                              f" worksheet count ({len(remaining_names)})")
+                except Exception as e:
+                    print(f"  [PDF EXPORT] Could not verify PDF page count: {e}")
+
                 _stage_mark("Export Sanitized PDF (all sheets)")
 
             finally:
@@ -1270,9 +1432,14 @@ def generate_coordinates_and_preview(
         for i, sheet_name in enumerate(visible_sheet_names):
             sheet_clusters = [m for m in cluster_meta if m["sheetName"] == sheet_name]
 
+            # PHASE 6.1 DIAGNOSTIC: Every page being generated
+            print(f"  [PAGE GEN] Sheet #{i}: '{sheet_name}' — {len(sheet_clusters)} field(s), "
+                  f"config={'YES' if sheet_name in ('_Fields', 'ExcelOutputSetting', '_RawData') else 'NO'}")
+
             if not sheet_clusters:
                 # No fields on this sheet — still include as a page with empty fields
                 # (the background PNG is still useful)
+                print(f"  [PAGE GEN] -> Empty page (no fields), still generating background PNG")
                 png_filename = f"preview_{output_id}_page{i}.png"
                 png_path = os.path.join(output_dir, png_filename)
                 pdf_page_to_png(orig_pdf_path, png_path, dpi=DPI, page_index=min(i, total_pdf_pages - 1))
@@ -1342,6 +1509,26 @@ def generate_coordinates_and_preview(
                 elapsed = _pt[i][1] - _pt[i - 1][1]
                 durations.append((label, elapsed))
             _print_perf_report(durations)
+
+        # PHASE 6.1 DIAGNOSTIC: Preview page generation summary
+        print("=" * 50)
+        print("PREVIEW PAGES GENERATED")
+        print("=" * 50)
+        for pi, p in enumerate(pages_result):
+            is_config = "YES" if p["sheetName"] in ("_Fields", "ExcelOutputSetting", "_RawData") else "NO"
+            print(f"  Page {pi}")
+            print(f"    Source Worksheet: {p['sheetName']}")
+            print(f"    Background Image: {p.get('backgroundImage', 'N/A')}")
+            print(f"    Page Size:        {p.get('page', {}).get('width', '?')}x{p.get('page', {}).get('height', '?')}")
+            print(f"    Fields:           {len(p.get('fields', []))}")
+            print(f"    Config Sheet:     {is_config}")
+            print()
+        config_pages = [p for p in pages_result if p["sheetName"] in ("_Fields", "ExcelOutputSetting", "_RawData")]
+        if config_pages:
+            print(f"WARNING: {len(config_pages)} configuration sheet(s) are leaking into preview pages:")
+            for cp in config_pages:
+                print(f"  -> {cp['sheetName']}")
+        print("=" * 50)
 
         return {"pages": pages_result}
 

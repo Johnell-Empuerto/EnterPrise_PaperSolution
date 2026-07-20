@@ -24,6 +24,23 @@ namespace ExcelAPI.Designer.Analysis
     /// </summary>
     public class WorkbookReaderService
     {
+        /// <summary>
+        /// Known configuration/internal sheet names that should NEVER become designer pages.
+        /// These sheets store metadata, field definitions, and designer settings — they
+        /// are data sources, not visual pages. The legacy ConMas Designer treats them
+        /// as internal configuration only. This set must be kept in sync with the
+        /// names used by WorkbookValueWriter.PostProcessZipForConMas and the legacy
+        /// COM WorkbookGenerator.
+        /// </summary>
+        private static readonly HashSet<string> ConfigurationSheetNames = new(StringComparer.OrdinalIgnoreCase)
+        {
+            "_Fields",
+            "ExcelOutputSetting",
+            "DesignerConfig",
+            "PaperLessConfig",
+            "ConMasConfig"
+        };
+
         private readonly ILogger<WorkbookReaderService> _logger;
 
         public WorkbookReaderService(ILogger<WorkbookReaderService> logger)
@@ -90,7 +107,11 @@ namespace ExcelAPI.Designer.Analysis
                     Marshal.ReleaseComObject(cpWs);
                 }
 
-                // Build a map of sheet name → COM worksheet for content sheets (skip _Fields)
+                // Build a map of sheet name → COM worksheet for content sheets.
+                // Phase 6: Configuration sheets (ExcelOutputSetting, _Fields, etc.) are
+                // data sources only — they must NEVER become designer pages. This matches
+                // the legacy ConMas Designer behavior where hidden metadata sheets are
+                // only used for reconstruction, never displayed.
                 var contentSheets = new List<(int index, Excel.Worksheet ws)>();
                 Excel.Worksheet? fieldsSheet = null;
 
@@ -102,7 +123,12 @@ namespace ExcelAPI.Designer.Analysis
                     if (string.Equals(name, "_Fields", StringComparison.OrdinalIgnoreCase))
                     {
                         fieldsSheet = ws;
-                        _logger.LogInformation("Found _Fields hidden sheet");
+                        _logger.LogInformation("Found _Fields configuration sheet — will not become a designer page");
+                    }
+                    else if (ConfigurationSheetNames.Contains(name))
+                    {
+                        _logger.LogInformation("Skipping configuration sheet '{Name}' — will not become a designer page", name);
+                        Marshal.ReleaseComObject(ws);
                     }
                     else
                     {
