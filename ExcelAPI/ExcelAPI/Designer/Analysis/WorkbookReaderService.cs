@@ -327,7 +327,7 @@ namespace ExcelAPI.Designer.Analysis
                                 continue;
                             }
 
-                            // Parse legacy comment format: Name\nType\n\nParams
+                            // Parse ConMas-compatible comment format (first 2 non-empty lines)
                             string[] lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
                             if (lines.Length >= 1) fieldName = lines[0].Trim();
                             if (lines.Length >= 2) fieldType = lines[1].Trim();
@@ -1161,35 +1161,49 @@ namespace ExcelAPI.Designer.Analysis
 
         /// <summary>
         /// Parse comment text in legacy ConMas format into InputParameters dictionary.
-        /// Format: Name\nType\n\nParams or 0
+        /// Supports both the old format (Params on line 3) and the full
+        /// 25-field ConMas-compatible format (Params on line 5).
         /// </summary>
         private static Dictionary<string, string> ParseCommentText(string text)
         {
             var result = new Dictionary<string, string>();
             if (string.IsNullOrWhiteSpace(text)) return result;
 
-            string[] lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = text.Split('\n');
 
             if (lines.Length >= 1)
                 result["name"] = lines[0].Trim();
             if (lines.Length >= 2)
                 result["type"] = lines[1].Trim();
-            if (lines.Length >= 4)
+
+            // Determine which line contains the InputParameters:
+            //   Old format: line 3 (0-indexed) = ReadOnly flag or param string
+            //   Full format (25-field): line 5 (0-indexed) = InputParameter
+            string paramStr = "";
+            if (lines.Length >= 6)
             {
-                string paramStr = lines[3].Trim();
-                if (!string.IsNullOrEmpty(paramStr) && paramStr != "0")
+                string candidate = lines[5].Trim();
+                if (!string.IsNullOrEmpty(candidate))
+                    paramStr = candidate;
+            }
+            if (string.IsNullOrEmpty(paramStr) && lines.Length >= 4)
+            {
+                string candidate = lines[3].Trim();
+                if (!string.IsNullOrEmpty(candidate) && candidate != "0" && candidate != "1")
+                    paramStr = candidate;
+            }
+
+            if (!string.IsNullOrEmpty(paramStr))
+            {
+                foreach (var pair in paramStr.Split(';', StringSplitOptions.RemoveEmptyEntries))
                 {
-                    // Parse semicolon-delimited key=value pairs
-                    foreach (var pair in paramStr.Split(';', StringSplitOptions.RemoveEmptyEntries))
+                    int eqIdx = pair.IndexOf('=');
+                    if (eqIdx > 0)
                     {
-                        int eqIdx = pair.IndexOf('=');
-                        if (eqIdx > 0)
-                        {
-                            string key = pair[..eqIdx].Trim();
-                            string val = pair[(eqIdx + 1)..].Trim();
-                            if (!string.IsNullOrEmpty(key))
-                                result[key] = val;
-                        }
+                        string key = pair[..eqIdx].Trim();
+                        string val = pair[(eqIdx + 1)..].Trim();
+                        if (!string.IsNullOrEmpty(key))
+                            result[key] = val;
                     }
                 }
             }

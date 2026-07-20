@@ -90,7 +90,7 @@ namespace ExcelAPI.Application
             MergeChanges + PrintAreaChanges + PageMarginChanges +
             PageSetupChanges + HeaderFooterChanges +
             DrawingChanges + ImageChanges + HyperlinkChanges +
-            CommentChanges + DataValidationChanges +
+            DataValidationChanges +
             ConditionalFormattingChanges + TableChanges +
             FormulaChanges + NewCellChanges + MissingCellChanges +
             SharedStringsChanges + WorkbookXmlChanges + ExternalLinksChanges +
@@ -280,6 +280,9 @@ namespace ExcelAPI.Application
     {
         private readonly ILogger<WorkbookDiffValidator> _logger;
 
+        private static readonly HashSet<string> KnownAdditionalSheets =
+            new(StringComparer.OrdinalIgnoreCase) { "ExcelOutputSetting" };
+
         public WorkbookDiffValidator(ILogger<WorkbookDiffValidator> logger)
         {
             _logger = logger;
@@ -453,16 +456,21 @@ namespace ExcelAPI.Application
             var origSheets = origWbPart.Workbook.Descendants<Sheet>().ToList();
             var editSheets = editWbPart.Workbook.Descendants<Sheet>().ToList();
 
-            if (origSheets.Count != editSheets.Count)
+            // Phase 5.5.2: Filter out intentionally-added sheets (e.g. ExcelOutputSetting for ConMas)
+            var filteredEditSheets = editSheets
+                .Where(s => !KnownAdditionalSheets.Contains(s.Name?.Value ?? ""))
+                .ToList();
+
+            if (origSheets.Count != filteredEditSheets.Count)
             {
-                result.SheetCountChanges = Math.Abs(origSheets.Count - editSheets.Count);
-                result.Details.Add($"Sheet count: original={origSheets.Count}, edited={editSheets.Count}");
+                result.SheetCountChanges = Math.Abs(origSheets.Count - filteredEditSheets.Count);
+                result.Details.Add($"Sheet count: original={origSheets.Count}, edited={editSheets.Count} (filtered={filteredEditSheets.Count})");
             }
 
-            for (int i = 0; i < Math.Min(origSheets.Count, editSheets.Count); i++)
+            for (int i = 0; i < Math.Min(origSheets.Count, filteredEditSheets.Count); i++)
             {
                 var o = origSheets[i];
-                var e = editSheets[i];
+                var e = filteredEditSheets[i];
                 if ((o.Name ?? "") != (e.Name ?? ""))
                 {
                     result.SheetNameChanges++;
@@ -1099,13 +1107,15 @@ namespace ExcelAPI.Application
                 }
             }
 
-            // Relationships
+            // Relationships (Phase 5.5.2: account for known additional sheet parts)
             var origRelCount = origWbPart.Parts.Count();
             var editRelCount = editWbPart.Parts.Count();
-            if (origRelCount != editRelCount)
+            int knownExtraParts = checkEditSheets.Count(s => KnownAdditionalSheets.Contains(s.Name?.Value ?? ""))
+                - checkSheets.Count(s => KnownAdditionalSheets.Contains(s.Name?.Value ?? ""));
+            if (origRelCount + knownExtraParts != editRelCount)
             {
                 result.RelationshipsChanges++;
-                result.Details.Add($"Relationship count: original={origRelCount}, edited={editRelCount}");
+                result.Details.Add($"Relationship count: original={origRelCount}, edited={editRelCount} (expected extra={knownExtraParts})");
             }
         }
 

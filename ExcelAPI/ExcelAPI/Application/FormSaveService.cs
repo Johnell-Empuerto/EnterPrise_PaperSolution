@@ -343,6 +343,23 @@ namespace ExcelAPI.Application
                     _logger.LogInformation("  CELL EDIT: {Change}", cellChange);
                 }
 
+                // Phase 5.5.2 DEBUG: Save a copy before deletion for inspection
+                try
+                {
+                    if (System.IO.File.Exists(result.WorkbookPath))
+                    {
+                        string debugDir = Path.Combine(Path.GetDirectoryName(result.WorkbookPath) ?? ".", "debug_output");
+                        Directory.CreateDirectory(debugDir);
+                        string debugPath = Path.Combine(debugDir, $"phase552_debug_{Guid.NewGuid():N}.xlsx");
+                        System.IO.File.Copy(result.WorkbookPath, debugPath, overwrite: true);
+                        _logger.LogInformation("[PHASE5.5.2 DEBUG] Saved debug output to {Path}", debugPath);
+                    }
+                }
+                catch (Exception exDbg)
+                {
+                    _logger.LogWarning("[PHASE5.5.2 DEBUG] Failed to save debug copy: {Msg}", exDbg.Message);
+                }
+
                 try { if (System.IO.File.Exists(result.WorkbookPath)) System.IO.File.Delete(result.WorkbookPath); } catch { }
 
                 throw new WorkbookFidelityException(diffResult);
