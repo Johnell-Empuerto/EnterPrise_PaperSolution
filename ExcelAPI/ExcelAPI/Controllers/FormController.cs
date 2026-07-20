@@ -22,6 +22,7 @@ namespace ExcelAPI.Controllers
         private readonly PythonRenderService _pythonRender;
         private readonly WorkbookReaderService _workbookReaderService;
         private readonly ISessionWorkbookStore _sessionStore;
+        private readonly IDesignerModelReader _designerModelReader;
 
         public FormController(
             IFormSaveService formSaveService,
@@ -31,7 +32,8 @@ namespace ExcelAPI.Controllers
             RuntimeCoordinateGenerator runtimeGenerator,
             PythonRenderService pythonRender,
             WorkbookReaderService workbookReaderService,
-            ISessionWorkbookStore sessionStore)
+            ISessionWorkbookStore sessionStore,
+            IDesignerModelReader designerModelReader)
         {
             _formSaveService = formSaveService;
             _env = env;
@@ -41,6 +43,7 @@ namespace ExcelAPI.Controllers
             _pythonRender = pythonRender;
             _workbookReaderService = workbookReaderService;
             _sessionStore = sessionStore;
+            _designerModelReader = designerModelReader;
         }
 
         [HttpPost("save")]
@@ -444,6 +447,44 @@ namespace ExcelAPI.Controllers
                 var session = _sessionStore.CreateSession(tempPath, file.FileName);
                 string sessionId = session.SessionId;
 
+                // Phase 21: Use DesignerModelReader to reconstruct the complete designer state
+                // directly from the workbook. This is the canonical deserialization path:
+                // Workbook → DesignerModelReader → DesignerModel → Frontend
+                var designerModel = _designerModelReader.Read(tempPath, file.FileName, sessionId);
+
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.2: REUPLOAD STATE — log DesignerModel fields
+                // ═════════════════════════════════════════════════════════
+                if (designerModel != null)
+                {
+                    _logger.LogInformation("========================================================");
+                    _logger.LogInformation("  REUPLOAD STATE — DesignerModel Fields from Workbook");
+                    _logger.LogInformation("========================================================");
+
+                    int reuploadFieldCount = 0;
+                    foreach (var rePage in designerModel.Pages)
+                    {
+                        _logger.LogInformation("  Page: {Name}", rePage.Name);
+                        foreach (var reField in rePage.Fields)
+                        {
+                            string reCell = reField.CellAddress ?? "?";
+                            string fontSize = reField.Style?.FontSize?.ToString() ?? "(default)";
+                            string fontName = reField.Style?.FontFamily ?? "(default)";
+                            string boldStr = reField.Style?.Bold == true ? "true" : "false";
+                            string fillColor = reField.Style?.FillColor ?? "(none)";
+                            string fontColor = reField.Style?.FontColor ?? "(default)";
+                            string hAlign = reField.Style?.HorizontalAlignment ?? "(default)";
+                            _logger.LogInformation(
+                                "  REUPLOAD Field: id='{Id}' cell='{Cell}' font='{FontName}/{FontSize}' bold={Bold} fill={Fill} color={Color} align={Align}",
+                                reField.Id, reCell, fontName, fontSize, boldStr, fillColor, fontColor, hAlign);
+                            reuploadFieldCount++;
+                        }
+                    }
+
+                    _logger.LogInformation("  REUPLOAD COMPLETE: {Count} fields reconstructed", reuploadFieldCount);
+                    _logger.LogInformation("========================================================");
+                }
+
                 return Ok(new ApiResponse<object>
                 {
                     Success = true,
@@ -453,7 +494,9 @@ namespace ExcelAPI.Controllers
                         formDefinition,
                         sessionId,
                         fieldCount = formDefinition.Clusters.Count,
-                        sheetCount = formDefinition.Sheets.Count
+                        sheetCount = formDefinition.Sheets.Count,
+                        // Phase 21: Return DesignerModel for frontend reconstruction
+                        designerModel
                     }
                 });
             }
@@ -521,13 +564,107 @@ namespace ExcelAPI.Controllers
         [ProducesResponseType(typeof(ApiErrorResponse), StatusCodes.Status500InternalServerError)]
         public async Task<IActionResult> SaveEdited([FromBody] WbDef.WorkbookDefinition wbDef)
         {
+            // ═════════════════════════════════════════════════════════
+            // PHASE 21.4 — STAGE 1: RAW EXPORT REQUEST
+            // ═════════════════════════════════════════════════════════
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("RAW EXPORT REQUEST");
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("Content-Type: {Ct}", Request.ContentType ?? "(not set)");
+            _logger.LogInformation("Content-Length: {Len} bytes", Request.ContentLength ?? -1);
+            _logger.LogInformation("Request Path: {Path}", Request.Path);
+            _logger.LogInformation("Method: {Method}", Request.Method);
+            _logger.LogInformation("Session cookie: {Sess}", Request.Cookies.ContainsKey("session") ? "present" : "not set");
+
+            // PHASE 21.4 — STAGE 2: Raw JSON Body
+            // NOTE: [FromBody] consumes the request stream before this method executes.
+            // To capture the raw JSON before deserialization, an IAsyncActionFilter
+            // must be registered. See note in Phase 21.4 Stage 2 of the report.
+            _logger.LogInformation("PHASE 21.4 STAGE 2 — Raw JSON Body");
+            _logger.LogInformation("  [INFO] Raw JSON cannot be captured here because [FromBody]");
+            _logger.LogInformation("  [INFO] has already consumed the request stream.");
+            _logger.LogInformation("  [INFO] To capture raw JSON, register an IAsyncActionFilter");
+            _logger.LogInformation("  [INFO] that reads Request.Body before model binding.");
+            _logger.LogInformation("  [INFO] Alternatively, enable client-side logging of the");
+            _logger.LogInformation("  [INFO] POST body before the fetch() call.");
+            _logger.LogInformation("=========================================================");
+
             if (wbDef == null)
             {
+                _logger.LogError("PHASE 21.4 STAGE 3 — MODEL BINDING RESULT: wbDef IS NULL!");
+                _logger.LogError("This means the JSON payload could not be deserialized.");
+                _logger.LogError("Check: Content-Type must be application/json; charset=UTF-8");
                 return BadRequest(new ApiErrorResponse
                 {
                     Message = "No workbook definition provided.",
                     ErrorCode = ErrorCodes.InvalidRequest
                 });
+            }
+
+            // ═════════════════════════════════════════════════════════
+            // PHASE 21.4 — STAGE 3: MODEL BINDING RESULT
+            // ═════════════════════════════════════════════════════════
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("MODEL BINDING RESULT");
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("wbDef != null: {NotNull}", wbDef != null);
+            if (wbDef != null)
+            {
+                _logger.LogInformation("SessionId: {Sid}", wbDef.SessionId ?? "(null/empty)");
+                _logger.LogInformation("SourceFileName: {File}", wbDef.SourceFileName ?? "(null/empty)");
+                _logger.LogInformation("SourcePath: {Path}", wbDef.SourcePath ?? "(null/empty)");
+                _logger.LogInformation("Info: {Info}", wbDef.Info != null ? "present" : "null");
+                _logger.LogInformation("Sheets Count: {Count}", wbDef.Sheets?.Count ?? 0);
+
+                if (wbDef.Sheets != null)
+                {
+                    for (int si = 0; si < wbDef.Sheets.Count; si++)
+                    {
+                        var sheet = wbDef.Sheets[si];
+                        _logger.LogInformation("  Sheet[{Idx}]: Name='{Name}', Fields={Fields}",
+                            si, sheet.Name ?? "(null)", sheet.Fields?.Count ?? 0);
+
+                        // PHASE 21.4 — STAGE 4: DUMP EVERY PROPERTY
+                        // Only logs first few fields to avoid extreme log spam
+                        if (sheet.Fields != null)
+                        {
+                            int dumpCount = Math.Min(sheet.Fields.Count, 5);
+                            for (int fi = 0; fi < dumpCount; fi++)
+                            {
+                                var f = sheet.Fields[fi];
+                                _logger.LogInformation("    Field[{Idx}]:", fi);
+                                _logger.LogInformation("      Id:             {Val}", f.Id ?? "(empty)");
+                                _logger.LogInformation("      Name:           {Val}", f.Name ?? "(empty)");
+                                _logger.LogInformation("      Cell.Address:   {Val}", f.Cell?.Address ?? "(empty/null)");
+                                _logger.LogInformation("      Cell.RowIndex:  {Val}", f.Cell != null ? f.Cell.RowIndex.ToString() : "(null)");
+                                _logger.LogInformation("      Type:           {Val}", f.Type.ToString());
+                                _logger.LogInformation("      Value:          {Val}", string.IsNullOrWhiteSpace(f.Value) ? "(empty)" : f.Value);
+                                _logger.LogInformation("      Required:       {Val}", f.Required);
+                                _logger.LogInformation("      Locked:         {Val}", f.Locked);
+                                _logger.LogInformation("      Formula:        {Val}", f.Formula ?? "(null)");
+                                _logger.LogInformation("      Placeholder:    {Val}", f.Placeholder ?? "(null)");
+                                _logger.LogInformation("      DefaultValue:   {Val}", f.DefaultValue ?? "(null)");
+                                _logger.LogInformation("      MaxLength:      {Val}", f.MaxLength);
+                                _logger.LogInformation("      TabIndex:       {Val}", f.TabIndex);
+                                _logger.LogInformation("      Visible:        {Val}", f.Visible);
+                                _logger.LogInformation("      DataValidation: {Val}", f.DataValidation != null ? f.DataValidation.Type : "(null)");
+                                _logger.LogInformation("      Style.Font:     {Val}", f.Style?.Font != null ? f.Style.Font.Name ?? "(default)" : "(null)");
+                                _logger.LogInformation("      Style.FontSize: {Val}", f.Style?.Font?.SizePt ?? 0);
+                            }
+                            if (sheet.Fields.Count > dumpCount)
+                            {
+                                _logger.LogInformation("      ... and {Remaining} more fields (first {Dumped} shown)",
+                                    sheet.Fields.Count - dumpCount, dumpCount);
+                            }
+                        }
+                    }
+                }
+
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("STAGE 3-4 COMPLETE: {Sheets} sheets, {Fields} fields total",
+                    wbDef.Sheets?.Count ?? 0,
+                    wbDef.Sheets?.Sum(s => s.Fields?.Count ?? 0) ?? 0);
+                _logger.LogInformation("=========================================================");
             }
 
             // Phase 5.2: Resolve the original workbook from the session store.
@@ -574,25 +711,63 @@ namespace ExcelAPI.Controllers
 
             try
             {
-                _logger.LogInformation("========== SAVE PIPELINE ==========");
-                _logger.LogInformation("Controller: POST /api/form/save-edited");
-                _logger.LogInformation("SessionId: {SessionId}", sessionId);
-                _logger.LogInformation("SourcePath: {Path}", sourcePath);
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.3 — STAGE 1: EXPORT PAYLOAD RECEIVED
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("EXPORT PAYLOAD RECEIVED");
+                _logger.LogInformation("=========================================================");
                 _logger.LogInformation("Workbook: {Title}", wbDef.Info?.Title ?? "(untitled)");
-                _logger.LogInformation("Sheets: {Count}, Fields with values: {Fields}",
-                    wbDef.Sheets.Count,
-                    wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value))));
-                _logger.LogInformation("WorkbookGenerator invoked: FALSE");
-                _logger.LogInformation("WorkbookValueWriter invoked: TRUE");
+                _logger.LogInformation("Session: {SessionId}", sessionId);
+                _logger.LogInformation("SourcePath: {Path}", sourcePath);
+                _logger.LogInformation("Pages (sheets): {Count}", wbDef.Sheets.Count);
 
-                // ── DIAGNOSTIC: Log incoming WbDef payload structure (Investigation 2/3) ──
-                _logger.LogInformation("========== PAYLOAD DIAGNOSTIC ==========");
-                _logger.LogInformation("SessionId present: {Has}", !string.IsNullOrEmpty(sessionId));
-                _logger.LogInformation("SourceFileName present (deprecated): {Has}", !string.IsNullOrEmpty(wbDef.SourceFileName));
-                _logger.LogInformation("Sheet count: {Count}", wbDef.Sheets.Count);
-                _logger.LogInformation("Total fields: {Total}", wbDef.Sheets.Sum(s => s.Fields.Count));
-                _logger.LogInformation("Total fields with non-empty values: {WithVal}",
-                    wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value))));
+                int st1TotalFields = wbDef.Sheets.Sum(s => s.Fields.Count);
+                int st1WithValues = wbDef.Sheets.Sum(s => s.Fields.Count(f => !string.IsNullOrWhiteSpace(f.Value)));
+                int st1Empty = st1TotalFields - st1WithValues;
+
+                _logger.LogInformation("Total Fields: {Total}", st1TotalFields);
+                _logger.LogInformation("Fields With Values: {WithVal}", st1WithValues);
+                _logger.LogInformation("Empty Fields: {Empty}", st1Empty);
+
+                // Print EVERY field
+                int st1FieldIdx = 0;
+                foreach (var st1Sheet in wbDef.Sheets)
+                {
+                    foreach (var st1Field in st1Sheet.Fields)
+                    {
+                        st1FieldIdx++;
+                        string st1Id = st1Field.Id ?? $"field_{st1FieldIdx}";
+                        _logger.LogInformation("  ---------------------------------------------------------");
+                        _logger.LogInformation("  Field #{Idx}:", st1FieldIdx);
+                        _logger.LogInformation("    Id             : {Id}", st1Id);
+                        _logger.LogInformation("    Page           : {Sheet}", st1Sheet.Name);
+                        _logger.LogInformation("    Cell           : {Cell}", st1Field.Cell?.Address ?? "?");
+                        _logger.LogInformation("    Type           : {Type}", st1Field.Type.ToString());
+                        _logger.LogInformation("    Value          : {Val}", string.IsNullOrWhiteSpace(st1Field.Value) ? "(empty)" : st1Field.Value);
+                        _logger.LogInformation("    Required       : {Req}", st1Field.Required);
+                        _logger.LogInformation("    ReadOnly       : {RO}", st1Field.Locked);
+                        _logger.LogInformation("    Placeholder    : {PH}", string.IsNullOrEmpty(st1Field.Placeholder) ? "" : st1Field.Placeholder);
+                        _logger.LogInformation("    Default Value  : {Def}", string.IsNullOrEmpty(st1Field.DefaultValue) ? "" : st1Field.DefaultValue);
+                        _logger.LogInformation("    Validation     : {Val}", string.IsNullOrEmpty(st1Field.Formula) ? "" : st1Field.Formula);
+                        _logger.LogInformation("    Max Length     : {Max}", st1Field.MaxLength > 0 ? st1Field.MaxLength.ToString() : "");
+                        _logger.LogInformation("    DV Formula     : {Opt}", st1Field.DataValidation?.Formula1 ?? (st1Field.DataValidation != null ? "validation present" : ""));
+                    }
+                }
+
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("EXPORT PAYLOAD END — {Total} fields received ({WithVal} with values, {Empty} empty)",
+                    st1TotalFields, st1WithValues, st1Empty);
+                _logger.LogInformation("=========================================================");
+
+                // If all fields are empty, flag early
+                if (st1WithValues == 0)
+                {
+                    _logger.LogError("[DIAG] CRITICAL: ALL fields have empty values. " +
+                        "No cells will be written. Possible model binding mismatch: " +
+                        "frontend runtimeFormToWorkbookDefinition may map fields with wrong property names. " +
+                        "Check: values[f.id] mapping → must match backend FieldDefinition.Name");
+                }
 
                 foreach (var diagSheet in wbDef.Sheets)
                 {
@@ -631,13 +806,160 @@ namespace ExcelAPI.Controllers
 
                 _logger.LogInformation("========== PAYLOAD DIAGNOSTIC END ==========");
 
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.4 — STAGE 6: CALLING SAVE SERVICE
+                // ═════════════════════════════════════════════════════════
+                int stageFieldCountController = wbDef.Sheets?.Sum(s => s.Fields?.Count ?? 0) ?? 0;
+                int stageWithValuesController = wbDef.Sheets?.Sum(s => s.Fields?.Count(f => !string.IsNullOrWhiteSpace(f.Value)) ?? 0) ?? 0;
+
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("CALLING SAVE SERVICE");
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("WorkbookDefinition");
+                _logger.LogInformation("  Sheets: {Count}", wbDef.Sheets?.Count ?? 0);
+                _logger.LogInformation("  Fields (total): {Count}", stageFieldCountController);
+                _logger.LogInformation("  Fields (with values): {Count}", stageWithValuesController);
+                _logger.LogInformation("  Fields (empty): {Count}", stageFieldCountController - stageWithValuesController);
+                _logger.LogInformation("");
                 string formsDir = Path.Combine(_env.ContentRootPath, "Forms");
+
+                _logger.LogInformation("Calling: FormSaveService.SaveEditedValuesAsync()");
+                _logger.LogInformation("  OutputDir: {Dir}", formsDir);
+                _logger.LogInformation("  SourcePath: {Path}", sourcePath);
+                _logger.LogInformation("=========================================================");
                 Directory.CreateDirectory(formsDir);
 
                 var result = await _formSaveService.SaveEditedValuesAsync(wbDef, formsDir, sourcePath);
 
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.4 — STAGE 10: FIELD LOSS DETECTOR
+                // ═════════════════════════════════════════════════════════
+                int stageCellsWritten = result.CellsWritten;
+                int stageServiceWithValues = 0; // Will be overridden by FormSaveService diagnostic
+
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("FIELD LOSS DETECTOR");
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("Field count tracking:");
+                _logger.LogInformation("  Stage 1-4 (Controller after binding):  {Cnt}", stageFieldCountController);
+                _logger.LogInformation("  Stage 6 (Fields with values):          {Cnt}", stageWithValuesController);
+                _logger.LogInformation("  Stage 7-8 (FormSaveService entry):     (see FormSaveService logs)");
+                _logger.LogInformation("  Stage 9 (WorkbookValueWriter entry):   (see WorkbookValueWriter logs)");
+                _logger.LogInformation("  Cells Written (result):               {Cnt}", stageCellsWritten);
+                _logger.LogInformation("");
+
+                // Detect where loss occurred
+                if (stageFieldCountController == 0)
+                {
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogError("FIELD LOSS DETECTED: Controller has 0 fields after model binding");
+                    _logger.LogError("LIKELY CAUSE: JSON property names don't match FieldDefinition model");
+                    _logger.LogError("Check: Frontend sends {{ id, name, cell, type, value }}");
+                    _logger.LogError("Backend expects: {{ Id, Name, Cell, Type, Value }}");
+                    _logger.LogError("Possible mismatch: 'id' vs 'Id', 'cell' vs 'Cell', etc.");
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else if (stageWithValuesController == 0 && stageFieldCountController > 0)
+                {
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogError("FIELD LOSS DETECTED: {Total} fields exist but ALL are empty", stageFieldCountController);
+                    _logger.LogError("LIKELY CAUSE: Frontend values[f.id] mapping does not match");
+                    _logger.LogError("Check: Frontend runtimeFormToWorkbookDefinition → values[f.id]");
+                    _logger.LogError("  → f.id must match backend field.Id (case-sensitive)");
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else if (stageCellsWritten == 0 && stageWithValuesController > 0)
+                {
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogError("FIELD LOSS DETECTED: {WithVal} fields with values, but 0 written", stageWithValuesController);
+                    _logger.LogError("LIKELY CAUSE: Sheet name mismatch or cell address resolution failure");
+                    _logger.LogError("Check: WorkbookValueWriter sheet name matching case-sensitivity");
+                    _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else
+                {
+                    _logger.LogInformation("FIELD LOSS NOT DETECTED — counts are consistent");
+                    _logger.LogInformation("  Controller: {Total} fields, {WithVal} with values",
+                        stageFieldCountController, stageWithValuesController);
+                    _logger.LogInformation("  Written: {Written} cells", stageCellsWritten);
+                    _logger.LogInformation("  (Differences may be caused by empty-value skipping)");
+                }
+
                 byte[] fileBytes = await System.IO.File.ReadAllBytesAsync(result.WorkbookPath);
                 string safeFileName = SanitizeFileName(wbDef.Info?.Title ?? "edited") + ".xlsx";
+
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.2: EXPORT STATE — log every field written
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("========================================================");
+                _logger.LogInformation("  EXPORT STATE — Fields Written to Workbook");
+                _logger.LogInformation("========================================================");
+
+                int exportFieldCount = 0;
+                foreach (var exportSheet in wbDef.Sheets)
+                {
+                    foreach (var exportField in exportSheet.Fields)
+                    {
+                        if (string.IsNullOrWhiteSpace(exportField.Value)) continue;
+                        string cellAddr = exportField.Cell?.Address ?? "?";
+                        string fieldId = exportField.Id ?? $"field_{exportFieldCount}";
+                        _logger.LogInformation(
+                            "  EXPORT Field: id='{Id}' cell='{Sheet}!{Cell}' value='{Val}' type={Type}",
+                            fieldId, exportSheet.Name, cellAddr, exportField.Value, exportField.Type);
+                        exportFieldCount++;
+                    }
+                }
+
+                _logger.LogInformation("  EXPORT COMPLETE: {Count} fields written to workbook", exportFieldCount);
+                _logger.LogInformation("========================================================");
+
+                // ═════════════════════════════════════════════════════════
+                // PHASE 21.4 — STAGE 11: EXPORT PIPELINE SUMMARY
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("EXPORT PIPELINE SUMMARY");
+                _logger.LogInformation("=========================================================");
+                _logger.LogInformation("Pipeline stage                         | Fields");
+                _logger.LogInformation("---------------------------------------------------------");
+                _logger.LogInformation("Frontend JSON (sent by browser)        | Unknown (see Stage 2)");
+                _logger.LogInformation("ASP.NET Model Binding                  | {Total}", stageFieldCountController);
+                _logger.LogInformation("Fields with non-empty values           | {WithVal}", stageWithValuesController);
+                _logger.LogInformation("SaveService.SaveEditedValuesAsync()     | see service logs");
+                _logger.LogInformation("WorkbookValueWriter.WriteValues()       | see writer logs");
+                _logger.LogInformation("Cells Actually Written                 | {Written}", stageCellsWritten);
+                _logger.LogInformation("Workbook Verification                  | see writer logs");
+                _logger.LogInformation("");
+
+                // Auto-diagnose: pinpoint the loss stage
+                if (stageFieldCountController == 0)
+                {
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogInformation("BUG LOCATION: Between Frontend JSON → ASP.NET Model Binding");
+                    _logger.LogInformation("  Frontend sends fields but binding produces 0.");
+                    _logger.LogInformation("  Root cause: JSON property name mismatch.");
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else if (stageWithValuesController == 0 && stageFieldCountController > 0)
+                {
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogInformation("BUG LOCATION: Model Binding → Export Pipeline");
+                    _logger.LogInformation("  {Total} fields exist but ALL have empty values.", stageFieldCountController);
+                    _logger.LogInformation("  Root cause: runtimeFormToWorkbookDefinition values mapping.");
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else if (stageCellsWritten == 0 && stageWithValuesController > 0)
+                {
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                    _logger.LogInformation("BUG LOCATION: FormSaveService → WorkbookValueWriter");
+                    _logger.LogInformation("  {WithVal} fields reach the service but none are written.", stageWithValuesController);
+                    _logger.LogInformation("  Root cause: Sheet name mismatch or cell resolution.");
+                    _logger.LogInformation("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                }
+                else
+                {
+                    _logger.LogInformation("Pipeline trace: Normal (all counts consistent)");
+                }
+                _logger.LogInformation("=========================================================");
 
                 _logger.LogInformation(
                     "Edited workbook saved: {CellsWritten} cells, {Size} bytes. Download: {FileName}",
@@ -693,6 +1015,246 @@ namespace ExcelAPI.Controllers
                     ErrorCode = ErrorCodes.InternalError
                 });
             }
+        }
+
+        /// <summary>
+        /// Phase 20: Build a DesignerModel from the reconstructed FormDefinition.
+        /// Converts the legacy FormDefinition/ClusterDefinition model into the
+        /// comprehensive DesignerModel used for frontend reconstruction.
+        /// </summary>
+        private static DesignerModel BuildDesignerModel(FormDefinition form, string sessionId)
+        {
+            var model = new DesignerModel
+            {
+                SessionId = sessionId,
+                Info = new DesignerWorkbookInfo
+                {
+                    Title = form.Workbook?.Title ?? "Untitled",
+                    Author = form.Workbook?.Author ?? "",
+                    Description = form.Workbook?.Description ?? "",
+                    Version = form.Workbook?.Version ?? "1.0"
+                },
+                Configuration = new DesignerConfiguration
+                {
+                    HasFieldsSheet = form.Sheets.Any(s =>
+                        string.Equals(s.Name, "_Fields", StringComparison.OrdinalIgnoreCase)),
+                    HasExcelOutputSetting = form.Sheets.Any(s =>
+                        string.Equals(s.Name, "ExcelOutputSetting", StringComparison.OrdinalIgnoreCase)),
+                    FieldsSheetRowCount = form.Clusters.Count
+                }
+            };
+
+            // Populate FieldsSheetFieldIds from clusters
+            model.Configuration.FieldsSheetFieldIds = form.Clusters
+                .Select(c => c.ClusterId)
+                .Where(id => !string.IsNullOrEmpty(id))
+                .ToList();
+
+            // Build pages from content sheets (skipping config sheets)
+            int pageIndex = 0;
+            foreach (var sheet in form.Sheets)
+            {
+                string sheetName = sheet.Name ?? "";
+                if (string.Equals(sheetName, "_Fields", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(sheetName, "ExcelOutputSetting", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string pageId = $"page_{pageIndex}";
+
+                var page = new DesignerPage
+                {
+                    Id = pageId,
+                    Name = sheetName,
+                    Index = pageIndex,
+                    Layout = new DesignerPageLayout
+                    {
+                        PrintArea = sheet.PrintArea?.Address ?? "",
+                        PaperSize = sheet.PageSettings?.PaperSize ?? "Letter",
+                        Orientation = sheet.PageSettings?.Orientation ?? "portrait",
+                        WidthPt = sheet.PageSettings?.WidthPt ?? 0,
+                        HeightPt = sheet.PageSettings?.HeightPt ?? 0,
+                        Zoom = sheet.PageSettings?.Zoom ?? 100,
+                        FitToPagesWide = sheet.PageSettings?.FitToPagesWide ?? 0,
+                        FitToPagesTall = sheet.PageSettings?.FitToPagesTall ?? 0,
+                        CenterHorizontally = sheet.PageSettings?.CenterHorizontally ?? false,
+                        CenterVertically = sheet.PageSettings?.CenterVertically ?? false,
+                        Margins = new DesignerMargins
+                        {
+                            Top = sheet.PageSettings?.TopMargin ?? 54,
+                            Bottom = sheet.PageSettings?.BottomMargin ?? 54,
+                            Left = sheet.PageSettings?.LeftMargin ?? 50.4,
+                            Right = sheet.PageSettings?.RightMargin ?? 50.4
+                        },
+                        Rows = sheet.RowHeights.Select(r => new DesignerRowInfo
+                        {
+                            Index = r.Key,
+                            HeightPt = r.Value
+                        }).ToList(),
+                        Columns = sheet.ColumnWidths.Select(c => new DesignerColumnInfo
+                        {
+                            Index = c.Key,
+                            WidthChars = c.Value
+                        }).ToList(),
+                        MergedCells = sheet.MergedCells.Select(m => m.Address).ToList()
+                    },
+                    BackgroundImage = sheet.BackgroundImage,
+                    BackgroundWidth = sheet.BackgroundWidth,
+                    BackgroundHeight = sheet.BackgroundHeight
+                };
+
+                // Build fields for this page from clusters matching this sheet
+                foreach (var cluster in form.Clusters)
+                {
+                    string clusterSheetId = cluster.SheetId ?? "";
+                    // Match by SheetId or by target sheet index
+                    bool matchesSheet = string.Equals(clusterSheetId, sheet.Id, StringComparison.OrdinalIgnoreCase);
+                    if (!matchesSheet && form.Sheets.Count > 0)
+                    {
+                        // Fallback: match by sheet index from SheetId
+                        int sheetIdx = -1;
+                        if (int.TryParse(clusterSheetId.Replace("sheet_", ""), out int parsed))
+                            sheetIdx = parsed;
+                        matchesSheet = sheetIdx == pageIndex;
+                    }
+                    if (!matchesSheet) continue;
+
+                    var cellAddr = cluster.CellAddress ?? "";
+                    cellAddr = cellAddr.Split(':')[0]; // Use first cell of merge range
+
+                    var field = new DesignerField
+                    {
+                        Id = cluster.ClusterId ?? $"field_{form.Clusters.IndexOf(cluster)}",
+                        Name = cluster.Name ?? "",
+                        CellAddress = cellAddr,
+                        Type = cluster.Type ?? "text",
+                        Visible = string.Equals(cluster.Visibility ?? "visible", "visible", StringComparison.OrdinalIgnoreCase),
+                        Value = cluster.Metadata?.GetValueOrDefault("currentValue") ?? "",
+                        Label = cluster.Name ?? "",
+                        Description = cluster.Remarks ?? ""
+                    };
+
+                    // Extract behavior from InputParameters or Metadata
+                    if (cluster.InputParameters?.TryGetValue("required", out var required) == true)
+                        field.Behavior.Required = required == "1" || string.Equals(required, "true", StringComparison.OrdinalIgnoreCase);
+                    if (cluster.InputParameters?.TryGetValue("readonly", out var readOnly) == true)
+                        field.Behavior.ReadOnly = readOnly == "1" || string.Equals(readOnly, "true", StringComparison.OrdinalIgnoreCase);
+                    if (cluster.InputParameters?.TryGetValue("maxlength", out var maxLen) == true)
+                    {
+                        if (int.TryParse(maxLen, out int parsedMaxLen))
+                            field.MaxLength = parsedMaxLen;
+                    }
+                    if (cluster.InputParameters?.TryGetValue("placeholder", out var placeholder) == true)
+                        field.Placeholder = placeholder;
+                    if (cluster.InputParameters?.TryGetValue("default", out var defaultVal) == true)
+                        field.DefaultValue = defaultVal;
+
+                    // Parse options for dropdown fields
+                    if (string.Equals(field.Type, "dropdown", StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(field.Type, "list", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (cluster.InputParameters?.TryGetValue("options", out var optionsStr) == true)
+                        {
+                            field.Options = optionsStr
+                                .Split(new[] { ',', ';', '|' }, StringSplitOptions.RemoveEmptyEntries)
+                                .Select(o => o.Trim())
+                                .Where(o => !string.IsNullOrEmpty(o))
+                                .ToList();
+                        }
+                    }
+
+                    // Extract formatting from cell styles if available
+                    if (sheet.CellStyles != null && cellAddr != null)
+                    {
+                        if (sheet.CellStyles.TryGetValue(cellAddr, out var styleInfo) && styleInfo != null)
+                        {
+                            field.Style = new DesignerFieldStyle
+                            {
+                                FontFamily = styleInfo.FontName,
+                                FontSize = styleInfo.FontSize,
+                                Bold = styleInfo.Bold,
+                                Italic = styleInfo.Italic,
+                                Underline = styleInfo.Underline,
+                                FontColor = styleInfo.Color,
+                                FillColor = styleInfo.FillColor,
+                                HorizontalAlignment = styleInfo.HorizontalAlignment,
+                                VerticalAlignment = styleInfo.VerticalAlignment,
+                                WrapText = styleInfo.WrapText,
+                                BorderTop = styleInfo.BorderTop,
+                                BorderBottom = styleInfo.BorderBottom,
+                                BorderLeft = styleInfo.BorderLeft,
+                                BorderRight = styleInfo.BorderRight
+                            };
+                        }
+                    }
+
+                    // Extract validation if available
+                    if (cluster.InputParameters?.TryGetValue("validation", out var valStr) == true)
+                    {
+                        field.Validation = new DesignerFieldValidation
+                        {
+                            Type = "custom",
+                            Formula1 = valStr
+                        };
+                    }
+
+                    page.Fields.Add(field);
+                }
+
+                model.Pages.Add(page);
+                pageIndex++;
+            }
+
+            // Build comments list from all sheets
+            foreach (var sheet in form.Sheets)
+            {
+                string sheetName = sheet.Name ?? "";
+                foreach (var mc in sheet.MergedCells)
+                {
+                    // Check CellValues dictionary for comments (stored as metadata)
+                    foreach (var kvp in sheet.CellStyles)
+                    {
+                        model.Comments.Add(new DesignerComment
+                        {
+                            CellAddress = kvp.Key,
+                            Worksheet = sheetName,
+                            Text = $"Field at {kvp.Key}",
+                            Author = "PaperLess"
+                        });
+                    }
+                    // Don't add duplicate comments for merged cells
+                    break;
+                }
+            }
+
+            // Add cluster remarks as comments
+            foreach (var cluster in form.Clusters)
+            {
+                string remarks = cluster.Remarks ?? "";
+                if (string.IsNullOrEmpty(remarks)) continue;
+
+                string cellAddr = (cluster.CellAddress ?? "").Split(':')[0];
+                if (string.IsNullOrEmpty(cellAddr)) continue;
+
+                // Avoid duplicates
+                if (!model.Comments.Any(c =>
+                    string.Equals(c.CellAddress, cellAddr, StringComparison.OrdinalIgnoreCase)))
+                {
+                    model.Comments.Add(new DesignerComment
+                    {
+                        CellAddress = cellAddr,
+                        Worksheet = "",
+                        Text = remarks,
+                        Author = "PaperLess"
+                    });
+                }
+            }
+
+            // Configuration duplicate detection
+            int excelOutputCount = form.Sheets.Count(s =>
+                string.Equals(s.Name, "ExcelOutputSetting", StringComparison.OrdinalIgnoreCase));
+            model.Configuration.IsDuplicated = excelOutputCount > 1;
+
+            return model;
         }
 
         /// <summary>

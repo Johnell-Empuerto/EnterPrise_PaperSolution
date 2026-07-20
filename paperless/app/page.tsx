@@ -1,16 +1,17 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import type { RuntimeForm, RuntimeField } from "@/types/runtime";
 import { useRuntime } from "@/hooks/useRuntime";
 import { useRuntimeState } from "@/components/Runtime";
 import { PaperlessDesigner } from "@/components/PaperlessDesigner";
 
 // ── WorkbookDefinition type for save-edited flow (Phase 5.2) ──
+// PHASE 21.6: type is now a number (integer enum value matching backend FieldType)
 interface WbDefField {
   cell: { address: string; rowIndex: number };
   name: string;
-  type: string;
+  type: number;
   value: string | null;
 }
 
@@ -50,6 +51,27 @@ function mapPreviewType(
   if (t.includes("calc") || t.includes("formula") || t.includes("computed"))
     return "calculated";
   return "KeyboardText";
+}
+
+// ═════════════════════════════════════════════════════════
+// PHASE 21.6 — Map frontend RuntimeField.dataType to backend
+// FieldType integer enum value (no JsonStringEnumConverter
+// registered on backend — System.Text.Json expects integers).
+//
+// Backend FieldType enum (in order):
+//   Text=0, Number=1, Date=2, Checkbox=3,
+//   Signature=4, Dropdown=5, Calculated=6
+// ═════════════════════════════════════════════════════════
+function fieldTypeToBackendEnum(dataType: string): number {
+  switch (dataType) {
+    case "number":     return 1; // Number
+    case "date":       return 2; // Date
+    case "checkbox":   return 3; // Checkbox
+    case "signature":  return 4; // Signature
+    case "dropdown":   return 5; // Dropdown
+    case "calculated": return 6; // Calculated
+    default:           return 0; // Text ("KeyboardText" + anything else)
+  }
 }
 export default function Home() {
   // ── Upload state ──
@@ -194,6 +216,33 @@ export default function Home() {
         }),
       };
 
+      // ═════════════════════════════════════════════════════════
+      // PHASE 21.5 — STAGE 1: Upload Response → RuntimeForm
+      // ═════════════════════════════════════════════════════════
+      console.log("%c=========================================================", "color: #047857; font-weight: bold");
+      console.log("%cSTAGE 1 — Upload Response → RuntimeForm", "color: #047857; font-weight: bold");
+      console.log("%c=========================================================", "color: #047857; font-weight: bold");
+      console.log("Upload Response:");
+      console.log("  Pages:", pageList.length);
+      pageList.forEach((p: any, pi: number) => {
+        const pageFields = p.fields ?? [];
+        console.log(`  Page ${pi}: '${p.sheetName ?? "?"}' — Fields: ${pageFields.length}`);
+        pageFields.forEach((f: any, fi: number) => {
+          console.log(`    Field ${fi}: id='${f.id ?? "?"}' name='${f.name ?? "?"}' cell='${f.cellAddr ?? "?"}' type='${f.type ?? "?"}'`);
+        });
+      });
+      console.log("");
+      console.log("Created RuntimeForm:");
+      console.log("  workbookName:", runtimeForm.workbookName);
+      console.log("  sheets:", runtimeForm.sheets.length);
+      runtimeForm.sheets.forEach((s, si) => {
+        console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+        s.fields.forEach((f, fi) => {
+          console.log(`    Field ${fi}: id='${f.id}' name='${f.name ?? "?"}' cell='${f.cellReference}' type='${f.dataType}'`);
+        });
+      });
+      console.log("%c=========================================================", "color: #047857; font-weight: bold");
+
       setRuntimeForm(runtimeForm);
     } catch (err) {
       setUploadError(
@@ -204,6 +253,27 @@ export default function Home() {
       setUploadFile(null);
     }
   };
+
+  // ═════════════════════════════════════════════════════════
+  // PHASE 21.5 — STAGE 2: React RuntimeForm State (on change)
+  // ═════════════════════════════════════════════════════════
+  useEffect(() => {
+    if (runtimeForm) {
+      console.log("%c=========================================================", "color: #0369a1; font-weight: bold");
+      console.log("%cSTAGE 2 — React RuntimeForm State (after setRuntimeForm)", "color: #0369a1; font-weight: bold");
+      console.log("%c=========================================================", "color: #0369a1; font-weight: bold");
+      console.log("React state runtimeForm:");
+      console.log("  sheets:", runtimeForm.sheets.length);
+      runtimeForm.sheets.forEach((s, si) => {
+        console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+        s.fields.forEach((f, fi) => {
+          console.log(`    Field ${fi}: id='${f.id}' name='${f.name ?? "?"}' cell='${f.cellReference}'`);
+        });
+      });
+      console.log("%c=========================================================", "color: #0369a1; font-weight: bold");
+      console.log("");
+    }
+  }, [runtimeForm]);
 
   // ── Reset handler ──
   const handleReset = () => {
@@ -232,29 +302,69 @@ export default function Home() {
     values: Record<string, string | boolean | null>,
     sid: string,
   ): WbDef => {
-    return {
+    // ═════════════════════════════════════════════════════════
+    // PHASE 21.5 — STAGE 6 & 7: runtimeFormToWorkbookDefinition
+    // ═════════════════════════════════════════════════════════
+    console.log("%c=========================================================", "color: #b45309; font-weight: bold");
+    console.log("%cSTAGE 6 — runtimeFormToWorkbookDefinition INPUT", "color: #b45309; font-weight: bold");
+    console.log("%c=========================================================", "color: #b45309; font-weight: bold");
+    console.log("INPUT RuntimeForm:");
+    console.log("  workbookName:", form.workbookName);
+    console.log("  sheets:", form.sheets.length);
+    form.sheets.forEach((s, si) => {
+      console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+      s.fields.forEach((f, fi) => {
+        const val = values[f.id];
+        console.log(`    Field ${fi}: id='${f.id}' name='${f.name ?? "?"}' cell='${f.cellReference}' value='${val ?? "(empty)"}'`);
+      });
+    });
+
+    // ═════════════════════════════════════════════════════════
+    // BUG FIX (Phase 21.5): Include ALL fields in the payload,
+    // not just fields with non-empty values. The filter was
+    // removing EVERY field because values starts empty ({}).
+    // Backend needs all fields to know which cells exist.
+    // ═════════════════════════════════════════════════════════
+    const result: WbDef = {
       info: { title: form.workbookName ?? "Untitled" },
       sourceFileName: sid,
       sessionId: sid,
       sheets: form.sheets.map((sheet, si) => ({
         name: sheet.name ?? `Page ${si + 1}`,
         index: si,
-        fields: sheet.fields
-          .filter(f => {
-            const val = values[f.id];
-            return val !== null && val !== undefined && val !== "";
-          })
-          .map(f => ({
-            cell: {
-              address: f.cellReference?.split(":")[0] ?? "A1",
-              rowIndex: parseInt(f.cellReference?.match(/\d+/)?.[0] ?? "1"),
-            },
-            name: f.name ?? f.id,
-            type: f.dataType ?? "KeyboardText",
-            value: String(values[f.id] ?? ""),
-          })),
+        fields: sheet.fields.map(f => ({
+          cell: {
+            address: f.cellReference?.split(":")[0] ?? "A1",
+            rowIndex: parseInt(f.cellReference?.match(/\d+/)?.[0] ?? "1"),
+          },
+          name: f.name ?? f.id,
+          // PHASE 21.6: Send integer enum value (0=Text, 1=Number, etc.)
+          // instead of string. Backend uses System.Text.Json default which
+          // expects integers for enums (no JsonStringEnumConverter).
+          type: fieldTypeToBackendEnum(f.dataType ?? "KeyboardText"),
+          value: String(values[f.id] ?? ""),
+        })),
       })),
     };
+
+    // ═════════════════════════════════════════════════════════
+    // PHASE 21.5 — STAGE 7: OUTPUT PAYLOAD
+    // ═════════════════════════════════════════════════════════
+    console.log("%c=========================================================", "color: #b45309; font-weight: bold");
+    console.log("%cSTAGE 7 — runtimeFormToWorkbookDefinition OUTPUT", "color: #b45309; font-weight: bold");
+    console.log("%c=========================================================", "color: #b45309; font-weight: bold");
+    console.log("OUTPUT WbDef:");
+    console.log("  sheets:", result.sheets.length);
+    result.sheets.forEach((s, si) => {
+      console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+      s.fields.forEach((f, fi) => {
+        console.log(`    Field ${fi}: id='${f.name}' cell='${f.cell.address}/${f.cell.rowIndex}' value='${f.value}'`);
+      });
+    });
+    console.log("%c=========================================================", "color: #b45309; font-weight: bold");
+    console.log("");
+
+    return result;
   }, []);
 
   // ── Save edited — POST /api/form/save-edited → WorkbookValueWriter (Phase 5.2) ──
@@ -270,6 +380,25 @@ export default function Home() {
 
     try {
       const wbDef = runtimeFormToWorkbookDefinition(runtimeForm, runtime.values, sessionId);
+
+      // ═════════════════════════════════════════════════════════
+      // PHASE 21.5 — STAGE 8: FINAL JSON PAYLOAD (before fetch)
+      // ═════════════════════════════════════════════════════════
+      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
+      console.log("%cSTAGE 8 — FINAL JSON PAYLOAD (before fetch)", "color: #dc2626; font-weight: bold");
+      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
+      console.log("FINAL FETCH PAYLOAD:");
+      console.log("  sheets:", wbDef.sheets.length);
+      wbDef.sheets.forEach((s, si) => {
+        console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+        s.fields.forEach((f, fi) => {
+          console.log(`    Field ${fi}: name='${f.name}' cell='${f.cell.address}' value='${f.value}'`);
+        });
+      });
+      console.log("");
+      console.log("JSON.stringify length:", JSON.stringify(wbDef).length, "bytes");
+      console.log("fields[0] check: wbDef.sheets[0].fields.length =", wbDef.sheets[0]?.fields?.length ?? 0);
+      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
 
       const response = await fetch(`${API_BASE_URL}/api/form/save-edited`, {
         method: "POST",

@@ -255,6 +255,39 @@ namespace ExcelAPI.Application
             cancellationToken.ThrowIfCancellationRequested();
             Directory.CreateDirectory(outputDirectory);
 
+            // ═════════════════════════════════════════════════════════
+            // PHASE 21.4 — STAGE 7: SAVE SERVICE INPUT
+            // ═════════════════════════════════════════════════════════
+            int serviceFieldCount = definition.Sheets?.Sum(s => s.Fields?.Count ?? 0) ?? 0;
+            int serviceWithValues = definition.Sheets?.Sum(s => s.Fields?.Count(f => !string.IsNullOrWhiteSpace(f.Value)) ?? 0) ?? 0;
+
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("SAVE SERVICE INPUT");
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("Workbook: {Title}", definition.Info?.Title ?? "(untitled)");
+            _logger.LogInformation("SessionId: {SessionId}", definition.SessionId ?? "(not set)");
+            _logger.LogInformation("SourcePath: {Path}", sourcePath);
+            _logger.LogInformation("Sheets: {Count}", definition.Sheets.Count);
+            _logger.LogInformation("Fields (total): {Count}", serviceFieldCount);
+            _logger.LogInformation("Fields (with values): {Count}", serviceWithValues);
+            _logger.LogInformation("Fields (empty): {Count}", serviceFieldCount - serviceWithValues);
+
+            // Field loss check: compare with controller stage
+            if (serviceFieldCount == 0)
+            {
+                _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+                _logger.LogError("FIELD LOSS DETECTED AT STAGE 7: 0 fields entered FormSaveService");
+                _logger.LogError("This means the WorkbookDefinition passed from the Controller");
+                _logger.LogError("already has 0 fields. The bug is in the Controller call chain.");
+                _logger.LogError("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+            }
+            else if (serviceWithValues == 0 && serviceFieldCount > 0)
+            {
+                _logger.LogWarning("STAGE 7: {Total} fields exist but ALL have empty values", serviceFieldCount);
+                _logger.LogWarning("Workbook will be copied unchanged (0 cells written).");
+            }
+            _logger.LogInformation("=========================================================");
+
             _logger.LogInformation("========== SAVE PIPELINE ==========");
             _logger.LogInformation("WorkbookValueWriter START");
             _logger.LogInformation("Workbook: {Title}", definition.Info?.Title ?? "(untitled)");
@@ -286,6 +319,64 @@ namespace ExcelAPI.Application
 
             var formId = Guid.NewGuid().ToString("N");
             var result = new FormSaveResult();
+
+            // ═════════════════════════════════════════════════════════
+            // PHASE 21.3 — STAGE 2: WORKBOOK DEFINITION DIAGNOSTIC
+            // ═════════════════════════════════════════════════════════
+
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("WORKBOOK DEFINITION — Before WorkbookValueWriter");
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("Workbook: {Title}", definition.Info?.Title ?? "(untitled)");
+            _logger.LogInformation("SessionId: {Sid}", definition.SessionId ?? "(none)");
+            _logger.LogInformation("Pages (sheets): {Count}", definition.Sheets.Count);
+
+            int wbDefTotalFields = 0;
+            int wbDefTotalWithValues = 0;
+            foreach (var wbSheet in definition.Sheets)
+            {
+                foreach (var field in wbSheet.Fields)
+                {
+                    wbDefTotalFields++;
+                    if (!string.IsNullOrWhiteSpace(field.Value))
+                        wbDefTotalWithValues++;
+
+                    string fieldId = field.Id ?? $"field_{wbDefTotalFields}";
+                    string cellAddr = field.Cell?.Address ?? "?";
+                    string fieldValue = field.Value ?? "";
+                    string isRequired = field.Required ? "true" : "false";
+                    string maxLen = field.MaxLength > 0 ? field.MaxLength.ToString() : "(unlimited)";
+                    string placeholder = field.Placeholder ?? "";
+                    string defaultValue = field.DefaultValue ?? "";
+                    string formula = field.Formula ?? "";
+                    string styleFont = "";
+                    if (field.Style?.Font != null)
+                    {
+                        var f = field.Style.Font;
+                        styleFont = $"Font='{f.Name ?? "?"}/{f.SizePt}' Bold={f.Bold} Color='{f.ColorArgb ?? ""}'";
+                    }
+
+                    _logger.LogInformation("  Field #{Count}:", wbDefTotalFields);
+                    _logger.LogInformation("    Id        : {Id}", fieldId);
+                    _logger.LogInformation("    Page      : {Sheet}", wbSheet.Name);
+                    _logger.LogInformation("    Cell      : {Cell}", cellAddr);
+                    _logger.LogInformation("    Type      : {Type}", field.Type.ToString());
+                    _logger.LogInformation("    Value     : {Val}", string.IsNullOrEmpty(fieldValue) ? "(empty)" : fieldValue);
+                    _logger.LogInformation("    Required  : {Req}", isRequired);
+                    _logger.LogInformation("    Locked    : {Locked}", field.Locked);
+                    _logger.LogInformation("    MaxLength : {Max}", maxLen);
+                    _logger.LogInformation("    Placeholder : {PH}", string.IsNullOrEmpty(placeholder) ? "(none)" : placeholder);
+                    _logger.LogInformation("    Default   : {Def}", string.IsNullOrEmpty(defaultValue) ? "(none)" : defaultValue);
+                    _logger.LogInformation("    Formula   : {F}", string.IsNullOrEmpty(formula) ? "(none)" : formula);
+                    _logger.LogInformation("    Style     : {S}", string.IsNullOrEmpty(styleFont) ? "(default)" : styleFont);
+                    _logger.LogInformation("    ---------------------------------------------------------");
+                }
+            }
+
+            _logger.LogInformation("=========================================================");
+            _logger.LogInformation("Total fields in WorkbookDefinition: {Total}", wbDefTotalFields);
+            _logger.LogInformation("Fields with non-empty values: {WithVal}", wbDefTotalWithValues);
+            _logger.LogInformation("=========================================================");
 
             // Write values into the original workbook using OpenXml
             cancellationToken.ThrowIfCancellationRequested();

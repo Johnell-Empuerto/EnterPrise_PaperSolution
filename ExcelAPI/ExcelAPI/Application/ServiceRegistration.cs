@@ -28,6 +28,11 @@ public static class ApplicationServiceRegistration
         // Matches ConMas behavior which never performs structural validation.
         services.AddScoped<CompatibilityValidator>();
 
+        // Phase 21: DesignerModelReader — deserializes workbook into DesignerModel
+        // Reads everything directly from the workbook using OpenXML SDK.
+        // No COM Interop, no dependency on original template.
+        services.AddScoped<IDesignerModelReader, DesignerModelReader>();
+
         // NOTE: WorkbookDiffValidator (Phase 4.4) has been removed from registration.
         // Structural byte-for-byte validation is no longer performed.
         // The source file is kept on disk for reference only.

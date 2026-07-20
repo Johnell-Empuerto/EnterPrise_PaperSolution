@@ -40,9 +40,52 @@ export function RuntimeFormViewer({
     initRef.current = key;
     const store = getDefaultStore();
     initializeStore(store, runtimeForm);
+
+    // ═════════════════════════════════════════════════════════
+    // PHASE 21.5 — STAGE 4: Runtime Model in Zustand Store
+    // ═════════════════════════════════════════════════════════
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+    console.log("%cSTAGE 4 — Runtime Model → Zustand Store", "color: #7c3aed; font-weight: bold");
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+    console.log("Store initialized with RuntimeForm:");
+    console.log("  title:", runtimeForm.title);
+    console.log("  sheets:", runtimeForm.sheets.length);
+    runtimeForm.sheets.forEach((s, si) => {
+      console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+      s.fields.forEach((f, fi) => {
+        console.log(`    Field ${fi}: id='${f.id}' name='${f.name ?? "?"}' cell='${f.cellReference}' type='${f.dataType}'`);
+      });
+    });
+    console.log("");
+
+    // Check Zustand store values after init
+    const storeState = store.getState();
+    console.log("Initial field values in store:", Object.keys(storeState.values).length, "fields initialized");
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
   }, [runtimeForm]);
 
   const sheet = runtimeForm.sheets[currentPage];
+
+  // ═════════════════════════════════════════════════════════
+  // PHASE 21.5 — STAGE 5: Before Rendering Page
+  // ═════════════════════════════════════════════════════════
+  console.log("%c=========================================================", "color: #0891b2; font-weight: bold");
+  console.log("%cSTAGE 5 — Rendering Page (RuntimeFormViewer)", "color: #0891b2; font-weight: bold");
+  console.log("%c=========================================================", "color: #0891b2; font-weight: bold");
+  if (sheet) {
+    console.log("Current page:", currentPage);
+    console.log("  Sheet name:", sheet.name);
+    console.log("  Fields:", sheet.fields.length);
+    sheet.fields.forEach((f, fi) => {
+      console.log(`    Field ${fi}: id='${f.id}' name='${f.name ?? "?"}' cell='${f.cellReference}' type='${f.dataType}'`);
+    });
+    console.log("  Overlays to render:", sheet.fields.length);
+  } else {
+    console.log("  No sheet found for page", currentPage);
+  }
+  console.log("%c=========================================================", "color: #0891b2; font-weight: bold");
+  console.log("");
+
   if (!sheet) return null;
 
   const overlaysForSheet = useMemo(() => {
