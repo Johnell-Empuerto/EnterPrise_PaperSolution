@@ -643,25 +643,38 @@ namespace ExcelAPI.Controllers
                     "Edited workbook saved: {CellsWritten} cells, {Size} bytes. Download: {FileName}",
                     result.CellsWritten, fileBytes.Length, safeFileName);
 
-                // Add validation results as a response header for the frontend
-                if (result.ValidationResult != null)
+                // Phase 19: Add round-trip compatibility report as response headers
+                if (result.RoundTripReport != null)
                 {
-                    var validationJson = System.Text.Json.JsonSerializer.Serialize(new
+                    var rt = result.RoundTripReport;
+
+                    // Compatibility score header (0-100)
+                    Response.Headers.Append("X-Compatibility-Score", rt.CompatibilityScore.ToString());
+                    Response.Headers.Append("X-Compatibility-Warnings", rt.Warnings.Count.ToString());
+                    Response.Headers.Append("X-Compatibility-Errors", rt.Errors.Count.ToString());
+
+                    // Field comparison headers
+                    Response.Headers.Append("X-Fields-Original", rt.FieldCountOriginal.ToString());
+                    Response.Headers.Append("X-Fields-Edited", rt.FieldCountEdited.ToString());
+                    Response.Headers.Append("X-Fields-Missing", rt.MissingFields.Count.ToString());
+                    Response.Headers.Append("X-Fields-Added", rt.AddedFields.Count.ToString());
+                    Response.Headers.Append("X-Fields-Changed", rt.ChangedFields.Count.ToString());
+
+                    // Configuration headers
+                    Response.Headers.Append("X-Config-FieldsSheet", rt.FieldsSheetExists ? "1" : "0");
+                    Response.Headers.Append("X-Config-ExcelOutputSetting", rt.ExcelOutputSettingExists ? "1" : "0");
+
+                    // Layout headers
+                    Response.Headers.Append("X-Layout-Changes", rt.LayoutChanges.Count.ToString());
+
+                    // Log if score is below threshold
+                    if (rt.CompatibilityScore < 100)
                     {
-                        passed = result.ValidationResult.Passed,
-                        cellsWritten = result.CellsWritten,
-                        sheetCountChanged = result.ValidationResult.SheetCountChanges,
-                        styleChanges = result.ValidationResult.StyleChanges,
-                        mergeChanges = result.ValidationResult.MergeChanges,
-                        pageSetupChanges = result.ValidationResult.PageSetupChanges,
-                        formulaChanges = result.ValidationResult.FormulaChanges,
-                        namedRangeChanges = result.ValidationResult.DefinedNameChanges,
-                        editableValueChanges = result.ValidationResult.EditableValueChanges,
-                        totalDiffs = result.ValidationResult.TotalDifferences
-                    });
-                    var encoded = Convert.ToBase64String(
-                        System.Text.Encoding.UTF8.GetBytes(validationJson));
-                    Response.Headers.Append("X-Validation-Results", encoded);
+                        _logger.LogInformation(
+                            "Round-trip compatibility: Score={Score}/100, Fields={F}/{E}, Layout={L}, Config={C}",
+                            rt.CompatibilityScore, rt.FieldCountOriginal, rt.FieldCountEdited,
+                            rt.LayoutChanges.Count, rt.ConfigurationChanges.Count);
+                    }
                 }
 
                 _logger.LogInformation("========== SAVE PIPELINE END ==========");
@@ -670,49 +683,6 @@ namespace ExcelAPI.Controllers
                     fileBytes,
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     safeFileName);
-            }
-            catch (WorkbookFidelityException fidelityEx)
-            {
-                _logger.LogError("VALIDATION FAILED: {Message}", fidelityEx.Message);
-
-                var validationData = new
-                {
-                    passed = false,
-                    totalStructuralDifferences = fidelityEx.ValidationResult.TotalDifferences,
-                    sheetCountChanged = fidelityEx.ValidationResult.SheetCountChanges,
-                    styleChanges = fidelityEx.ValidationResult.StyleChanges,
-                    fontChanges = fidelityEx.ValidationResult.FontChanges,
-                    fillChanges = fidelityEx.ValidationResult.FillChanges,
-                    borderChanges = fidelityEx.ValidationResult.BorderChanges,
-                    alignmentChanges = fidelityEx.ValidationResult.AlignmentChanges,
-                    numberFormatChanges = fidelityEx.ValidationResult.NumberFormatChanges,
-                    mergeChanges = fidelityEx.ValidationResult.MergeChanges,
-                    printSetupChanges = fidelityEx.ValidationResult.PageSetupChanges,
-                    pageMarginChanges = fidelityEx.ValidationResult.PageMarginChanges,
-                    freezePaneChanges = fidelityEx.ValidationResult.FreezePaneChanges,
-                    rowHeightChanges = fidelityEx.ValidationResult.RowHeightChanges,
-                    columnWidthChanges = fidelityEx.ValidationResult.ColumnWidthChanges,
-                    hiddenRowChanges = fidelityEx.ValidationResult.HiddenRowChanges,
-                    hiddenColumnChanges = fidelityEx.ValidationResult.HiddenColumnChanges,
-                    drawingChanges = fidelityEx.ValidationResult.DrawingChanges,
-                    imageChanges = fidelityEx.ValidationResult.ImageChanges,
-                    commentChanges = fidelityEx.ValidationResult.CommentChanges,
-                    hyperlinkChanges = fidelityEx.ValidationResult.HyperlinkChanges,
-                    dataValidationChanges = fidelityEx.ValidationResult.DataValidationChanges,
-                    conditionalFormattingChanges = fidelityEx.ValidationResult.ConditionalFormattingChanges,
-                    formulaChanges = fidelityEx.ValidationResult.FormulaChanges,
-                    definedNameChanges = fidelityEx.ValidationResult.DefinedNameChanges,
-                    editableValueChanges = fidelityEx.ValidationResult.EditableValueChanges,
-                    details = fidelityEx.ValidationResult.Details,
-                    rowEdits = fidelityEx.ValidationResult.EditableChangedCells
-                };
-
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = "Workbook fidelity validation failed. The edited workbook is not structurally identical to the original. No file has been returned.",
-                    validation = validationData
-                });
             }
             catch (Exception ex)
             {

@@ -807,31 +807,46 @@ namespace ExcelAPI.Application
         }
 
         // ════════════════════════════════════════════════════════════════════════
-        // Phase 5.5.2 — Post-process ZIP for ConMas compatibility
+        // Phase 8.1 — Post-process ZIP for ExcelOutputSetting (Idempotent)
         //
-        // After the SDK write + ZIP restore cycle, we directly manipulate the
-        // output ZIP to craft exact ConMas-compatible structures that the SDK
-        // cannot produce correctly:
-        //   1. Cell comments with \r\n 25-line format, xr:uid GUIDs, run properties
-        //   2. ExcelOutputSetting hidden worksheet (xl/worksheets/sheet3.xml)
-        //   3. 36 ConMas XML config shared strings appended to existing strings
-        //   4. Updated workbook.xml (adds sheet3 entry)
-        //   5. Updated workbook.xml.rels (adds relationship for sheet3)
-        //   6. Updated [Content_Types].xml (adds Override for sheet3)
+        // Creates the ExcelOutputSetting configuration sheet ONLY when the
+        // workbook does not already have one. On the first export (from a
+        // template without ExcelOutputSetting), the sheet is created with
+        // 36 XML config fragments in shared strings and A1:A36 cell references.
+        // On subsequent exports (from an already-exported workbook that already
+        // has ExcelOutputSetting), the entire PostProcess is SKIPPED to prevent
+        // shared string index shifting and configuration value drift.
+        //
+        // This makes the export pipeline idempotent — matching legacy ConMas
+        // behavior where workbook configuration is preserved across unlimited
+        // export cycles.
         // ════════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Post-process the output ZIP to add ConMas-compatible structures
-        /// (comments, ExcelOutputSetting sheet, shared strings) that enable
-        /// round-trip metadata recovery from the output Excel file.
+        /// Post-process the output ZIP to add ExcelOutputSetting sheet if it
+        /// does not already exist. Phase 8.1: Idempotent — if ExcelOutputSetting
+        /// already exists, the entire PostProcess is skipped.
         /// </summary>
         private void PostProcessZipForConMas(string outputPath, WbDef.WorkbookDefinition wbDef)
         {
-            _logger.LogInformation("[PHASE5.5.2] Post-processing ZIP for ConMas compatibility...");
+            _logger.LogInformation("[PHASE8.1] Post-processing ZIP for ExcelOutputSetting (idempotent)...");
 
             try
             {
                 using var pkg = ZipFile.Open(outputPath, ZipArchiveMode.Update);
+
+                // ── Phase 8.1: Guard — skip if ExcelOutputSetting already exists ──
+                // Check if xl/worksheets/sheet3.xml already exists in the workbook.
+                // If it does, the configuration was created in a previous export.
+                // We skip ALL PostProcess to prevent shared string index shifting
+                // and configuration value drift across generations.
+                var existingSheet3 = pkg.GetEntry("xl/worksheets/sheet3.xml");
+                if (existingSheet3 != null)
+                {
+                    _logger.LogInformation("[PHASE8.1] ExcelOutputSetting already exists — skipping PostProcess (idempotent guard)");
+                    return;
+                }
+                _logger.LogInformation("[PHASE8.1] No existing ExcelOutputSetting found — will create configuration sheet");
 
                 // 1. Generate 36 ExcelOutputSetting XML config fragments
                 int clusterCount = Math.Max(1, wbDef.Sheets.Sum(s => s.Fields.Count));
@@ -863,12 +878,12 @@ namespace ExcelAPI.Application
                 // 7. Update [Content_Types].xml for sheet3 override
                 UpdateContentTypesForSheet3(pkg);
 
-                _logger.LogInformation("[PHASE5.5.2] Post-processing complete: {Strings} shared strings @ index {StartIdx}, sheet3 created, {Fragments} fragments used",
+                _logger.LogInformation("[PHASE8.1] Post-processing complete: {Strings} shared strings @ index {StartIdx}, sheet3 created, {Fragments} fragments used",
                     xmlFragments.Length, newStartIndex, xmlFragments.Length);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "[PHASE5.5.2] Post-processing failed: {Msg}", ex.Message);
+                _logger.LogError(ex, "[PHASE8.1] Post-processing failed: {Msg}", ex.Message);
             }
         }
 

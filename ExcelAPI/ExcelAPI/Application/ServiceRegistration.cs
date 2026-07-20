@@ -20,9 +20,17 @@ public static class ApplicationServiceRegistration
         // Coordinate transform for printed page origin (Phase 36)
         services.AddSingleton<CoordinateTransformer>();
 
-        // Phase 4.4: Workbook editing and diff validation
+        // Phase 4.4: Workbook editing
         services.AddScoped<WorkbookValueWriter>();
-        services.AddScoped<WorkbookDiffValidator>();
+
+        // Phase 17/18: Lightweight functional compatibility validator (replaces WorkbookDiffValidator)
+        // Validates only business-critical requirements — never rejects the workbook.
+        // Matches ConMas behavior which never performs structural validation.
+        services.AddScoped<CompatibilityValidator>();
+
+        // NOTE: WorkbookDiffValidator (Phase 4.4) has been removed from registration.
+        // Structural byte-for-byte validation is no longer performed.
+        // The source file is kept on disk for reference only.
 
         // Phase 5.2: Server-side session storage (TempWorkbooks/{sessionId}/original.xlsx)
         // The browser only tracks sessionId — the server owns the workbook.

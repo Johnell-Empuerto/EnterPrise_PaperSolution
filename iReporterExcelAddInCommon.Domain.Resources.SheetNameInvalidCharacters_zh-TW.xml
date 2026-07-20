@@ -1,0 +1,223 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<InvalidCharacters>
+  <Character>
+    <Symbol>‘</Symbol>
+    <Name>Left Single Quotation Mark</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>’</Symbol>
+    <Name>Right Single Quotation Mark</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>“</Symbol>
+    <Name>Left Double Quotation Mark</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>”</Symbol>
+    <Name>Right Double Quotation Mark</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>　</Symbol>
+    <Name>Ideographic Space</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>、</Symbol>
+    <Name>Ideographic Comma</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>。</Symbol>
+    <Name>Ideographic Full Stop</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>！</Symbol>
+    <Name>Fullwidth Exclamation</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＂</Symbol>
+    <Name>Fullwidth Quotation</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＃</Symbol>
+    <Name>Fullwidth Number Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＄</Symbol>
+    <Name>Fullwidth Dollar Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>％</Symbol>
+    <Name>Fullwidth Percent Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＆</Symbol>
+    <Name>Fullwidth Ampersand</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>（</Symbol>
+    <Name>Fullwidth Left Parenthesis</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>）</Symbol>
+    <Name>Fullwidth Right Parenthesis</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＋</Symbol>
+    <Name>Fullwidth Plus Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>，</Symbol>
+    <Name>Fullwidth Comma</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>－</Symbol>
+    <Name>Fullwidth Hyphen-Minus</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>；</Symbol>
+    <Name>Fullwidth Semicolon</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＜</Symbol>
+    <Name>Fullwidth Less-Than Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＝</Symbol>
+    <Name>Fullwidth Equals Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＞</Symbol>
+    <Name>Fullwidth Greater-Than Sign</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＠</Symbol>
+    <Name>Fullwidth Commercial At</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>＾</Symbol>
+    <Name>Fullwidth Circumflex Accent</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>｀</Symbol>
+    <Name>Fullwidth Grave Accent</Name>
+    <method>1</method>
+  </Character>
+  <Character>
+    <Symbol>^</Symbol>
+    <Name>Circumflex Accent</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>・</Symbol>
+    <Name>Katakana Middle Dot</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>･</Symbol>
+    <Name>Halfwidth Katakana Middle Dot</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>【</Symbol>
+    <Name>Left Black Lenticular Bracket</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>】</Symbol>
+    <Name>Right Black Lenticular Bracket</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>＿</Symbol>
+    <Name>Fullwidth Low Line</Name>
+    <method>0</method>
+  </Character>
+  <Character>
+    <Symbol>:</Symbol>
+    <Name>Colon</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>：</Symbol>
+    <Name>Fullwidth Colon</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>\</Symbol>
+    <Name>Reverse Solidus</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>￥</Symbol>
+    <Name>Fullwidth Yen Sign</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>?</Symbol>
+    <Name>Question Mark</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>？</Symbol>
+    <Name>Fullwidth Question Mark</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>[</Symbol>
+    <Name>Left Square Bracket</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>]</Symbol>
+    <Name>Right Square Bracket</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>/</Symbol>
+    <Name>Solidus</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>／</Symbol>
+    <Name>Fullwidth Solidus</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>＼</Symbol>
+    <Name>Fullwidth Reverse Solidus</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>*</Symbol>
+    <Name>Asterisk</Name>
+    <method></method>
+  </Character>
+  <Character>
+    <Symbol>＊</Symbol>
+    <Name>Fullwidth Asterisk</Name>
+    <method></method>
+  </Character>
+</InvalidCharacters>

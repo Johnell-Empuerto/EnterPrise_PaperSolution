@@ -12,8 +12,10 @@ namespace ExcelAPI.Application
         public string PreviewPath { get; set; } = "";
         public string PdfPath { get; set; } = "";
         public DatabaseResult? DatabaseObjects { get; set; }
-        /// <summary>Validation results from WorkbookDiffValidator (Phase 4.4.1).</summary>
-        public WorkbookDiffResult? ValidationResult { get; set; }
+        /// <summary>Phase 19 business-level round-trip compatibility validation result.
+        /// Includes field-level, comment, print layout, and configuration comparisons.
+        /// Never rejects the workbook. Always returns it.</summary>
+        public RoundTripCompatibilityReport? RoundTripReport { get; set; }
         /// <summary>Number of cells written by WorkbookValueWriter.</summary>
         public int CellsWritten { get; set; }
         /// <summary>Source workbook path that was used.</summary>
@@ -49,7 +51,7 @@ namespace ExcelAPI.Application
         private readonly PreviewGenerator _previewGenerator;
         private readonly PdfGenerator _pdfGenerator;
         private readonly WorkbookValueWriter _valueWriter;
-        private readonly WorkbookDiffValidator _diffValidator;
+        private readonly CompatibilityValidator _compatValidator;
         private readonly ILogger<FormSaveService> _logger;
 
         public FormSaveService(
@@ -59,7 +61,7 @@ namespace ExcelAPI.Application
             PreviewGenerator previewGenerator,
             PdfGenerator pdfGenerator,
             WorkbookValueWriter valueWriter,
-            WorkbookDiffValidator diffValidator,
+            CompatibilityValidator compatValidator,
             ILogger<FormSaveService> logger)
         {
             _xmlGenerator = xmlGenerator;
@@ -68,7 +70,7 @@ namespace ExcelAPI.Application
             _previewGenerator = previewGenerator;
             _pdfGenerator = pdfGenerator;
             _valueWriter = valueWriter;
-            _diffValidator = diffValidator;
+            _compatValidator = compatValidator;
             _logger = logger;
         }
 
@@ -295,82 +297,26 @@ namespace ExcelAPI.Application
                 "[WBDF] Edited values saved: {Count} cells written to {Path} (source: {Source})",
                 result.CellsWritten, result.WorkbookPath, sourcePath);
 
-            // Auto-validate by comparing original vs edited — Phase 4.5 ENFORCEMENT
-            _logger.LogInformation("Running WorkbookDiffValidator...");
-            var diffResult = _diffValidator.Compare(sourcePath, result.WorkbookPath);
-            result.ValidationResult = diffResult;
+            // Phase 19: Business-level round-trip compatibility validation.
+            // Compares fields, comments, configuration, print layout, and background.
+            // Never rejects the workbook — always returns it to the user.
+            // Matches ConMas behavior: ConMas never performs structural validation.
+            _logger.LogInformation("Running Phase 19 CompatibilityValidator...");
+            var compatReport = _compatValidator.Validate(
+                sourcePath, result.WorkbookPath, result.CellsWritten);
+            result.RoundTripReport = compatReport;
 
-            _logger.LogInformation("========== VALIDATION RESULTS ==========");
-            _logger.LogInformation("Sheet Count Changed: {V}", diffResult.SheetCountChanges);
-            _logger.LogInformation("Styles Changed: {V}", diffResult.StyleChanges);
-            _logger.LogInformation("Fonts Changed: {V}", diffResult.FontChanges);
-            _logger.LogInformation("Fills Changed: {V}", diffResult.FillChanges);
-            _logger.LogInformation("Borders Changed: {V}", diffResult.BorderChanges);
-            _logger.LogInformation("Alignment Changed: {V}", diffResult.AlignmentChanges);
-            _logger.LogInformation("NumberFormat Changed: {V}", diffResult.NumberFormatChanges);
-            _logger.LogInformation("Merged Cells Changed: {V}", diffResult.MergeChanges);
-            _logger.LogInformation("Print Setup Changed: {V}", diffResult.PageSetupChanges);
-            _logger.LogInformation("Page Margins Changed: {V}", diffResult.PageMarginChanges);
-            _logger.LogInformation("Freeze Panes Changed: {V}", diffResult.FreezePaneChanges);
-            _logger.LogInformation("Row Heights Changed: {V}", diffResult.RowHeightChanges);
-            _logger.LogInformation("Column Widths Changed: {V}", diffResult.ColumnWidthChanges);
-            _logger.LogInformation("Hidden Rows Changed: {V}", diffResult.HiddenRowChanges);
-            _logger.LogInformation("Hidden Columns Changed: {V}", diffResult.HiddenColumnChanges);
-            _logger.LogInformation("Drawings Changed: {V}", diffResult.DrawingChanges);
-            _logger.LogInformation("Images Changed: {V}", diffResult.ImageChanges);
-            _logger.LogInformation("Comments Changed: {V}", diffResult.CommentChanges);
-            _logger.LogInformation("Hyperlinks Changed: {V}", diffResult.HyperlinkChanges);
-            _logger.LogInformation("Data Validation Changed: {V}", diffResult.DataValidationChanges);
-            _logger.LogInformation("Conditional Format Changed: {V}", diffResult.ConditionalFormattingChanges);
-            _logger.LogInformation("Tables Changed: {V}", diffResult.TableChanges);
-            _logger.LogInformation("Defined Names Changed: {V}", diffResult.DefinedNameChanges);
-            _logger.LogInformation("Header/Footer Changed: {V}", diffResult.HeaderFooterChanges);
-            _logger.LogInformation("Formula Changed: {V}", diffResult.FormulaChanges);
-            _logger.LogInformation("Editable Values Changed: {V}", diffResult.EditableValueChanges);
-            _logger.LogInformation("Validation Passed: {V}", diffResult.Passed);
+            _logger.LogInformation("========== COMPATIBILITY REPORT ==========");
+            _logger.LogInformation("Score: {Score}/100", compatReport.CompatibilityScore);
+            _logger.LogInformation("Fields: {Orig} → {Edit}",
+                compatReport.FieldCountOriginal, compatReport.FieldCountEdited);
+            _logger.LogInformation("Errors: {E}, Warnings: {W}",
+                compatReport.Errors.Count, compatReport.Warnings.Count);
 
-            // Phase 4.5: REJECT on validation failure — never return a corrupted workbook
-            if (!diffResult.Passed)
-            {
-                _logger.LogError("VALIDATION FAILED: {Total} structural differences detected!", diffResult.TotalDifferences);
-                foreach (var detail in diffResult.Details)
-                {
-                    _logger.LogError("  MISMATCH: {Detail}", detail);
-                }
-
-                foreach (var cellChange in diffResult.EditableChangedCells)
-                {
-                    _logger.LogInformation("  CELL EDIT: {Change}", cellChange);
-                }
-
-                // Phase 5.5.2 DEBUG: Save a copy before deletion for inspection
-                try
-                {
-                    if (System.IO.File.Exists(result.WorkbookPath))
-                    {
-                        string debugDir = Path.Combine(Path.GetDirectoryName(result.WorkbookPath) ?? ".", "debug_output");
-                        Directory.CreateDirectory(debugDir);
-                        string debugPath = Path.Combine(debugDir, $"phase552_debug_{Guid.NewGuid():N}.xlsx");
-                        System.IO.File.Copy(result.WorkbookPath, debugPath, overwrite: true);
-                        _logger.LogInformation("[PHASE5.5.2 DEBUG] Saved debug output to {Path}", debugPath);
-                    }
-                }
-                catch (Exception exDbg)
-                {
-                    _logger.LogWarning("[PHASE5.5.2 DEBUG] Failed to save debug copy: {Msg}", exDbg.Message);
-                }
-
-                try { if (System.IO.File.Exists(result.WorkbookPath)) System.IO.File.Delete(result.WorkbookPath); } catch { }
-
-                throw new WorkbookFidelityException(diffResult);
-            }
-
-            _logger.LogInformation("Validation PASSED — {VC} editable values changed correctly.",
-                diffResult.EditableValueChanges);
-            foreach (var cellChange in diffResult.EditableChangedCells)
-            {
-                _logger.LogInformation("  CELL CHANGE: {Change}", cellChange);
-            }
+            foreach (var warning in compatReport.Warnings)
+                _logger.LogWarning("  COMPAT WARNING: {Warn}", warning);
+            foreach (var error in compatReport.Errors)
+                _logger.LogError("  COMPAT ERROR: {Err}", error);
 
             _logger.LogInformation("========== SAVE PIPELINE END ==========");
 

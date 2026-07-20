@@ -456,20 +456,28 @@ namespace ExcelAPI.Application
             var origSheets = origWbPart.Workbook.Descendants<Sheet>().ToList();
             var editSheets = editWbPart.Workbook.Descendants<Sheet>().ToList();
 
-            // Phase 5.5.2: Filter out intentionally-added sheets (e.g. ExcelOutputSetting for ConMas)
+            // Phase 8.2: Filter known additional sheets (e.g. ExcelOutputSetting) from BOTH
+            // original and edited workbooks so that sheets added during export do not produce
+            // false positive sheet count differences on subsequent exports.
+            // Previously the filter was applied only to editSheets, causing:
+            //   orig=3 (unfiltered) vs filteredEdit=2 (ExcelOutputSetting removed) → SheetCountChanges=1
+            // which is a false positive when BOTH workbooks already have ExcelOutputSetting.
+            var filteredOrigSheets = origSheets
+                .Where(s => !KnownAdditionalSheets.Contains(s.Name?.Value ?? ""))
+                .ToList();
             var filteredEditSheets = editSheets
                 .Where(s => !KnownAdditionalSheets.Contains(s.Name?.Value ?? ""))
                 .ToList();
 
-            if (origSheets.Count != filteredEditSheets.Count)
+            if (filteredOrigSheets.Count != filteredEditSheets.Count)
             {
-                result.SheetCountChanges = Math.Abs(origSheets.Count - filteredEditSheets.Count);
-                result.Details.Add($"Sheet count: original={origSheets.Count}, edited={editSheets.Count} (filtered={filteredEditSheets.Count})");
+                result.SheetCountChanges = Math.Abs(filteredOrigSheets.Count - filteredEditSheets.Count);
+                result.Details.Add($"Sheet count: original={origSheets.Count}, edited={editSheets.Count} (filtered orig={filteredOrigSheets.Count}, filtered edit={filteredEditSheets.Count})");
             }
 
-            for (int i = 0; i < Math.Min(origSheets.Count, filteredEditSheets.Count); i++)
+            for (int i = 0; i < Math.Min(filteredOrigSheets.Count, filteredEditSheets.Count); i++)
             {
-                var o = origSheets[i];
+                var o = filteredOrigSheets[i];
                 var e = filteredEditSheets[i];
                 if ((o.Name ?? "") != (e.Name ?? ""))
                 {
