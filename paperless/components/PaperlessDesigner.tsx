@@ -41,8 +41,6 @@ export interface PaperlessDesignerProps {
   templateName: string;
   onReset: () => void;
   onUploadClick: () => void;
-  /** Callback for uploading a previously-generated Output Excel workbook */
-  onUploadExcel: () => void;
   /** Callback for exporting the current form as an Output Excel workbook */
   onExportExcel: () => void;
   /** Whether an export is in progress */
@@ -61,7 +59,6 @@ export function PaperlessDesigner({
   templateName,
   onReset,
   onUploadClick,
-  onUploadExcel,
   onExportExcel,
   exporting = false,
   exportError,
@@ -471,7 +468,6 @@ export function PaperlessDesigner({
         onGoNext={goNext}
         onReset={onReset}
         onUploadClick={onUploadClick}
-        onUploadExcel={onUploadExcel}
         onExportExcel={onExportExcel}
         exporting={exporting}
         exportError={exportError}
@@ -822,7 +818,6 @@ interface ToolbarProps {
   onGoNext: () => void;
   onReset: () => void;
   onUploadClick: () => void;
-  onUploadExcel: () => void;
   onExportExcel: () => void;
   exporting?: boolean;
   exportError?: string | null;
@@ -849,7 +844,6 @@ function Toolbar({
   onGoNext,
   onReset,
   onUploadClick,
-  onUploadExcel,
   onExportExcel,
   exporting = false,
   exportError,
@@ -924,25 +918,6 @@ function Toolbar({
               strokeLinecap="round"
               strokeLinejoin="round"
               d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
-            />
-          </svg>
-        }
-      />
-      <ToolbarButton
-        onClick={onUploadExcel}
-        title="Upload Excel (round-trip)"
-        icon={
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M7.5 21h3.75m-6.75-8.25V21m15-8.25V21m-9-3.75h4.5M21 3h-4.5M3 5.25v.75m0 0h15"
             />
           </svg>
         }
