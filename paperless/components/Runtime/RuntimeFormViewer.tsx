@@ -94,6 +94,20 @@ export function RuntimeFormViewer({
       field = migrateFieldToKeyboardText(field);
       const type = fieldDataTypeToOverlayType(field.dataType);
       if (!type) continue;
+      // ═════════════════════════════════════════════════════════
+      // [GEOMETRY DEBUG] STAGE 3 — OverlayModel Creation
+      // ═════════════════════════════════════════════════════════
+      console.log(`[GEOMETRY DEBUG] STAGE 3 — OVERLAY MODEL ${field.id}`);
+      console.log(`  cellReference: ${field.cellReference}`);
+      console.log(`  leftPt:        ${field.leftPx}  (from field.leftPx)  usePixelUnits=true`);
+      console.log(`  topPt:         ${field.topPx}  (from field.topPx)`);
+      console.log(`  widthPt:       ${field.widthPx}  (from field.widthPx)`);
+      console.log(`  heightPt:      ${field.heightPx}  (from field.heightPx)`);
+      console.log(`  pageWidthPx:   ${sheet.pageWidthPx}`);
+      console.log(`  pageHeightPx:  ${sheet.pageHeightPx}`);
+      console.log(`  CSS would be:  left=${field.leftPx}px top=${field.topPx}px w=${field.widthPx}px h=${field.heightPx}px`);
+      console.log("");
+
       result.push({
         id: field.id,
         type,

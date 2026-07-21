@@ -33,6 +33,21 @@ function RuntimeFieldInner({ overlay, production, usePixelUnits, onSelect }: Run
   if (!FieldComponent) return null;
 
   const unit = usePixelUnits ? "px" : "pt";
+
+  // ═════════════════════════════════════════════════════════
+  // [GEOMETRY DEBUG] STAGE 4 — Overlay Rendering (actual CSS position)
+  // ═════════════════════════════════════════════════════════
+  console.log(`[GEOMETRY DEBUG] STAGE 4 — RENDER ${overlay.id}`);
+  console.log(`  cell:        ${overlay.cell}`);
+  console.log(`  leftPt:      ${overlay.leftPt}`);
+  console.log(`  topPt:       ${overlay.topPt}`);
+  console.log(`  widthPt:     ${overlay.widthPt}`);
+  console.log(`  heightPt:    ${overlay.heightPt}`);
+  console.log(`  unit:        ${unit}`);
+  console.log(`  CSS:         left=${overlay.leftPt}${unit} top=${overlay.topPt}${unit} w=${overlay.widthPt}${unit} h=${overlay.heightPt}${unit}`);
+  console.log(`  visible:     ${visible}`);
+  console.log("");
+
   const fieldStyle: React.CSSProperties = {
     position: "absolute",
     left: `${overlay.leftPt}${unit}`,

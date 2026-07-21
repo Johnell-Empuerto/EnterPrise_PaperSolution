@@ -756,51 +756,113 @@ def split_merged_rects(pixel_rects: list[dict], cluster_meta: list[dict]) -> lis
     if cur:
         cl_groups.append(cur)
 
-    # Map each group to a pixel rect by vertical overlap (order preserved)
+    # ══════════════════════════════════════════════════════════════════
+    # Map each group to pixel rects — prefer independent rects, fall back to split
+    # ══════════════════════════════════════════════════════════════════
+    #
+    # Phase 12.2: When multiple pixel rects overlap a group's Y range,
+    # match each field to its own rect by horizontal position. Only
+    # fall back to proportional splitting when not enough rects exist.
+    #
+    # This fixes the critical bug where adding C12:D12 would discard
+    # its independent pixel rect and incorrectly split A12's rect.
     result = []
     for group in cl_groups:
         if not rects_sorted:
             break
-        rect = rects_sorted.pop(0)
 
         if len(group) == 1:
-            result.append(rect)
+            # Single field group: pop first rect (no splitting needed)
+            result.append(rects_sorted.pop(0))
             continue
 
-        # Multiple clusters in this rect — split proportionally
-        # Determine bounding grid of this group
-        all_rr = [_cluster_row_range(m["cellAddr"]) for m in group]
-        all_cr = [_cluster_col_range(m["cellAddr"]) for m in group]
-        min_row = min(rr[0] for rr in all_rr)
-        max_row = max(rr[1] for rr in all_rr)
-        min_col = min(cr[0] for cr in all_cr)
-        max_col = max(cr[1] for cr in all_cr)
-        grid_cols = max_col - min_col + 1
-        grid_rows = max_row - min_row + 1
+        # Multi-field group: find ALL rects at the same vertical band
+        # Rects at the same row have identical Top values (from the pixel scan).
+        # Since rects_sorted is sorted by (Top, Left), same-band rects are adjacent.
+        first_top = rects_sorted[0]["Top"]
+        first_bottom = rects_sorted[0]["Bottom"]
+        overlapping = []
+        remaining = []
+        for r in rects_sorted:
+            # Same row band: Top within 2px of the first rect's Top
+            if abs(r["Top"] - first_top) < 2.0 and abs(r["Bottom"] - first_bottom) < 2.0:
+                overlapping.append(r)
+            elif overlapping:
+                break  # Passed the band — stop collecting
+        # Remaining = rects after the band
+        remaining = rects_sorted[len(overlapping):]
+        rects_sorted = remaining
 
-        rl = rect["Left"]
-        rr_v = rect["Right"]
-        rt = rect["Top"]
-        rb = rect["Bottom"]
-        # Exclusive range (Right − Left) — adjacent clusters naturally
-        # share the boundary pixel, avoiding gaps in the overlay.
-        rw = rr_v - rl
-        rh = rb - rt
+        if len(overlapping) >= len(group):
+            # ── Path A: Enough independent rects exist — match by column position ──
+            # Sort fields left-to-right by their start column
+            fields_by_col = sorted(
+                [(m, _cluster_col_range(m["cellAddr"])) for m in group],
+                key=lambda x: x[1][0],
+            )
+            # Sort rects left-to-right by Left pixel position
+            rects_by_left = sorted(overlapping, key=lambda r: r["Left"])
 
-        for m in group:
-            cr = _cluster_col_range(m["cellAddr"])
-            rr2 = _cluster_row_range(m["cellAddr"])
-            rel_left = (cr[0] - min_col) / grid_cols
-            rel_right = (cr[1] - min_col + 1) / grid_cols
-            rel_top = (rr2[0] - min_row) / grid_rows
-            rel_bot = (rr2[1] - min_row + 1) / grid_rows
+            print(f"  [SPLIT] Group has {len(group)} fields and {len(overlapping)} independent rects — matching")
+            for m, cr in fields_by_col:
+                matched_rect = rects_by_left.pop(0)
+                result.append(matched_rect)
+                print(f"  [SPLIT DEBUG] Matched independent rect:"
+                      f" cell={m.get('cellAddr','?')}"
+                      f" pixel=({matched_rect['Left']:.0f},{matched_rect['Top']:.0f},{matched_rect['Right']:.0f},{matched_rect['Bottom']:.0f})")
+        else:
+            # ── Path B: Not enough rects — proportional split (legacy fallback) ──
+            # This handles the common case where multiple fields merge into
+            # a single pixel blob (e.g., A1:B2 + C1:D2 + A3:D4 → one rect)
+            rect = overlapping[0]
 
-            result.append({
-                "Left": rl + rel_left * rw,
-                "Top": rt + rel_top * rh,
-                "Right": rl + rel_right * rw,
-                "Bottom": rt + rel_bot * rh,
-            })
+            all_rr = [_cluster_row_range(m["cellAddr"]) for m in group]
+            all_cr = [_cluster_col_range(m["cellAddr"]) for m in group]
+            min_row = min(rr[0] for rr in all_rr)
+            max_row = max(rr[1] for rr in all_rr)
+            min_col = min(cr[0] for cr in all_cr)
+            max_col = max(cr[1] for cr in all_cr)
+            grid_cols = max_col - min_col + 1
+            grid_rows = max_row - min_row + 1
+
+            rl = rect["Left"]
+            rr_v = rect["Right"]
+            rt = rect["Top"]
+            rb = rect["Bottom"]
+            rw = rr_v - rl
+            rh = rb - rt
+
+            print(f"  [SPLIT] Group has {len(group)} fields but only {len(overlapping)} rect — proportional split")
+
+            # Gap-filling: each field gets space from its start col to the next
+            col_starts = sorted(set(cr[0] for cr in all_cr))
+
+            for i, m in enumerate(group):
+                cr = _cluster_col_range(m["cellAddr"])
+                rr2 = _cluster_row_range(m["cellAddr"])
+                rel_left = (cr[0] - min_col) / grid_cols
+
+                next_start = col_starts[i + 1] if i + 1 < len(col_starts) else max_col + 1
+                rel_right = (next_start - min_col) / grid_cols
+
+                rel_top = (rr2[0] - min_row) / grid_rows
+                rel_bot = (rr2[1] - min_row + 1) / grid_rows
+
+                print(f"  [SPLIT DEBUG] Field in multi-field group:"
+                      f" cell={m.get('cellAddr','?')}"
+                      f" col_range=({cr[0]},{cr[1]})"
+                      f" min_col={min_col} max_col={max_col} grid={grid_cols}"
+                      f" col_starts={col_starts}"
+                      f" next_start={next_start}"
+                      f" rel_left={rel_left:.4f} rel_right={rel_right:.4f}"
+                      f" pixel=({rl+rel_left*rw:.0f},{rt+rel_top*rh:.0f},{rl+rel_right*rw:.0f},{rt+rel_bot*rh:.0f})")
+
+                result.append({
+                    "Left": rl + rel_left * rw,
+                    "Top": rt + rel_top * rh,
+                    "Right": rl + rel_right * rw,
+                    "Bottom": rt + rel_bot * rh,
+                })
 
     return result
 
@@ -1342,6 +1404,102 @@ def generate_coordinates_and_preview(
 
                 _stage_mark("Workbook Sanitization")
 
+                # ════════════════════════════════════════════════════
+                # [ROW12 DIAGNOSTIC] COM state after sanitization
+                # ════════════════════════════════════════════════════
+                print(f"\n{'='*60}")
+                print(f"[SANITIZE CELL] COM state after sanitization (Sheet1)")
+                print(f"{'='*60}")
+                for _diag_addr in ["$A$12", "$C$12:$D$12", "$B$12", "$A$1:$B$2", "$C$1:$D$2"]:
+                    _diag_sheet = None
+                    for _ws_cell in wb.Worksheets:
+                        try:
+                            if _ws_cell.Visible == -1 and _ws_cell.Name not in CONFIGURATION_SHEET_NAMES:
+                                _diag_sheet = _ws_cell
+                                break
+                        except Exception:
+                            pass
+                    if _diag_sheet is None:
+                        continue
+                    try:
+                        _rng = _diag_sheet.Range(_diag_addr)
+                        _addr_out = str(_rng.Address)
+                        _merge_out = "YES" if _rng.MergeCells else "NO"
+                        try:
+                            _ma = _rng.MergeArea
+                            _ma_addr = str(_ma.Address)
+                        except Exception:
+                            _ma_addr = "<ERROR>"
+                        _color = "?"
+                        try:
+                            _c = _rng.Interior.Color
+                            if _c == 1:
+                                _color = "BLACK(1)"
+                            elif _c == 16777215 or _c == 0xFFFFFF:
+                                _color = "WHITE(16777215/0xFFFFFF)"
+                            else:
+                                _color = f"OTHER({_c})"
+                        except Exception:
+                            _color = "<ERROR>"
+                        _val = str(_rng.Value) if _rng.Value is not None else "<EMPTY/NONE>"
+                        _borders = "?"
+                        try:
+                            _ls = _rng.Borders.LineStyle
+                            if _ls == -4142:
+                                _borders = "xlNone"
+                            elif _ls == 1:
+                                _borders = "xlContinuous"
+                            else:
+                                _borders = f"OTHER({_ls})"
+                        except Exception:
+                            _borders = "<ERROR>"
+                        print(f"  Cell {_diag_addr}:"
+                              f" Addr={_addr_out}"
+                              f" MergeCells={_merge_out}"
+                              f" MergeArea={_ma_addr}"
+                              f" Color={_color}"
+                              f" Value='{_val[:30]}'"
+                              f" Borders={_borders}")
+                    except Exception as _e:
+                        print(f"  Cell {_diag_addr}: ERROR={_e}")
+                # Also log column widths for columns A-D
+                try:
+                    _diag_sheet2 = None
+                    for _ws2 in wb.Worksheets:
+                        try:
+                            if _ws2.Visible == -1 and _ws2.Name not in CONFIGURATION_SHEET_NAMES:
+                                _diag_sheet2 = _ws2
+                                break
+                        except Exception:
+                            pass
+                    if _diag_sheet2 is not None:
+                        print(f"  Column widths:")
+                        for _col_idx in range(1, 8):
+                            try:
+                                _cw = _diag_sheet2.Columns(_col_idx).ColumnWidth
+                                _col_l = chr(ord('A') + _col_idx - 1)
+                                print(f"    Col {_col_l} width={_cw} chars ({_cw*7:.1f}pt)")
+                            except Exception:
+                                pass
+                except Exception:
+                    pass
+                # PageSetup info
+                try:
+                    if _diag_sheet2 is not None:
+                        _ps = _diag_sheet2.PageSetup
+                        print(f"  PageSetup:"
+                              f" PrintArea={_ps.PrintArea}"
+                              f" FitToPagesWide={_ps.FitToPagesWide}"
+                              f" FitToPagesTall={_ps.FitToPagesTall}"
+                              f" Zoom={_ps.Zoom}"
+                              f" LeftMargin={_ps.LeftMargin:.2f}"
+                              f" TopMargin={_ps.TopMargin:.2f}"
+                              f" CenterH={_ps.CenterHorizontally}"
+                              f" CenterV={_ps.CenterVertically}")
+                except Exception as _e:
+                    print(f"  PageSetup ERROR: {_e}")
+                print(f"{'='*60}\n")
+
                 # ── Step 4: Delete metadata sheets & export sanitized PDF ──
                 # Export ALL worksheets so the PDF has one page per visible sheet.
                 # Phase 6.3: Delete ALL configuration sheets, not just _Fields/_RawData
@@ -1379,7 +1537,7 @@ def generate_coordinates_and_preview(
                     0, 0, False,
                 )
 
-                # Verify PDF page count
+                # Verify PDF page count & compare dimensions
                 import fitz
                 try:
                     ver_doc = fitz.open(pdf_path)
@@ -1389,8 +1547,25 @@ def generate_coordinates_and_preview(
                     if actual_pages != len(remaining_names):
                         print(f"  [PDF EXPORT] WARNING: PDF page count ({actual_pages}) differs from"
                               f" worksheet count ({len(remaining_names)})")
-                except Exception as e:
-                    print(f"  [PDF EXPORT] Could not verify PDF page count: {e}")
+
+                    # ════════════════════════════════════════════════════
+                    # [PDF DIMENSIONS] Compare original vs sanitized PDF
+                    # ════════════════════════════════════════════════════
+                    odoc = fitz.open(orig_pdf_path)
+                    sdoc = fitz.open(pdf_path)
+                    for _pi in range(min(len(odoc), len(sdoc))):
+                        op = odoc[_pi]
+                        sp = sdoc[_pi]
+                        ow, oh = op.rect.width, op.rect.height
+                        sw_, sh_ = sp.rect.width, sp.rect.height
+                        print(f"  [PDF DIMENSIONS] Page {_pi}:"
+                              f" Original=({ow:.1f}x{oh:.1f}pt)"
+                              f" Sanitized=({sw_:.1f}x{sh_:.1f}pt)"
+                              f" Match={'YES' if abs(ow-sw_)<0.1 and abs(oh-sh_)<0.1 else 'NO'}")
+                    odoc.close()
+                    sdoc.close()
+                except Exception as _e_pdf:
+                    print(f"  [PDF DIAGNOSTICS] ERROR: {_e_pdf}")
 
                 _stage_mark("Export Sanitized PDF (all sheets)")
 
@@ -1459,6 +1634,68 @@ def generate_coordinates_and_preview(
 
             rects = scan_black_rectangles(img)
             _stage_mark("Pixel Scan page %d" % i)
+
+            # ════════════════════════════════════════════════════
+            # [ROW12 DIAGNOSTIC] Raw rectangles BEFORE split
+            # ════════════════════════════════════════════════════
+            print(f"\n{'='*60}")
+            print(f"[ROW12 DIAGNOSTIC] Sheet '{sheet_name}' — Pixel Scan Results")
+            print(f"{'='*60}")
+            print(f"  Raw rectangles found: {len(rects)}")
+            print(f"  Sheet clusters: {len(sheet_clusters)}")
+            for ri, r in enumerate(rects):
+                print(f"  Rect {ri}: Left={r['Left']:.1f} Top={r['Top']:.1f} "
+                      f"Right={r['Right']:.1f} Bottom={r['Bottom']:.1f} "
+                      f"Width={r['Right']-r['Left']:.1f}px Height={r['Bottom']-r['Top']:.1f}px")
+
+            # ── Per-column pixel analysis of the LAST rectangle (likely row 12) ──
+            if rects:
+                last = rects[-1]
+                _rl = int(last["Left"])
+                _rr = int(last["Right"])
+                _rt = int(last["Top"])
+                _rb = int(last["Bottom"])
+                _rw = _rr - _rl
+                _rh = _rb - _rt
+                last_region = img[_rt:_rb+1, _rl:_rr+1]
+                total_pix = _rw * _rh
+                black_pix = int(np.sum(np.all(last_region < BLACK_THRESHOLD, axis=2)))
+                white_pix = int(np.sum(np.all(last_region > WHITE_THRESHOLD, axis=2)))
+                other_pix = total_pix - black_pix - white_pix
+                print(f"  Last rect pixel composition: total={total_pix} black={black_pix} "
+                      f"white={white_pix} other(gray)={other_pix}")
+
+                # The expected column count for the form is 4 (A-D) at ~51px each
+                # Divide the width into 4 equal column regions and count pixels
+                if _rw > 20:  # Only if wide enough to analyze
+                    n_cols = 4
+                    col_w = _rw // n_cols
+                    diag_rows_used = min(_rh, 100)  # Analyze up to 100 rows
+                    print(f"  Row 12 column pixel analysis (analyzing {diag_rows_used} rows vertically):")
+                    for ci in range(n_cols):
+                        cx1 = max(0, ci * col_w)
+                        cx2 = min(_rw, (ci + 1) * col_w)
+                        col_region = last_region[:diag_rows_used, cx1:cx2]
+                        ct = col_region.shape[0] * col_region.shape[1]
+                        cb = int(np.sum(np.all(col_region < BLACK_THRESHOLD, axis=2)))
+                        cw = int(np.sum(np.all(col_region > WHITE_THRESHOLD, axis=2)))
+                        co = ct - cb - cw
+                        col_letter = chr(ord('A') + ci)
+                        print(f"    Col {col_letter}(px{cx1}-{cx2}): "
+                              f"black={cb} white={cw} other={co} "
+                              f"({cb*100//ct if ct>0 else 0}% black)")
+
+                # Compare row-12 column positions with expected from rows 1-10
+                # Expected: column A starts at ~857px, column C at ~1274px (from legacy data)
+                print(f"  Row 12 rect pixel coords: x=[{_rl},{_rr}] y=[{_rt},{_rb}]")
+                print(f"  Legacy expected: Col A~857px Col C~1274px (at 300 DPI)")
+                print(f"  Actual rect: left={_rl}px matches Col A at {'YES' if abs(_rl-857)<20 else 'NO'}")
+                if abs(_rl - 857) < 20:
+                    # Column A starts at ~857, C at ~1274 (about 417px apart)
+                    expected_c_start = 1274
+                    actual_c_x = _rl + _rw * 2 // 4  # Approx position of column C
+                    print(f"  Approx col C at pixel: {actual_c_x}px (expected ~{expected_c_start}px)")
+            print(f"{'='*60}\n")
 
             if len(rects) < len(sheet_clusters):
                 rects = split_merged_rects(rects, sheet_clusters)

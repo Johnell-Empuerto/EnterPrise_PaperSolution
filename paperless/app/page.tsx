@@ -212,7 +212,7 @@ export default function Home() {
               const topRatio = f.top_ratio ?? 0;
               const rightRatio = f.right_ratio ?? 0;
               const bottomRatio = f.bottom_ratio ?? 0;
-              return {
+              const fieldDef = {
                 id: f.id,
                 name: f.name,
                 cellReference: f.cellAddr ?? "",
@@ -245,6 +245,30 @@ export default function Home() {
                 maxLength: 0,
                 tabIndex: i,
               };
+
+              // ═════════════════════════════════════════════════════════
+              // [GEOMETRY DEBUG] STAGE 1 — Raw API Field (BEFORE PaperLessConfig restore)
+              // ═════════════════════════════════════════════════════════
+              console.log(`[GEOMETRY DEBUG] STAGE 1 — API FIELD ${f.id}`);
+              console.log(`  cellAddr:      ${f.cellAddr ?? ""}`);
+              console.log(`  left_ratio:    ${leftRatio}`);
+              console.log(`  top_ratio:     ${topRatio}`);
+              console.log(`  right_ratio:   ${rightRatio}`);
+              console.log(`  bottom_ratio:  ${bottomRatio}`);
+              console.log(`  pageW:         ${pageW}`);
+              console.log(`  pageH:         ${pageH}`);
+              console.log(`  leftPx:        ${fieldDef.leftPx}  (${leftRatio} * ${pageW})`);
+              console.log(`  topPx:         ${fieldDef.topPx}  (${topRatio} * ${pageH})`);
+              console.log(`  widthPx:       ${fieldDef.widthPx}  ((${rightRatio} - ${leftRatio}) * ${pageW})`);
+              console.log(`  heightPx:      ${fieldDef.heightPx}  ((${bottomRatio} - ${topRatio}) * ${pageH})`);
+              console.log(`  leftRatio:     ${fieldDef.leftRatio}`);
+              console.log(`  topRatio:      ${fieldDef.topRatio}`);
+              console.log(`  widthRatio:    ${fieldDef.widthRatio}`);
+              console.log(`  heightRatio:   ${fieldDef.heightRatio}`);
+              console.log(`  mergeRange:    ${fieldDef.mergeRange ?? "null"}`);
+              console.log("");
+
+              return fieldDef;
             }),
           };
         }),
@@ -482,6 +506,28 @@ export default function Home() {
           console.groupEnd();
         }
       }
+
+      // ═════════════════════════════════════════════════════════
+      // [GEOMETRY DEBUG] STAGE 2 — After PaperLessConfig Restoration
+      // (right before setRuntimeForm)
+      // ═════════════════════════════════════════════════════════
+      runtimeForm.sheets.forEach((s, si) => {
+        s.fields.forEach((f, fi) => {
+          console.log(`[GEOMETRY DEBUG] STAGE 2 — RUNTIME FIELD ${f.id}`);
+          console.log(`  cellReference: ${f.cellReference}`);
+          console.log(`  leftPx:        ${f.leftPx}`);
+          console.log(`  topPx:         ${f.topPx}`);
+          console.log(`  widthPx:       ${f.widthPx}`);
+          console.log(`  heightPx:      ${f.heightPx}`);
+          console.log(`  leftRatio:     ${f.leftRatio}`);
+          console.log(`  topRatio:      ${f.topRatio}`);
+          console.log(`  widthRatio:    ${f.widthRatio}`);
+          console.log(`  heightRatio:   ${f.heightRatio}`);
+          console.log(`  dataType:      ${f.dataType}`);
+          console.log(`  config?.appearance?.fontFamily: ${f.config?.appearance?.fontFamily ?? "(none)"}`);
+          console.log("");
+        });
+      });
 
       setRuntimeForm(runtimeForm);
     } catch (err) {
