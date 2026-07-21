@@ -257,11 +257,47 @@ namespace ExcelAPI.Controllers
                     })
                     .ToList();
 
+                // ═════════════════════════════════════════════════════════
+                // Read PaperLessConfig from the workbook (if present)
+                // This restores field identity, style, and configuration
+                // on re-upload without requiring designerModel.
+                // ═════════════════════════════════════════════════════════
+                object? paperLessConfig = null;
+                try
+                {
+                    if (System.IO.File.Exists(xlsxPath))
+                    {
+                        using var plPkg = System.IO.Compression.ZipFile.OpenRead(xlsxPath);
+                        var plEntry = plPkg.GetEntry("xl/worksheets/paperlessconfig.xml");
+                        if (plEntry != null)
+                        {
+                            string plXml;
+                            using (var plReader = new StreamReader(plEntry.Open()))
+                                plXml = plReader.ReadToEnd();
+
+                            var b1Match = System.Text.RegularExpressions.Regex.Match(plXml,
+                                @"<c\s+r=""B1""[^>]*>.*?<is><t[^>]*>(.*?)</t></is></c>",
+                                System.Text.RegularExpressions.RegexOptions.Singleline);
+                            if (b1Match.Success)
+                            {
+                                string plJson = System.Net.WebUtility.HtmlDecode(b1Match.Groups[1].Value);
+                                paperLessConfig = System.Text.Json.JsonSerializer.Deserialize<object>(plJson);
+                                _logger.LogInformation("[UPLOAD-PREVIEW] PaperLessConfig read and returned in response");
+                            }
+                        }
+                    }
+                }
+                catch (Exception plEx)
+                {
+                    _logger.LogWarning(plEx, "[UPLOAD-PREVIEW] Failed to read PaperLessConfig (non-fatal)");
+                }
+
                 return Ok(new
                 {
                     success = true,
                     sessionId,
-                    pages = pageResults
+                    pages = pageResults,
+                    paperLessConfig
                 });
             }
             catch (Exception ex)
@@ -453,37 +489,78 @@ namespace ExcelAPI.Controllers
                 var designerModel = _designerModelReader.Read(tempPath, file.FileName, sessionId);
 
                 // ═════════════════════════════════════════════════════════
-                // PHASE 21.2: REUPLOAD STATE — log DesignerModel fields
+                // PHASE 22.1 — STAGE 25: STYLE RE-READ (Upload → DesignerModel)
                 // ═════════════════════════════════════════════════════════
                 if (designerModel != null)
                 {
                     _logger.LogInformation("========================================================");
-                    _logger.LogInformation("  REUPLOAD STATE — DesignerModel Fields from Workbook");
+                    _logger.LogInformation("  STAGE 25 — Style Re-read");
                     _logger.LogInformation("========================================================");
 
-                    int reuploadFieldCount = 0;
+                    int reStageCount = 0;
                     foreach (var rePage in designerModel.Pages)
                     {
                         _logger.LogInformation("  Page: {Name}", rePage.Name);
                         foreach (var reField in rePage.Fields)
                         {
                             string reCell = reField.CellAddress ?? "?";
-                            string fontSize = reField.Style?.FontSize?.ToString() ?? "(default)";
                             string fontName = reField.Style?.FontFamily ?? "(default)";
+                            string fontSize = reField.Style?.FontSize?.ToString() ?? "(default)";
                             string boldStr = reField.Style?.Bold == true ? "true" : "false";
-                            string fillColor = reField.Style?.FillColor ?? "(none)";
+                            string italicStr = reField.Style?.Italic == true ? "true" : "false";
                             string fontColor = reField.Style?.FontColor ?? "(default)";
+                            string fillColor = reField.Style?.FillColor ?? "(none)";
                             string hAlign = reField.Style?.HorizontalAlignment ?? "(default)";
-                            _logger.LogInformation(
-                                "  REUPLOAD Field: id='{Id}' cell='{Cell}' font='{FontName}/{FontSize}' bold={Bold} fill={Fill} color={Color} align={Align}",
-                                reField.Id, reCell, fontName, fontSize, boldStr, fillColor, fontColor, hAlign);
-                            reuploadFieldCount++;
+                            string vAlign = reField.Style?.VerticalAlignment ?? "(default)";
+                            string wrapStr = reField.Style?.WrapText == true ? "true" : "false";
+
+                            _logger.LogInformation("  ------------------------------");
+                            _logger.LogInformation($"  Cell:        {reCell}");
+                            _logger.LogInformation($"  ✓ Font:       {fontName}");
+                            _logger.LogInformation($"  ✓ Size:       {fontSize}");
+                            _logger.LogInformation($"  ✓ Bold:       {boldStr}");
+                            _logger.LogInformation($"  ✓ Italic:     {italicStr}");
+                            _logger.LogInformation($"  ✓ Color:      {fontColor}");
+                            _logger.LogInformation($"  ✓ Fill:       {fillColor}");
+                            _logger.LogInformation($"  ✓ H-Align:    {hAlign}");
+                            _logger.LogInformation($"  ✓ V-Align:    {vAlign}");
+                            _logger.LogInformation($"  ✓ Wrap:       {wrapStr}");
+                            _logger.LogInformation($"  Field ID:    {reField.Id}");
+                            reStageCount++;
                         }
                     }
 
-                    _logger.LogInformation("  REUPLOAD COMPLETE: {Count} fields reconstructed", reuploadFieldCount);
+                    _logger.LogInformation("========================================================");
+                    _logger.LogInformation($"  STAGE 25 COMPLETE: {reStageCount} fields re-read");
                     _logger.LogInformation("========================================================");
                 }
+
+                // ═════════════════════════════════════════════════════════
+                // PAPERLESS DEBUG STAGE 14 — Final DesignerModel Response
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("========================================================");
+                _logger.LogInformation("PAPERLESS DEBUG STAGE 14 — Final DesignerModel Response");
+                _logger.LogInformation("========================================================");
+                if (designerModel != null)
+                {
+                    foreach (var p in designerModel.Pages)
+                    {
+                        _logger.LogInformation("  Page: {Name}", p.Name);
+                        foreach (var f in p.Fields)
+                        {
+                            _logger.LogInformation("    Field ID: {Id}", f.Id);
+                            _logger.LogInformation("    Cell: {Cell}", f.CellAddress ?? "?");
+                            _logger.LogInformation("    FontSize: {Sz}", f.Style?.FontSize ?? 0);
+                            _logger.LogInformation("    FontFamily: {Ff}", f.Style?.FontFamily ?? "(default)");
+                            _logger.LogInformation("    Bold: {B}", f.Style?.Bold ?? false);
+                        }
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("  designerModel IS NULL");
+                }
+                _logger.LogInformation("========================================================");
 
                 return Ok(new ApiResponse<object>
                 {
@@ -602,10 +679,10 @@ namespace ExcelAPI.Controllers
             }
 
             // ═════════════════════════════════════════════════════════
-            // PHASE 21.4 — STAGE 3: MODEL BINDING RESULT
+            // PAPERLESS DEBUG STAGE 2 — Request Payload Received (Model Binding)
             // ═════════════════════════════════════════════════════════
             _logger.LogInformation("=========================================================");
-            _logger.LogInformation("MODEL BINDING RESULT");
+            _logger.LogInformation("PAPERLESS DEBUG STAGE 2 — Request Payload Received");
             _logger.LogInformation("=========================================================");
             _logger.LogInformation("wbDef != null: {NotNull}", wbDef != null);
             if (wbDef != null)

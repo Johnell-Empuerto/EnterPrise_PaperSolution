@@ -3,6 +3,8 @@ using DocumentFormat.OpenXml.Spreadsheet;
 using ExcelAPI.Models;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using System.Text.Json;
+using WbDef = ExcelAPI.Models.WorkbookDefinition;
 
 namespace ExcelAPI.Application
 {
@@ -42,7 +44,13 @@ namespace ExcelAPI.Application
 
         private static readonly HashSet<string> ConfigSheetNames = new(StringComparer.OrdinalIgnoreCase)
         {
-            "_Fields", "ExcelOutputSetting"
+            "_Fields", "ExcelOutputSetting", "PaperLessConfig"
+        };
+
+        private static readonly JsonSerializerOptions PaperLessJsonOptions = new()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            PropertyNameCaseInsensitive = true
         };
 
         public DesignerModelReader(ILogger<DesignerModelReader> logger)
@@ -111,6 +119,24 @@ namespace ExcelAPI.Application
                 log.AppendLine($"[DesignerModelReader] Config Sheets: {configSheets.Count}");
 
                 // ═════════════════════════════════════════════════════════
+                // PAPERLESS DEBUG STAGE 7 — Re-upload XLSX Detected
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("========================================================");
+                _logger.LogInformation("PAPERLESS DEBUG STAGE 7 — Re-upload XLSX Detected");
+                _logger.LogInformation("========================================================");
+                _logger.LogInformation("Total worksheets: {Count}", allSheets.Count);
+                foreach (var s in allSheets)
+                {
+                    _logger.LogInformation("  Sheet: {Name}", s.Name?.Value ?? "?");
+                }
+                bool hasPaperLessConfig = configSheets.Any(s =>
+                    string.Equals(s.Name?.Value, "PaperLessConfig", StringComparison.OrdinalIgnoreCase));
+                _logger.LogInformation("PaperLessConfig sheet present: {Has}", hasPaperLessConfig);
+                _logger.LogInformation("Printable sheets: {Count}", printableSheets.Count);
+                _logger.LogInformation("Config sheets: {Count}", configSheets.Count);
+                _logger.LogInformation("========================================================");
+
+                // ═════════════════════════════════════════════════════════
                 // 10. _FIELDS SHEET — authoritative metadata source
                 // ═════════════════════════════════════════════════════════
                 var fieldsData = new List<(string cellAddr, string fieldId, string name, string type,
@@ -164,6 +190,121 @@ namespace ExcelAPI.Application
                 if (model.Configuration.IsDuplicated)
                 {
                     log.AppendLine("[DesignerModelReader] WARNING: ExcelOutputSetting appears multiple times");
+                }
+
+                // ═════════════════════════════════════════════════════════
+                // 12. PAPERLESSCONFIG — embedded PaperLess JSON configuration
+                // ═════════════════════════════════════════════════════════
+                WbDef.PaperLessConfig? paperLessConfig = null;
+                var paperLessConfigSheet = configSheets.FirstOrDefault(s =>
+                    string.Equals(s.Name?.Value, "PaperLessConfig", StringComparison.OrdinalIgnoreCase));
+                if (paperLessConfigSheet != null && paperLessConfigSheet.Id?.Value != null)
+                {
+                    log.AppendLine();
+                    log.AppendLine("[PAPERLESS CONFIG] Configuration sheet found");
+                    log.AppendLine("----------------------------------------");
+
+                    try
+                    {
+                        var plWsPart = wbPart.GetPartById(paperLessConfigSheet.Id.Value) as WorksheetPart;
+                        if (plWsPart != null)
+                        {
+                            var plSheetData = plWsPart.Worksheet
+                                .Descendants<Row>()
+                                .FirstOrDefault()? // Row 1
+                                .Descendants<Cell>()
+                                .ToList();
+
+                            // Config JSON is in B1 (second cell)
+                            var jsonCell = plSheetData?.FirstOrDefault(c =>
+                                string.Equals(c.CellReference?.Value, "B1", StringComparison.OrdinalIgnoreCase));
+                            if (jsonCell != null)
+                            {
+                                string? jsonText = GetCellInlineText(jsonCell);
+                                if (!string.IsNullOrWhiteSpace(jsonText))
+                                {
+                                    // ═════════════════════════════════════════════════════════
+                                    // PAPERLESS DEBUG STAGE 8 — Raw PaperLessConfig JSON
+                                    // ═════════════════════════════════════════════════════════
+                                    _logger.LogInformation("========================================================");
+                                    _logger.LogInformation("PAPERLESS DEBUG STAGE 8 — Raw PaperLessConfig JSON");
+                                    _logger.LogInformation("========================================================");
+                                    int p1f1Raw = jsonText.IndexOf("\"id\":\"p1f1\"", StringComparison.OrdinalIgnoreCase);
+                                    if (p1f1Raw >= 0)
+                                    {
+                                        int start = Math.Max(0, p1f1Raw - 80);
+                                        int len = Math.Min(jsonText.Length - start, 400);
+                                        _logger.LogInformation("p1f1 in raw JSON: {Ctx}", jsonText.Substring(start, len));
+                                    }
+                                    else
+                                    {
+                                        _logger.LogInformation("p1f1 NOT FOUND in raw JSON — first 400 chars:");
+                                        _logger.LogInformation("{Ctx}", jsonText.Length <= 400 ? jsonText : jsonText[..400] + "...");
+                                    }
+                                    _logger.LogInformation("Raw JSON length: {Len}", jsonText.Length);
+                                    _logger.LogInformation("========================================================");
+
+                                    paperLessConfig = JsonSerializer.Deserialize<WbDef.PaperLessConfig>(
+                                        jsonText, PaperLessJsonOptions);
+
+                                    if (paperLessConfig != null)
+                                    {
+                                        // ═════════════════════════════════════════════════════════
+                                        // PAPERLESS DEBUG STAGE 9 — Deserialized PaperLessConfig
+                                        // ═════════════════════════════════════════════════════════
+                                        _logger.LogInformation("========================================================");
+                                        _logger.LogInformation("PAPERLESS DEBUG STAGE 9 — Deserialized PaperLessConfig");
+                                        _logger.LogInformation("========================================================");
+                                        if (paperLessConfig.Sheets != null)
+                                        {
+                                            foreach (var ps9 in paperLessConfig.Sheets)
+                                            {
+                                                _logger.LogInformation("  Sheet: {Name}", ps9.Name);
+                                                if (ps9.Fields != null)
+                                                {
+                                                    foreach (var pf9 in ps9.Fields.Take(3))
+                                                    {
+                                                        _logger.LogInformation("    Field ID: {Id}", pf9.Id);
+                                                        _logger.LogInformation("    Cell: {Cell}", pf9.Cell);
+                                                        _logger.LogInformation("    FontSize: {Sz}", pf9.Style?.Font?.SizePt ?? 0);
+                                                        _logger.LogInformation("    FontName: {Fn}", pf9.Style?.Font?.Name ?? "(null)");
+                                                        _logger.LogInformation("    Bold: {B}", pf9.Style?.Font?.Bold ?? false);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        _logger.LogInformation("========================================================");
+
+                                        log.AppendLine($"[PAPERLESS CONFIG] JSON parsed successfully");
+                                        log.AppendLine($"[PAPERLESS CONFIG] Schema version: {paperLessConfig.SchemaVersion}");
+                                        log.AppendLine($"[PAPERLESS CONFIG] Sheets in config: {paperLessConfig.Sheets?.Count ?? 0}");
+
+                                        int configFieldCount = paperLessConfig.Sheets?.Sum(s => s.Fields?.Count ?? 0) ?? 0;
+                                        log.AppendLine($"[PAPERLESS CONFIG] Fields in config: {configFieldCount}");
+
+                                        if (paperLessConfig.SchemaVersion != 1)
+                                        {
+                                            log.AppendLine($"[PAPERLESS CONFIG] WARNING: Unsupported schema version {paperLessConfig.SchemaVersion} — ignoring config");
+                                            _logger.LogWarning("[PAPERLESS CONFIG] Unsupported schema version {Version} — ignoring config", paperLessConfig.SchemaVersion);
+                                            paperLessConfig = null;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        log.AppendLine($"[PAPERLESS CONFIG] WARNING: Failed to parse configuration JSON: {ex.Message}");
+                        _logger.LogWarning(ex, "[PAPERLESS CONFIG] Configuration JSON invalid — falling back to Excel field detection");
+                        paperLessConfig = null;
+                    }
+                }
+                else
+                {
+                    log.AppendLine();
+                    log.AppendLine("[PAPERLESS CONFIG] No PaperLessConfig sheet found — legacy workbook");
+                    _logger.LogInformation("[PAPERLESS CONFIG] No configuration sheet found — legacy workbook");
                 }
 
                 // ═════════════════════════════════════════════════════════
@@ -346,6 +487,175 @@ namespace ExcelAPI.Application
 
                     model.Pages.Add(page);
                     pageIndex++;
+                }
+
+                // ═════════════════════════════════════════════════════════
+                // 12b. OVERLAY PAPERLESSCONFIG — restore PaperLess field identity,
+                //      style, and configuration on top of Excel-detected fields.
+                // ═════════════════════════════════════════════════════════
+
+                // ═════════════════════════════════════════════════════════
+                // PAPERLESS DEBUG STAGE 10 — Excel Field Detection Before Overlay
+                // ═════════════════════════════════════════════════════════
+                _logger.LogInformation("========================================================");
+                _logger.LogInformation("PAPERLESS DEBUG STAGE 10 — Field Detection Before Overlay");
+                _logger.LogInformation("========================================================");
+                foreach (var p10 in model.Pages)
+                {
+                    _logger.LogInformation("  Page: {Name}", p10.Name);
+                    foreach (var f10 in p10.Fields)
+                    {
+                        _logger.LogInformation("    Field ID: {Id}", f10.Id);
+                        _logger.LogInformation("    Cell: {Cell}", f10.CellAddress ?? "?");
+                        _logger.LogInformation("    FontSize: {Sz}", f10.Style?.FontSize ?? 0);
+                        _logger.LogInformation("    FontFamily: {Ff}", f10.Style?.FontFamily ?? "(default)");
+                        _logger.LogInformation("    Bold: {B}", f10.Style?.Bold ?? false);
+                    }
+                }
+                _logger.LogInformation("========================================================");
+
+                if (paperLessConfig?.Sheets != null)
+                {
+                    int overlaidFields = 0;
+                    foreach (var configSheet in paperLessConfig.Sheets)
+                    {
+                        if (configSheet.Fields == null) continue;
+
+                        // Find the matching page by sheet name
+                        var page = model.Pages.FirstOrDefault(p =>
+                            string.Equals(p.Name, configSheet.Name, StringComparison.OrdinalIgnoreCase));
+                        if (page == null) continue;
+
+                        foreach (var configField in configSheet.Fields)
+                        {
+                            // Match by cell address — extract first cell from range
+                            string configCell = NormalizeCellAddress(configField.Cell);
+                            if (string.IsNullOrWhiteSpace(configCell)) continue;
+
+                            // ═════════════════════════════════════════════════════════
+                            // PAPERLESS DEBUG STAGE 11 — Field Matching
+                            // ═════════════════════════════════════════════════════════
+                            _logger.LogInformation("--------------------------------------------------------");
+                            _logger.LogInformation("PAPERLESS DEBUG STAGE 11 — Field Matching");
+                            _logger.LogInformation("  Config Field:");
+                            _logger.LogInformation("    ID = {Id}", configField.Id);
+                            _logger.LogInformation("    Cell = {Cell}", configField.Cell);
+                            _logger.LogInformation("    Normalized = {NCell}", configCell);
+                            _logger.LogInformation("  Searching in page '{Page}' with {FieldCount} fields",
+                                page.Name, page.Fields.Count);
+
+                            var matchingField = page.Fields.FirstOrDefault(f =>
+                                string.Equals(NormalizeCellAddress(f.CellAddress ?? ""), configCell, StringComparison.OrdinalIgnoreCase));
+
+                            if (matchingField == null)
+                            {
+                                _logger.LogInformation("  MATCH = FALSE — no field found with normalized cell '{NCell}'", configCell);
+                                _logger.LogInformation("--------------------------------------------------------");
+                                continue;
+                            }
+
+                            _logger.LogInformation("  Detected Field:");
+                            _logger.LogInformation("    ID = {Id}", matchingField.Id);
+                            _logger.LogInformation("    Cell = {Cell}", matchingField.CellAddress ?? "?");
+                            _logger.LogInformation("  MATCH = TRUE");
+                            _logger.LogInformation("--------------------------------------------------------");
+
+                            // ═════════════════════════════════════════════════════════
+                            // PAPERLESS DEBUG STAGE 12 — Before Overlay
+                            // ═════════════════════════════════════════════════════════
+                            _logger.LogInformation("PAPERLESS DEBUG STAGE 12 — Before Overlay");
+                            _logger.LogInformation("  Detected field state BEFORE overlay:");
+                            _logger.LogInformation("    Field ID: {Id}", matchingField.Id);
+                            _logger.LogInformation("    Cell: {Cell}", matchingField.CellAddress ?? "?");
+                            _logger.LogInformation("    FontSize: {Sz}", matchingField.Style?.FontSize ?? 0);
+                            _logger.LogInformation("    FontFamily: {Ff}", matchingField.Style?.FontFamily ?? "(default)");
+                            _logger.LogInformation("    Bold: {B}", matchingField.Style?.Bold ?? false);
+                            _logger.LogInformation("  Config value to apply:");
+                            _logger.LogInformation("    Config FontSize: {Sz}", configField.Style?.Font?.SizePt ?? 0);
+                            _logger.LogInformation("--------------------------------------------------------");
+
+                            // Overlay PaperLess field ID (stable identity)
+                            if (!string.IsNullOrWhiteSpace(configField.Id))
+                            {
+                                matchingField.Id = configField.Id;
+                            }
+
+                            // Restore PaperLess style properties from config (takes precedence)
+                            if (configField.Style != null)
+                            {
+                                matchingField.Style ??= new DesignerFieldStyle();
+
+                                if (configField.Style.Font != null)
+                                {
+                                    var cf = configField.Style.Font;
+                                    if (!string.IsNullOrEmpty(cf.Name))
+                                        matchingField.Style.FontFamily = cf.Name;
+                                    if (cf.SizePt > 0)
+                                        matchingField.Style.FontSize = cf.SizePt;
+                                    matchingField.Style.Bold = cf.Bold;
+                                    matchingField.Style.Italic = cf.Italic;
+                                    matchingField.Style.Underline = cf.Underline;
+                                    if (!string.IsNullOrEmpty(cf.ColorArgb))
+                                        matchingField.Style.FontColor = cf.ColorArgb;
+                                }
+
+                                if (configField.Style.Fill != null)
+                                {
+                                    matchingField.Style.FillColor = configField.Style.Fill.ColorArgb;
+                                }
+
+                                if (configField.Style.Alignment != null)
+                                {
+                                    if (!string.IsNullOrEmpty(configField.Style.Alignment.Horizontal))
+                                        matchingField.Style.HorizontalAlignment = MapHorizontalAlignment(configField.Style.Alignment.Horizontal);
+                                    if (!string.IsNullOrEmpty(configField.Style.Alignment.Vertical))
+                                        matchingField.Style.VerticalAlignment = MapVerticalAlignment(configField.Style.Alignment.Vertical);
+                                }
+
+                                matchingField.Style.WrapText = configField.Style.WrapText;
+                            }
+
+                            // Restore field type from config
+                            if (!string.IsNullOrWhiteSpace(configField.Type))
+                            {
+                                string mappedType = MapFieldType(configField.Type);
+                                if (!string.IsNullOrEmpty(mappedType))
+                                    matchingField.Type = mappedType;
+                            }
+
+                            // Restore input configuration
+                            if (configField.Config != null)
+                            {
+                                matchingField.Behavior.Required = configField.Config.Required;
+                                if (configField.Config.MaxLength > 0)
+                                    matchingField.MaxLength = configField.Config.MaxLength;
+                            }
+
+                            // ═════════════════════════════════════════════════════════
+                            // PAPERLESS DEBUG STAGE 13 — After Overlay
+                            // ═════════════════════════════════════════════════════════
+                            _logger.LogInformation("PAPERLESS DEBUG STAGE 13 — After Overlay");
+                            _logger.LogInformation("  Field state AFTER overlay:");
+                            _logger.LogInformation("    Field ID: {Id}", matchingField.Id);
+                            _logger.LogInformation("    Cell: {Cell}", matchingField.CellAddress ?? "?");
+                            _logger.LogInformation("    FontSize: {Sz}", matchingField.Style?.FontSize ?? 0);
+                            _logger.LogInformation("    FontFamily: {Ff}", matchingField.Style?.FontFamily ?? "(default)");
+                            _logger.LogInformation("    Bold: {B}", matchingField.Style?.Bold ?? false);
+                            _logger.LogInformation("--------------------------------------------------------");
+
+                            log.AppendLine($"[PAPERLESS CONFIG] Field '{configField.Id}' matched by cell {configField.Cell}");
+                            if (configField.Style?.Font != null)
+                                log.AppendLine($"[PAPERLESS CONFIG]   Restored style: fontSize={configField.Style.Font.SizePt}, bold={configField.Style.Font.Bold}, font='{configField.Style.Font.Name}'");
+                            overlaidFields++;
+                        }
+                    }
+
+                    if (overlaidFields > 0)
+                    {
+                        log.AppendLine();
+                        log.AppendLine($"[PAPERLESS CONFIG] Fields restored from configuration: {overlaidFields}");
+                        _logger.LogInformation("[PAPERLESS CONFIG] Fields restored from configuration: {Count}", overlaidFields);
+                    }
                 }
 
                 // ═════════════════════════════════════════════════════════
@@ -1029,22 +1339,24 @@ namespace ExcelAPI.Application
             };
 
             // ═══════════════════════════════════════════════════════════
-            // PHASE 21.1: DETAILED FORMATTING LOG
+            // PHASE 22.1 — STAGE 23: STYLE READ (Workbook → DesignerModel)
             // ═══════════════════════════════════════════════════════════
-            log.AppendLine("[DesignerModelReader]   Field Style");
-            log.AppendLine($"    Cell: {cellAddr}");
-            log.AppendLine($"    Font Name: {style.FontName}");
-            log.AppendLine($"    Font Size: {style.FontSize}");
-            log.AppendLine($"    Bold: {style.Bold}");
-            log.AppendLine($"    Italic: {style.Italic}");
-            log.AppendLine($"    Underline: {style.Underline}");
-            log.AppendLine($"    Font Color: {style.FontColor}");
-            log.AppendLine($"    Fill Color: {style.FillColor}");
-            log.AppendLine($"    Horizontal: {style.HorizontalAlignment}");
-            log.AppendLine($"    Vertical: {style.VerticalAlignment}");
-            log.AppendLine($"    Wrap: {style.WrapText}");
-            log.AppendLine($"    Number Format: {style.NumberFormat}");
-            log.AppendLine($"    Rotation: {style.Rotation}");
+            log.AppendLine("========================================================");
+            log.AppendLine("  STAGE 23 — Style Read");
+            log.AppendLine("========================================================");
+            log.AppendLine($"  Cell: {cellAddr}");
+            log.AppendLine($"  ✓ Font Name:     {style.FontName}");
+            log.AppendLine($"  ✓ Font Size:     {style.FontSize}");
+            log.AppendLine($"  ✓ Bold:          {style.Bold}");
+            log.AppendLine($"  ✓ Italic:        {style.Italic}");
+            log.AppendLine($"  ✓ Underline:     {style.Underline}");
+            log.AppendLine($"  ✓ Font Color:    {style.FontColor}");
+            log.AppendLine($"  ✓ Fill Color:    {style.FillColor}");
+            log.AppendLine($"  ✓ H-Align:       {style.HorizontalAlignment}");
+            log.AppendLine($"  ✓ V-Align:       {style.VerticalAlignment}");
+            log.AppendLine($"  ✓ Wrap Text:     {style.WrapText}");
+            log.AppendLine($"  ✓ Number Format: {style.NumberFormat}");
+            log.AppendLine("========================================================");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -1568,6 +1880,84 @@ namespace ExcelAPI.Application
                 "textlength" => "textLength",
                 "custom" => "custom",
                 _ => "any"
+            };
+        }
+
+        /// <summary>
+        /// Extract text from a cell that may store inline strings (t="inlineStr") or shared strings (t="s").
+        /// </summary>
+        private static string? GetCellInlineText(Cell cell)
+        {
+            if (cell == null) return null;
+
+            // Inline string
+            if (cell.InlineString != null && cell.InlineString.Text != null)
+                return cell.InlineString.Text.Text;
+
+            // Shared string
+            if (cell.DataType != null && cell.DataType.Value == CellValues.SharedString && cell.CellValue != null)
+            {
+                if (int.TryParse(cell.CellValue.Text, out int ssIndex))
+                {
+                    // Cannot resolve shared string without the SharedStringTablePart
+                    // This is a best-effort; the config uses inline strings
+                    return $"(shared string index {ssIndex})";
+                }
+            }
+
+            // Plain text value
+            if (cell.CellValue != null && !string.IsNullOrEmpty(cell.CellValue.Text))
+                return cell.CellValue.Text;
+
+            return null;
+        }
+
+        /// <summary>
+        /// Normalize a cell address or range to a canonical cell reference (e.g., "$A$1:$B$2" → "A1").
+        /// Removes dollar signs, splits ranges, and returns the first cell.
+        /// </summary>
+        private static string NormalizeCellAddress(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address)) return "";
+            string trimmed = address.Trim();
+            // Handle ranges: "A1:B2" → "A1", "$A$1:$B$2" → "A1"
+            if (trimmed.Contains(':'))
+                trimmed = trimmed.Split(':')[0];
+            // Remove dollar signs: "$A$1" → "A1"
+            trimmed = trimmed.Replace("$", "");
+            return trimmed.ToUpperInvariant();
+        }
+
+        /// <summary>
+        /// Map CellStyle alignment horizontal value to DesignerFieldStyle horizontal alignment.
+        /// </summary>
+        private static string MapHorizontalAlignment(string? horiz)
+        {
+            return (horiz ?? "").ToLowerInvariant() switch
+            {
+                "left" => "left",
+                "center" or "centre" => "center",
+                "right" => "right",
+                "general" => "general",
+                "fill" => "fill",
+                "justify" => "justify",
+                _ => "" // let the default from Excel detection stand
+            };
+        }
+
+        /// <summary>
+        /// Map CellStyle alignment vertical value to DesignerFieldStyle vertical alignment.
+        /// </summary>
+        private static string MapVerticalAlignment(string? vert)
+        {
+            return (vert ?? "").ToLowerInvariant() switch
+            {
+                "top" => "top",
+                "center" or "middle" => "middle",
+                "bottom" => "bottom",
+                "justify" => "justify",
+                "distributed" => "distributed",
+                _ => "" // let the default from Excel detection stand
             };
         }
 

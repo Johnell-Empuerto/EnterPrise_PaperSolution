@@ -67,6 +67,12 @@ namespace ExcelAPI.Models.WorkbookDefinition
         public bool Required { get; set; }
 
         /// <summary>
+        /// Whether the field requires validation during editing (not just on submit).
+        /// Specific to KeyboardText fields.
+        /// </summary>
+        public bool ValidateOnEditing { get; set; }
+
+        /// <summary>
         /// User-entered value for this field (set by the frontend editor).
         /// Written back to the original XLSX by WorkbookValueWriter.
         /// </summary>

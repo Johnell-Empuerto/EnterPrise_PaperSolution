@@ -42,7 +42,7 @@ export interface PaperlessDesignerProps {
   onReset: () => void;
   onUploadClick: () => void;
   /** Callback for exporting the current form as an Output Excel workbook */
-  onExportExcel: () => void;
+  onExportExcel: (fieldConfigs?: Record<string, FieldConfig>) => void;
   /** Whether an export is in progress */
   exporting?: boolean;
   /** Export error message, if any */
@@ -98,22 +98,31 @@ export function PaperlessDesigner({
   // Overridden field type — the uploaded Excel type is the initial default, user can switch
   const [fieldTypes, setFieldTypes] = useState<Record<string, string>>({});
 
+  // Phase 22: Wrap onExportExcel to pass fieldConfigs for style persistence
+  const handleExportWithStyles = useCallback(() => {
+    onExportExcel(fieldConfigs);
+  }, [onExportExcel, fieldConfigs]);
+
   // DEBUG: Log selection changes
   useEffect(() => {
     console.log("SELECTION CHANGED", { selectedFieldId, timestamp: new Date().toISOString() });
   }, [selectedFieldId]);
 
-  // Auto-migrate legacy text fields to KeyboardText on selection
+  // Auto-migrate legacy text fields to KeyboardText on selection.
+  // Also populates ktConfigs for KeyboardText fields that have a config
+  // (e.g. restored from PaperLessConfig on re-upload) so the property panel
+  // reflects restored values instead of DEFAULTS (fontSize=11).
   useEffect(() => {
-    if (!selectedField || !isLegacyTextField(selectedField)) return;
+    if (!selectedField) return;
     if (ktConfigs[selectedField.id]) return;
-    const params = convertLegacyConfigToKtParams(selectedField.config);
-    setKtConfigs((prev) => ({
-      ...prev,
-      [selectedField.id]: params,
-    }));
-    // Also set the field type so the dropdown reflects the effective KeyboardText type
-    setFieldTypes((prev) => ({ ...prev, [selectedField.id]: "KeyboardText" }));
+    if (isLegacyTextField(selectedField) || (selectedField.dataType === "KeyboardText" && selectedField.config)) {
+      const params = convertLegacyConfigToKtParams(selectedField.config);
+      setKtConfigs((prev) => ({
+        ...prev,
+        [selectedField.id]: params,
+      }));
+      setFieldTypes((prev) => ({ ...prev, [selectedField.id]: "KeyboardText" }));
+    }
   }, [selectedField, ktConfigs]);
 
   const updateFieldConfig = useCallback(
@@ -141,6 +150,47 @@ export function PaperlessDesigner({
   const updateKeyboardTextConfig = useCallback(
     (fieldId: string, params: KeyboardTextInputParameters) => {
       setKtConfigs((prev) => ({ ...prev, [fieldId]: params }));
+      // Sync keyboard text properties into fieldConfigs.appearance so that
+      // buildFieldStyle (in page.tsx) picks them up during export/save.
+      // This is the bridge between runtime rendering params and export style persistence.
+      setFieldConfigs((prev) => {
+        const existing = prev[fieldId];
+        const appearance = existing?.appearance ?? {};
+        const layout = existing?.layout ?? {};
+        const behavior = existing?.behavior ?? {};
+        const input = existing?.input ?? {};
+        return {
+          ...prev,
+          [fieldId]: {
+            ...existing,
+            appearance: {
+              ...appearance,
+              fontFamily: params.font || undefined,
+              fontSize: params.fontSize > 0 ? params.fontSize : undefined,
+              fontWeight: params.weight?.toLowerCase() === "bold" ? "bold" : undefined,
+              textColor: params.color || undefined,
+            },
+            layout: {
+              ...layout,
+              horizontalAlign: params.align ? params.align.toLowerCase() as "left" | "center" | "right" : undefined,
+              verticalAlign: params.verticalAlignment !== undefined ? (params.verticalAlignment === 0 ? "top" : params.verticalAlignment === 1 ? "middle" : "bottom") : undefined,
+            },
+            behavior: {
+                ...behavior,
+                required: params.required || undefined,
+                readOnly: params.readOnly || undefined,
+                visible: params.hidden ? false : undefined,
+                validateOnEditing: params.validateOnEditing || undefined,
+              },
+            input: {
+              ...input,
+              maxLength: params.maxLength > 0 ? params.maxLength : undefined,
+              placeholder: params.placeholder || undefined,
+              defaultValue: params.defaultValue || undefined,
+            },
+          } as FieldConfig,
+        };
+      });
     },
     [],
   );
@@ -468,7 +518,7 @@ export function PaperlessDesigner({
         onGoNext={goNext}
         onReset={onReset}
         onUploadClick={onUploadClick}
-        onExportExcel={onExportExcel}
+        onExportExcel={handleExportWithStyles}
         exporting={exporting}
         exportError={exportError}
         exportSuccess={exportSuccess}

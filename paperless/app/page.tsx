@@ -1,18 +1,51 @@
 "use client";
 
 import { useState, useCallback, useRef, useEffect } from "react";
-import type { RuntimeForm, RuntimeField } from "@/types/runtime";
+import type { RuntimeForm, RuntimeField, FieldConfig } from "@/types/runtime";
 import { useRuntime } from "@/hooks/useRuntime";
 import { useRuntimeState } from "@/components/Runtime";
 import { PaperlessDesigner } from "@/components/PaperlessDesigner";
 
+// Phase 22: Style object matching backend CellStyle/FontDefinition/AlignmentDefinition.
+// System.Text.Json camelCase serialization maps these to C# models directly.
+interface WbDefStyle {
+  font?: {
+    name?: string;
+    sizePt?: number;
+    bold?: boolean;
+    italic?: boolean;
+    underline?: boolean;
+    colorArgb?: string;
+  };
+  alignment?: {
+    horizontal?: string;
+    vertical?: string;
+  };
+  fill?: {
+    patternType?: string;
+    colorArgb?: string;
+  };
+  wrapText?: boolean;
+}
+
 // ── WorkbookDefinition type for save-edited flow (Phase 5.2) ──
 // PHASE 21.6: type is now a number (integer enum value matching backend FieldType)
 interface WbDefField {
+  id: string;
   cell: { address: string; rowIndex: number };
   name: string;
   type: number;
   value: string | null;
+  // Phase 22: Browser style persistence — applied to cell after value write
+  style?: WbDefStyle;
+  // Full PaperLess config properties for round-trip persistence
+  required?: boolean;
+  locked?: boolean;
+  visible?: boolean;
+  maxLength?: number;
+  placeholder?: string | null;
+  defaultValue?: string | null;
+  validateOnEditing?: boolean;
 }
 
 interface WbDefSheet {
@@ -243,6 +276,185 @@ export default function Home() {
       });
       console.log("%c=========================================================", "color: #047857; font-weight: bold");
 
+            // ═════════════════════════════════════════════════════════
+            // Apply PaperLessConfig to RuntimeForm fields
+            // Restores field ID, font, size, bold, color, alignment,
+            // required, maxLength, and type from the embedded config JSON.
+            // Also builds runtimeField.config so KeyboardTextField and
+            // KeyboardTextPropertyPanel reflect restored values.
+            // ═════════════════════════════════════════════════════════
+            function mapPLHorizontalAlignment(h: string | undefined): "left" | "center" | "right" | undefined {
+              if (!h) return undefined;
+              const a = h.toLowerCase();
+              if (a === "left") return "left";
+              if (a === "center" || a === "middle") return "center";
+              if (a === "right") return "right";
+              return undefined;
+            }
+            function mapPLVerticalAlignment(v: string | undefined): "top" | "middle" | "bottom" | undefined {
+              if (!v) return undefined;
+              const a = v.toLowerCase();
+              if (a === "top") return "top";
+              if (a === "center" || a === "middle") return "middle";
+              if (a === "bottom") return "bottom";
+              return undefined;
+            }
+            // Convert #AARRGGBB or #RRGGBB to #RRGGBB
+            function argbToRgb(argb: string | undefined): string | undefined {
+              if (!argb) return undefined;
+              const c = argb.replace("#", "");
+              if (c.length === 8) return "#" + c.substring(2);
+              if (c.length === 6) return "#" + c.toUpperCase();
+              if (c.length === 3) return "#" + c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+              return argb;
+            }
+            if (result.paperLessConfig?.sheets) {
+              for (const configSheet of result.paperLessConfig.sheets) {
+                const runtimeSheet = runtimeForm.sheets.find(s => s.name === configSheet.name);
+                if (!runtimeSheet) continue;
+
+                for (const cf of configSheet.fields ?? []) {
+                  const configCell = (cf.cell ?? "").replace(/^\$/, "").split(":")[0].replace(/\$/g, "").toUpperCase();
+                  if (!configCell) continue;
+
+                  const runtimeField = runtimeSheet.fields.find(f => {
+                    const fCell = (f.cellReference ?? "").replace(/^\$/, "").split(":")[0].replace(/\$/g, "").toUpperCase();
+                    return fCell === configCell;
+                  });
+                  if (!runtimeField) continue;
+
+                  // Field identity
+                  if (cf.id) runtimeField.id = cf.id;
+
+                  // Style — font
+                  const styleFont = cf.style?.font;
+                  if (styleFont) {
+                    if (styleFont.name) runtimeField.font = styleFont.name;
+                    if (styleFont.sizePt > 0) runtimeField.fontSize = styleFont.sizePt;
+                    if (styleFont.bold) runtimeField.bold = true;
+                    if (styleFont.colorArgb) runtimeField.fontColor = styleFont.colorArgb;
+                  }
+
+                  // Style — fill / background
+                  const styleFill = cf.style?.fill;
+                  if (styleFill?.colorArgb) {
+                    runtimeField.backgroundColor = styleFill.colorArgb;
+                  }
+
+                  // Style — alignment (horizontal + vertical)
+                  const vAlignFromConfig = cf.style?.alignment?.vertical;
+                  if (cf.style?.alignment?.horizontal) {
+                    runtimeField.alignment = cf.style.alignment.horizontal;
+                  }
+
+                  // Field type
+                  if (cf.type) {
+                    runtimeField.dataType = mapPreviewType(cf.type);
+                  }
+
+                  // Input configuration (from PaperLessFieldConfig)
+                  const cfg = cf.config;
+                  if (cfg) {
+                    if (cfg.required) runtimeField.required = true;
+                    if (cfg.maxLength > 0) runtimeField.maxLength = cfg.maxLength;
+                    if (cfg.placeholder !== undefined && cfg.placeholder !== null) runtimeField.placeholder = cfg.placeholder;
+                    if (cfg.defaultValue !== undefined && cfg.defaultValue !== null) runtimeField.defaultValue = cfg.defaultValue;
+                    // inputRestriction is stored in cfg but used via config.appearance below
+                  }
+
+                  // Build FieldConfig from PaperLessConfig so runtime components
+                  // (KeyboardTextField, KeyboardTextPropertyPanel) reflect restored values.
+                  // Without this, the property panel shows DEFAULTS (fontSize=11) and
+                  // panel changes would override the correct flat property values.
+                  runtimeField.config = {
+                    appearance: {
+                      fontFamily: styleFont?.name || undefined,
+                      fontSize: (styleFont?.sizePt ?? 0) > 0 ? styleFont!.sizePt : undefined,
+                      fontWeight: styleFont?.bold ? "bold" : undefined,
+                      textColor: argbToRgb(styleFont?.colorArgb),
+                      backgroundColor: argbToRgb(styleFill?.colorArgb),
+                    },
+                    layout: {
+                      horizontalAlign: mapPLHorizontalAlignment(cf.style?.alignment?.horizontal),
+                      verticalAlign: mapPLVerticalAlignment(cf.style?.alignment?.vertical),
+                    },
+                    behavior: {
+                      required: cfg?.required || undefined,
+                      readOnly: cfg?.readOnly || undefined,
+                      visible: !(cfg?.hidden) || undefined,
+                      enabled: undefined,
+                    },
+                    input: {
+                      maxLength: (cfg?.maxLength ?? 0) > 0 ? cfg!.maxLength : undefined,
+                      minLength: cfg?.minLength ?? undefined,
+                    },
+                  } as FieldConfig;
+
+                  // Add keyboardText params so convertLegacyConfigToKtParams picks them up
+                  if (runtimeField.dataType === "KeyboardText") {
+                    const va = mapPLVerticalAlignment(cf.style?.alignment?.vertical);
+                    const vaMap: Record<string, 0 | 1 | 2> = { top: 0, middle: 1, bottom: 2 };
+                    const ha = mapPLHorizontalAlignment(cf.style?.alignment?.horizontal);
+                    const haMap: Record<string, "Left" | "Center" | "Right"> = { left: "Left", center: "Center", right: "Right" };
+                    const inputRestriction = cfg?.inputRestriction && cfg.inputRestriction !== "None" ? cfg.inputRestriction : "None";
+                    runtimeField.config = {
+                      ...runtimeField.config,
+                      keyboardText: {
+                        required: cfg?.required ?? false,
+                        validateOnEditing: cfg?.validateOnEditing ?? false,
+                        readOnly: cfg?.readOnly ?? false,
+                        hidden: cfg?.hidden ?? false,
+                        lines: cfg?.lines ?? 1,
+                        inputRestriction: inputRestriction as any,
+                        maxLength: cfg?.maxLength ?? 0,
+                        align: (ha ? haMap[ha] : "Center") as any,
+                        font: styleFont?.name || "Arial",
+                        fontSize: (styleFont?.sizePt ?? 0) > 0 ? styleFont!.sizePt : 11,
+                        defaultFontSize: (styleFont?.sizePt ?? 0) > 0 ? styleFont!.sizePt : 11,
+                        weight: styleFont?.bold ? "Bold" : ("Normal" as any),
+                        color: (() => {
+                          const rgb = argbToRgb(styleFont?.colorArgb);
+                          if (!rgb) return "0,0,0";
+                          const c = rgb.replace("#", "");
+                          if (c.length === 6) return `${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)}`;
+                          return "0,0,0";
+                        })(),
+                        verticalAlignment: (va ? vaMap[va] : 1) as any,
+                        placeholder: cfg?.placeholder ?? "",
+                        defaultValue: cfg?.defaultValue ?? "",
+                      }
+                    } as FieldConfig;
+                  }
+                }
+              }
+            }
+
+      // ═════════════════════════════════════════════════════════
+      // PAPERLESS DEBUG STAGE 15 — After Re-upload Response
+      // ═════════════════════════════════════════════════════════
+      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+      console.log("%cPAPERLESS DEBUG STAGE 15 — After Re-upload Response", "color: #7c3aed; font-weight: bold");
+      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+      {
+        const s15Sheet = runtimeForm.sheets[0];
+        const s15Field = s15Sheet?.fields[0];
+        if (s15Field) {
+          console.log("Field ID:", s15Field.id);
+          console.log("Cell:", s15Field.cellReference);
+          console.log("Font Name:", s15Field.font ?? "(not set)");
+          console.log("Font Size:", s15Field.fontSize);
+          console.log("Bold:", s15Field.bold);
+          console.log("Font Color:", s15Field.fontColor ?? "(not set)");
+          console.log("BG Color:", s15Field.backgroundColor ?? "(not set)");
+          console.log("Alignment:", s15Field.alignment ?? "(not set)");
+          console.log("Required:", s15Field.required);
+          console.log("MaxLength:", s15Field.maxLength);
+          console.log("DataType:", s15Field.dataType);
+        }
+      }
+      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+      console.log("");
+
       setRuntimeForm(runtimeForm);
     } catch (err) {
       setUploadError(
@@ -296,11 +508,112 @@ export default function Home() {
     setTimeout(() => fileInputRef.current?.click(), 100);
   }, []);
 
+  /**
+   * Convert hex color #RRGGBB or #RGB to #AARRGGBB format.
+   * Adds FF alpha prefix if not present.
+   */
+  function normalizeColorArgb(color: string | null | undefined): string | undefined {
+    if (!color) return undefined;
+    let c = color.replace("#", "");
+    if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+    if (c.length === 6) return "#FF" + c.toUpperCase();
+    if (c.length === 8) return "#" + c.toUpperCase();
+    return undefined;
+  }
+
+  /**
+   * Map frontend alignment string to backend HorizontalAlignment value.
+   * "Center" → "center", "Left" → "left", "Right" → "right"
+   */
+  function mapHorizontalAlignment(align: string | null | undefined): string | undefined {
+    if (!align) return undefined;
+    const a = align.toLowerCase();
+    if (a.includes("center")) return "center";
+    if (a.includes("left")) return "left";
+    if (a.includes("right")) return "right";
+    return undefined;
+  }
+
+  /**
+   * Map frontend vertical alignment to backend VerticalAlignment value.
+   * "top" → "top", "middle" → "center", "bottom" → "bottom"
+   */
+  function mapVerticalAlignment(align: string | null | undefined): string | undefined {
+    if (!align) return undefined;
+    const a = align.toLowerCase();
+    if (a === "top") return "top";
+    if (a === "middle" || a === "center") return "center";
+    if (a === "bottom") return "bottom";
+    return undefined;
+  }
+
+  /**
+   * Build WbDefStyle from RuntimeField + FieldConfig overrides.
+   * FieldConfig overrides take priority over RuntimeField properties.
+   */
+  function buildFieldStyle(field: RuntimeField, config?: FieldConfig): WbDefStyle | undefined {
+    const appearance = config?.appearance;
+    const layout = config?.layout;
+
+    // Read from RuntimeField properties (original upload values)
+    let fontFamily = field.font ?? undefined;
+    let fontSize = field.fontSize > 0 ? field.fontSize : undefined;
+    let bold = field.bold || undefined;
+    let fontColor = normalizeColorArgb(field.fontColor);
+    let bgColor = normalizeColorArgb(field.backgroundColor);
+    let hAlign = mapHorizontalAlignment(field.alignment);
+    let vAlign = undefined as string | undefined;
+
+    // Override with FieldConfig (user edits in browser)
+    if (appearance) {
+      if (appearance.fontFamily !== undefined) fontFamily = appearance.fontFamily;
+      if (appearance.fontSize !== undefined) fontSize = appearance.fontSize;
+      if (appearance.fontWeight !== undefined && appearance.fontWeight.toLowerCase() === "bold") bold = true;
+      if (appearance.textColor !== undefined) fontColor = normalizeColorArgb(appearance.textColor);
+      if (appearance.backgroundColor !== undefined) bgColor = normalizeColorArgb(appearance.backgroundColor);
+    }
+    if (layout) {
+      if (layout.horizontalAlign !== undefined) hAlign = layout.horizontalAlign;
+      if (layout.verticalAlign !== undefined) {
+        // FieldConfig uses "middle", backend expects "center"
+        vAlign = layout.verticalAlign === "middle" ? "center" : layout.verticalAlign;
+      }
+    }
+
+    // Only emit style if there are actual changes from defaults
+    const hasFontStyle = fontFamily !== undefined || fontSize !== undefined || bold !== undefined || fontColor !== undefined;
+    const hasAlignment = hAlign !== undefined || vAlign !== undefined;
+    const hasFill = bgColor !== undefined;
+
+    if (!hasFontStyle && !hasAlignment && !hasFill) return undefined;
+
+    const result: WbDefStyle = {};
+    if (hasFontStyle) {
+      result.font = {};
+      if (fontFamily !== undefined) result.font.name = fontFamily;
+      if (fontSize !== undefined) result.font.sizePt = fontSize;
+      if (bold !== undefined) result.font.bold = bold;
+      if (fontColor !== undefined) result.font.colorArgb = fontColor;
+    }
+    if (hasAlignment) {
+      result.alignment = {};
+      if (hAlign !== undefined) result.alignment.horizontal = hAlign;
+      if (vAlign !== undefined) result.alignment.vertical = vAlign;
+    }
+    if (hasFill) {
+      result.fill = {};
+      result.fill.patternType = "solid";
+      result.fill.colorArgb = bgColor;
+    }
+    return result;
+  }
+
   // ── Convert RuntimeForm → WorkbookDefinition for save-edited flow (Phase 5.2) ──
   const runtimeFormToWorkbookDefinition = useCallback((
     form: RuntimeForm,
     values: Record<string, string | boolean | null>,
     sid: string,
+    fieldConfigs?: Record<string, FieldConfig>,
   ): WbDef => {
     // ═════════════════════════════════════════════════════════
     // PHASE 21.5 — STAGE 6 & 7: runtimeFormToWorkbookDefinition
@@ -332,18 +645,35 @@ export default function Home() {
       sheets: form.sheets.map((sheet, si) => ({
         name: sheet.name ?? `Page ${si + 1}`,
         index: si,
-        fields: sheet.fields.map(f => ({
-          cell: {
-            address: f.cellReference?.split(":")[0] ?? "A1",
-            rowIndex: parseInt(f.cellReference?.match(/\d+/)?.[0] ?? "1"),
-          },
-          name: f.name ?? f.id,
-          // PHASE 21.6: Send integer enum value (0=Text, 1=Number, etc.)
-          // instead of string. Backend uses System.Text.Json default which
-          // expects integers for enums (no JsonStringEnumConverter).
-          type: fieldTypeToBackendEnum(f.dataType ?? "KeyboardText"),
-          value: String(values[f.id] ?? ""),
-        })),
+        fields: sheet.fields.map(f => {
+          const fc = fieldConfigs?.[f.id];
+          const beh = fc?.behavior ?? {};
+          const inp = fc?.input ?? {};
+          return {
+            id: f.id,
+            cell: {
+              address: f.cellReference ?? "A1",
+              rowIndex: parseInt(f.cellReference?.match(/\d+/)?.[0] ?? "1"),
+            },
+            name: f.name ?? "",
+            // PHASE 21.6: Send integer enum value (0=Text, 1=Number, etc.)
+            // instead of string. Backend uses System.Text.Json default which
+            // expects integers for enums (no JsonStringEnumConverter).
+            type: fieldTypeToBackendEnum(f.dataType ?? "KeyboardText"),
+            value: String(values[f.id] ?? ""),
+            // Phase 22: Browser style persistence — include user-edited styles
+            style: buildFieldStyle(f, fieldConfigs?.[f.id]),
+            // Full PaperLess config properties — sent so PaperLessConfigWriter
+            // persists them in the hidden JSON for re-upload restoration.
+            required: beh.required === true ? true : undefined,
+            locked: beh.readOnly === true ? true : undefined,
+            visible: beh.visible !== false ? undefined : false,
+            maxLength: (inp.maxLength ?? 0) > 0 ? inp.maxLength : undefined,
+            placeholder: fc?.input?.placeholder || undefined,
+            defaultValue: fc?.input?.defaultValue || undefined,
+            validateOnEditing: beh.validateOnEditing === true ? true : undefined,
+          };
+        }),
       })),
     };
 
@@ -358,7 +688,10 @@ export default function Home() {
     result.sheets.forEach((s, si) => {
       console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
       s.fields.forEach((f, fi) => {
-        console.log(`    Field ${fi}: id='${f.name}' cell='${f.cell.address}/${f.cell.rowIndex}' value='${f.value}'`);
+        console.log(`    Field ${fi}: id='${f.id}' name='${f.name}' cell='${f.cell.address}' value='${f.value}'`);
+        if (f.style) {
+          console.log(`    Style: font='${f.style.font?.name ?? "?"}/${f.style.font?.sizePt ?? "?"}' bold=${!!f.style.font?.bold} fill='${f.style.fill?.colorArgb ?? "none"}' hAlign='${f.style.alignment?.horizontal ?? "?"}'`);
+        }
       });
     });
     console.log("%c=========================================================", "color: #b45309; font-weight: bold");
@@ -368,7 +701,7 @@ export default function Home() {
   }, []);
 
   // ── Save edited — POST /api/form/save-edited → WorkbookValueWriter (Phase 5.2) ──
-  const handleSaveEdited = useCallback(async () => {
+  const handleSaveEdited = useCallback(async (fieldConfigs?: Record<string, FieldConfig>) => {
     if (!runtimeForm || !sessionId) {
       setExportError(sessionId ? "No form loaded." : "No session found. Please upload the workbook first.");
       return;
@@ -379,26 +712,53 @@ export default function Home() {
     setExportSuccess(null);
 
     try {
-      const wbDef = runtimeFormToWorkbookDefinition(runtimeForm, runtime.values, sessionId);
+      const wbDef = runtimeFormToWorkbookDefinition(runtimeForm, runtime.values, sessionId, fieldConfigs);
 
-      // ═════════════════════════════════════════════════════════
-      // PHASE 21.5 — STAGE 8: FINAL JSON PAYLOAD (before fetch)
-      // ═════════════════════════════════════════════════════════
-      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
-      console.log("%cSTAGE 8 — FINAL JSON PAYLOAD (before fetch)", "color: #dc2626; font-weight: bold");
-      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
-      console.log("FINAL FETCH PAYLOAD:");
-      console.log("  sheets:", wbDef.sheets.length);
-      wbDef.sheets.forEach((s, si) => {
-        console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
-        s.fields.forEach((f, fi) => {
-          console.log(`    Field ${fi}: name='${f.name}' cell='${f.cell.address}' value='${f.value}'`);
-        });
+    // ═════════════════════════════════════════════════════════
+    // PAPERLESS DEBUG STAGE 1 — Before Export Request
+    // ═════════════════════════════════════════════════════════
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+    console.log("%cPAPERLESS DEBUG STAGE 1 — Before Export Request", "color: #7c3aed; font-weight: bold");
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+    {
+      const s1Sheet = wbDef.sheets[0];
+      const s1Field = s1Sheet?.fields[0];
+      if (s1Field) {
+        console.log("Field ID:", s1Field.id);
+        console.log("Cell:", s1Field.cell.address);
+        console.log("Font Name:", s1Field.style?.font?.name ?? "(not set)");
+        console.log("Font Size:", s1Field.style?.font?.sizePt ?? "(not set)");
+        console.log("Bold:", !!s1Field.style?.font?.bold);
+        console.log("Italic:", !!s1Field.style?.font?.italic);
+        console.log("Underline:", !!s1Field.style?.font?.underline);
+        console.log("H-Align:", s1Field.style?.alignment?.horizontal ?? "(not set)");
+      }
+    }
+    console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
+    console.log("");
+
+    // ═════════════════════════════════════════════════════════
+    // PHASE 21.5 — STAGE 8: FINAL JSON PAYLOAD (before fetch)
+    // ═════════════════════════════════════════════════════════
+    // PHASE 22 — STAGE 22: Style payload diagnostic
+    console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
+    console.log("%cSTAGE 8 — FINAL JSON PAYLOAD (before fetch)", "color: #dc2626; font-weight: bold");
+    console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
+    console.log("FINAL FETCH PAYLOAD:");
+    console.log("  sheets:", wbDef.sheets.length);
+    wbDef.sheets.forEach((s, si) => {
+      console.log(`  Sheet ${si}: '${s.name}' — Fields: ${s.fields.length}`);
+      s.fields.forEach((f, fi) => {
+        console.log(`    Field ${fi}: id='${f.id}' name='${f.name}' cell='${f.cell.address}' value='${f.value}'`);
+        if (f.style) {
+          console.log(`    Style: font='${f.style.font?.name ?? "?"}/${f.style.font?.sizePt ?? "?"}' bold=${!!f.style.font?.bold} fill='${f.style.fill?.colorArgb ?? "none"}' hAlign='${f.style.alignment?.horizontal ?? "?"}'`);
+        }
       });
-      console.log("");
-      console.log("JSON.stringify length:", JSON.stringify(wbDef).length, "bytes");
-      console.log("fields[0] check: wbDef.sheets[0].fields.length =", wbDef.sheets[0]?.fields?.length ?? 0);
-      console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
+    });
+    console.log("");
+    console.log("JSON.stringify length:", JSON.stringify(wbDef).length, "bytes");
+    console.log("fields[0] check: wbDef.sheets[0].fields.length =", wbDef.sheets[0]?.fields?.length ?? 0);
+    console.log("%c=========================================================", "color: #dc2626; font-weight: bold");
 
       const response = await fetch(`${API_BASE_URL}/api/form/save-edited`, {
         method: "POST",
@@ -455,7 +815,8 @@ export default function Home() {
   }, [runtimeForm, runtime.values, sessionId, runtimeFormToWorkbookDefinition, runtime]);
 
   // ── Export Excel handler — Phase 5.2: save-edited is the ONLY path ──
-  const handleExportExcel = useCallback(async () => {
+  // Phase 22: Accept fieldConfigs from PaperlessDesigner for style persistence
+  const handleExportExcel = useCallback(async (fieldConfigs?: Record<string, FieldConfig>) => {
     if (!runtimeForm) {
       setExportError("No form loaded.");
       return;
@@ -466,7 +827,7 @@ export default function Home() {
       return;
     }
 
-    return handleSaveEdited();
+    return handleSaveEdited(fieldConfigs);
   }, [runtimeForm, sessionId, handleSaveEdited]);
 
   // ── Drag and drop handlers ──
@@ -816,7 +1177,7 @@ export default function Home() {
               templateName={templateName}
               onReset={handleReset}
               onUploadClick={handleUploadClick}
-              onExportExcel={handleExportExcel}
+              onExportExcel={handleExportExcel as unknown as () => void}
               exporting={exporting}
               exportError={exportError}
               exportSuccess={exportSuccess}

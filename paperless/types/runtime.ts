@@ -52,10 +52,13 @@ export interface FieldConfig {
     required?: boolean;
     visible?: boolean;
     enabled?: boolean;
+    validateOnEditing?: boolean;
   };
   input: {
     maxLength?: number;
     minLength?: number;
+    placeholder?: string;
+    defaultValue?: string;
   };
   layout: {
     horizontalAlign?: "left" | "center" | "right";

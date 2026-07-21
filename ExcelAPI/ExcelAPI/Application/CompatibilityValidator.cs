@@ -293,7 +293,7 @@ namespace ExcelAPI.Application
         private readonly ILogger<CompatibilityValidator> _logger;
 
         private static readonly HashSet<string> ConfigurationSheetNames =
-            new(StringComparer.OrdinalIgnoreCase) { "_Fields", "_RawData", "ExcelOutputSetting" };
+            new(StringComparer.OrdinalIgnoreCase) { "_Fields", "_RawData", "ExcelOutputSetting", "PaperLessConfig" };
 
         public CompatibilityValidator(ILogger<CompatibilityValidator> logger)
         {

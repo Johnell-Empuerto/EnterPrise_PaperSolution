@@ -50,8 +50,10 @@ namespace ExcelAPI.Application
         private readonly WorkbookGenerator _workbookGenerator;
         private readonly PreviewGenerator _previewGenerator;
         private readonly PdfGenerator _pdfGenerator;
-        private readonly WorkbookValueWriter _valueWriter;
+        private readonly ConMasCompatibleWorkbookWriter _valueWriter;
+        private readonly WorkbookStyleWriter _styleWriter;
         private readonly CompatibilityValidator _compatValidator;
+        private readonly IPaperLessConfigWriter _paperLessConfigWriter;
         private readonly ILogger<FormSaveService> _logger;
 
         public FormSaveService(
@@ -60,8 +62,10 @@ namespace ExcelAPI.Application
             WorkbookGenerator workbookGenerator,
             PreviewGenerator previewGenerator,
             PdfGenerator pdfGenerator,
-            WorkbookValueWriter valueWriter,
+            ConMasCompatibleWorkbookWriter valueWriter,
+            WorkbookStyleWriter styleWriter,
             CompatibilityValidator compatValidator,
+            IPaperLessConfigWriter paperLessConfigWriter,
             ILogger<FormSaveService> logger)
         {
             _xmlGenerator = xmlGenerator;
@@ -70,7 +74,9 @@ namespace ExcelAPI.Application
             _previewGenerator = previewGenerator;
             _pdfGenerator = pdfGenerator;
             _valueWriter = valueWriter;
+            _styleWriter = styleWriter;
             _compatValidator = compatValidator;
+            _paperLessConfigWriter = paperLessConfigWriter;
             _logger = logger;
         }
 
@@ -232,6 +238,28 @@ namespace ExcelAPI.Application
         }
 
         /// <summary>
+        /// Check if a CellStyle has any actual style properties to apply.
+        /// </summary>
+        private static bool HasStyleProperties(CellStyle? style)
+        {
+            if (style == null) return false;
+            bool hasFont = style.Font != null &&
+                (!string.IsNullOrEmpty(style.Font.Name) ||
+                 style.Font.SizePt > 0 ||
+                 style.Font.Bold ||
+                 style.Font.Italic ||
+                 !string.IsNullOrEmpty(style.Font.ColorArgb));
+            bool hasFill = style.Fill != null &&
+                !string.IsNullOrEmpty(style.Fill.ColorArgb) &&
+                style.Fill.PatternType != "none";
+            bool hasAlign = style.Alignment != null &&
+                (!string.IsNullOrEmpty(style.Alignment.Horizontal) ||
+                 !string.IsNullOrEmpty(style.Alignment.Vertical));
+            bool hasWrap = style.WrapText;
+            return hasFont || hasFill || hasAlign || hasWrap;
+        }
+
+        /// <summary>
         /// Save edited values back into the original workbook (Phase 4.4 / 5.2).
         /// Uses WorkbookValueWriter to surgically modify only editable cells
         /// in the original XLSX, preserving all formatting, layouts, and structure.
@@ -387,6 +415,49 @@ namespace ExcelAPI.Application
             _logger.LogInformation(
                 "[WBDF] Edited values saved: {Count} cells written to {Path} (source: {Source})",
                 result.CellsWritten, result.WorkbookPath, sourcePath);
+
+            // Phase 22: Apply browser-edited styles (font, fill, alignment) to cells
+            if (definition.Sheets.Any(s => s.Fields.Any(f => f.Style != null && HasStyleProperties(f.Style))))
+            {
+                int stylesApplied = _styleWriter.ApplyStyles(definition, result.WorkbookPath);
+                _logger.LogInformation(
+                    "[PHASE22] Browser styles applied: {Count} cells styled",
+                    stylesApplied);
+            }
+            else
+            {
+                _logger.LogInformation("[PHASE22] No field style overrides found — skipping style writer");
+            }
+
+            // ═════════════════════════════════════════════════════════
+            // PAPERLESS DEBUG STAGE 3 — Before PaperLessConfigWriter
+            // ═════════════════════════════════════════════════════════
+            _logger.LogInformation("========================================================");
+            _logger.LogInformation("PAPERLESS DEBUG STAGE 3 — FormSaveService Before Config Writer");
+            _logger.LogInformation("========================================================");
+            if (definition.Sheets != null)
+            {
+                foreach (var s in definition.Sheets)
+                {
+                    _logger.LogInformation("  Sheet: {Name}", s.Name ?? "(unnamed)");
+                    if (s.Fields != null)
+                    {
+                        foreach (var f in s.Fields.Take(3))
+                        {
+                            _logger.LogInformation("    Field ID: {Id}", f.Id ?? "(empty)");
+                            _logger.LogInformation("    Cell: {Cell}", f.Cell?.Address ?? "?");
+                            _logger.LogInformation("    FontSize (CellStyle): {Sz}", f.Style?.Font?.SizePt ?? 0);
+                            _logger.LogInformation("    FontName: {Fn}", f.Style?.Font?.Name ?? "(null)");
+                            _logger.LogInformation("    Bold: {B}", f.Style?.Font?.Bold ?? false);
+                        }
+                    }
+                }
+            }
+            _logger.LogInformation("========================================================");
+
+            // PaperLess config persistence — embed field identity, style, and config
+            // as VeryHidden JSON inside the workbook for re-upload restoration.
+            _paperLessConfigWriter.WritePaperLessConfig(definition, result.WorkbookPath);
 
             // Phase 19: Business-level round-trip compatibility validation.
             // Compares fields, comments, configuration, print layout, and background.

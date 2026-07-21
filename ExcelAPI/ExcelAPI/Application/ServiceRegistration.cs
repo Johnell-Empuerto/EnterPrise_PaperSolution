@@ -20,8 +20,14 @@ public static class ApplicationServiceRegistration
         // Coordinate transform for printed page origin (Phase 36)
         services.AddSingleton<CoordinateTransformer>();
 
-        // Phase 4.4: Workbook editing
-        services.AddScoped<WorkbookValueWriter>();
+        // Phase 8: ConMas-compatible workbook editing (COM-based, preserves structure)
+        services.AddScoped<ConMasCompatibleWorkbookWriter>();
+
+        // Phase 22: Browser style persistence — applies font/fill/alignment to cells
+        services.AddScoped<WorkbookStyleWriter>();
+
+        // PaperLess config persistence — embeds field identity, style, and config as VeryHidden sheet
+        services.AddScoped<IPaperLessConfigWriter, PaperLessConfigWriter>();
 
         // Phase 17/18: Lightweight functional compatibility validator (replaces WorkbookDiffValidator)
         // Validates only business-critical requirements — never rejects the workbook.
