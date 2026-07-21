@@ -834,7 +834,6 @@ def split_merged_rects(pixel_rects: list[dict], cluster_meta: list[dict]) -> lis
 
             print(f"  [SPLIT] Group has {len(group)} fields but only {len(overlapping)} rect — proportional split")
 
-            # Gap-filling: each field gets space from its start col to the next
             col_starts = sorted(set(cr[0] for cr in all_cr))
 
             for i, m in enumerate(group):
@@ -842,7 +841,23 @@ def split_merged_rects(pixel_rects: list[dict], cluster_meta: list[dict]) -> lis
                 rr2 = _cluster_row_range(m["cellAddr"])
                 rel_left = (cr[0] - min_col) / grid_cols
 
-                next_start = col_starts[i + 1] if i + 1 < len(col_starts) else max_col + 1
+                # ── Phase 12.3 — Smart next_start: same-row gap-fill, cross-row own-span ──
+                # When the next field in the group is in the same row, gap-fill to its
+                # start column (correct for fields like A12→C12:D12 on the same row).
+                # When the next field is in a different row, use the current field's own
+                # column span (correct for multi-row groups like A1,B1,A2,B2).
+                # This avoids the col_starts[i+1] bug where deduplication causes index
+                # out of bounds for fields beyond the first unique columns.
+                if i + 1 < len(group):
+                    next_rr = _cluster_row_range(group[i + 1]["cellAddr"])
+                    if next_rr[0] == rr2[0]:  # Same row as current field
+                        next_cr = _cluster_col_range(group[i + 1]["cellAddr"])
+                        next_start = next_cr[0]
+                    else:  # Different row — use own column span
+                        next_start = cr[1] + 1
+                else:
+                    next_start = max_col + 1  # Last field: extend to end
+
                 rel_right = (next_start - min_col) / grid_cols
 
                 rel_top = (rr2[0] - min_row) / grid_rows
