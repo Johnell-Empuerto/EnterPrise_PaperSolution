@@ -59,6 +59,7 @@ export interface FieldConfig {
     minLength?: number;
     placeholder?: string;
     defaultValue?: string;
+    inputRestriction?: string;
   };
   layout: {
     horizontalAlign?: "left" | "center" | "right";

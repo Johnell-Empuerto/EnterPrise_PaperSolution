@@ -141,7 +141,9 @@ function KeyboardTextFieldInner({
         ? "2px solid rgba(234, 179, 8, 0.6)"
         : "1px solid rgba(59, 130, 246, 0.5)",
     borderRadius: "2px",
-    background: config?.appearance?.backgroundColor ?? (production ? "rgba(254, 249, 195, 0.25)" : "rgba(255, 255, 255, 0.85)"),
+    // Fully opaque background hides underlying Excel cell value rendered in the PNG preview,
+    // preventing duplicate visible text when defaultValue matches the cell value.
+    background: config?.appearance?.backgroundColor ?? (production ? "rgb(254, 249, 195)" : "rgb(255, 255, 255)"),
     transition: "border-color 0.15s, box-shadow 0.15s",
     opacity: enabled ? 1 : 0.5,
     cursor: readOnly ? "default" : "text",

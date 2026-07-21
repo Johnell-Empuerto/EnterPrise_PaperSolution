@@ -46,6 +46,7 @@ interface WbDefField {
   placeholder?: string | null;
   defaultValue?: string | null;
   validateOnEditing?: boolean;
+  inputRestriction?: string;
 }
 
 interface WbDefSheet {
@@ -283,22 +284,6 @@ export default function Home() {
             // Also builds runtimeField.config so KeyboardTextField and
             // KeyboardTextPropertyPanel reflect restored values.
             // ═════════════════════════════════════════════════════════
-            function mapPLHorizontalAlignment(h: string | undefined): "left" | "center" | "right" | undefined {
-              if (!h) return undefined;
-              const a = h.toLowerCase();
-              if (a === "left") return "left";
-              if (a === "center" || a === "middle") return "center";
-              if (a === "right") return "right";
-              return undefined;
-            }
-            function mapPLVerticalAlignment(v: string | undefined): "top" | "middle" | "bottom" | undefined {
-              if (!v) return undefined;
-              const a = v.toLowerCase();
-              if (a === "top") return "top";
-              if (a === "center" || a === "middle") return "middle";
-              if (a === "bottom") return "bottom";
-              return undefined;
-            }
             // Convert #AARRGGBB or #RRGGBB to #RRGGBB
             function argbToRgb(argb: string | undefined): string | undefined {
               if (!argb) return undefined;
@@ -341,8 +326,7 @@ export default function Home() {
                     runtimeField.backgroundColor = styleFill.colorArgb;
                   }
 
-                  // Style — alignment (horizontal + vertical)
-                  const vAlignFromConfig = cf.style?.alignment?.vertical;
+                  // Style — alignment (horizontal only, for visual export reference)
                   if (cf.style?.alignment?.horizontal) {
                     runtimeField.alignment = cf.style.alignment.horizontal;
                   }
@@ -375,8 +359,8 @@ export default function Home() {
                       backgroundColor: argbToRgb(styleFill?.colorArgb),
                     },
                     layout: {
-                      horizontalAlign: mapPLHorizontalAlignment(cf.style?.alignment?.horizontal),
-                      verticalAlign: mapPLVerticalAlignment(cf.style?.alignment?.vertical),
+                      // NOT populated from cf.style?.alignment — that is Excel background,
+                      // not interactive config. User-set alignment flows through fieldConfigs.
                     },
                     behavior: {
                       required: cfg?.required || undefined,
@@ -387,16 +371,17 @@ export default function Home() {
                     input: {
                       maxLength: (cfg?.maxLength ?? 0) > 0 ? cfg!.maxLength : undefined,
                       minLength: cfg?.minLength ?? undefined,
+                      placeholder: cfg?.placeholder ?? undefined,
+                      defaultValue: cfg?.defaultValue ?? undefined,
+                      inputRestriction: cfg?.inputRestriction && cfg.inputRestriction !== "None" ? cfg.inputRestriction : undefined,
                     },
                   } as FieldConfig;
 
                   // Add keyboardText params so convertLegacyConfigToKtParams picks them up
+                  // Alignment is intentionally excluded — Excel background alignment must NOT
+                  // become interactive KeyboardText configuration. User-set alignment flows
+                  // through fieldConfigs → export → PaperLessConfig → restoration → config.input.
                   if (runtimeField.dataType === "KeyboardText") {
-                    const va = mapPLVerticalAlignment(cf.style?.alignment?.vertical);
-                    const vaMap: Record<string, 0 | 1 | 2> = { top: 0, middle: 1, bottom: 2 };
-                    const ha = mapPLHorizontalAlignment(cf.style?.alignment?.horizontal);
-                    const haMap: Record<string, "Left" | "Center" | "Right"> = { left: "Left", center: "Center", right: "Right" };
-                    const inputRestriction = cfg?.inputRestriction && cfg.inputRestriction !== "None" ? cfg.inputRestriction : "None";
                     runtimeField.config = {
                       ...runtimeField.config,
                       keyboardText: {
@@ -405,9 +390,8 @@ export default function Home() {
                         readOnly: cfg?.readOnly ?? false,
                         hidden: cfg?.hidden ?? false,
                         lines: cfg?.lines ?? 1,
-                        inputRestriction: inputRestriction as any,
+                        inputRestriction: (cfg?.inputRestriction && cfg.inputRestriction !== "None" ? cfg.inputRestriction : "None") as any,
                         maxLength: cfg?.maxLength ?? 0,
-                        align: (ha ? haMap[ha] : "Center") as any,
                         font: styleFont?.name || "Arial",
                         fontSize: (styleFont?.sizePt ?? 0) > 0 ? styleFont!.sizePt : 11,
                         defaultFontSize: (styleFont?.sizePt ?? 0) > 0 ? styleFont!.sizePt : 11,
@@ -419,7 +403,6 @@ export default function Home() {
                           if (c.length === 6) return `${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)}`;
                           return "0,0,0";
                         })(),
-                        verticalAlignment: (va ? vaMap[va] : 1) as any,
                         placeholder: cfg?.placeholder ?? "",
                         defaultValue: cfg?.defaultValue ?? "",
                       }
@@ -430,30 +413,75 @@ export default function Home() {
             }
 
       // ═════════════════════════════════════════════════════════
-      // PAPERLESS DEBUG STAGE 15 — After Re-upload Response
+      // [PaperLess Upload Debug] PART 1/2 — Complete Upload/Restoration Logging
       // ═════════════════════════════════════════════════════════
-      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
-      console.log("%cPAPERLESS DEBUG STAGE 15 — After Re-upload Response", "color: #7c3aed; font-weight: bold");
-      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
       {
-        const s15Sheet = runtimeForm.sheets[0];
-        const s15Field = s15Sheet?.fields[0];
-        if (s15Field) {
-          console.log("Field ID:", s15Field.id);
-          console.log("Cell:", s15Field.cellReference);
-          console.log("Font Name:", s15Field.font ?? "(not set)");
-          console.log("Font Size:", s15Field.fontSize);
-          console.log("Bold:", s15Field.bold);
-          console.log("Font Color:", s15Field.fontColor ?? "(not set)");
-          console.log("BG Color:", s15Field.backgroundColor ?? "(not set)");
-          console.log("Alignment:", s15Field.alignment ?? "(not set)");
-          console.log("Required:", s15Field.required);
-          console.log("MaxLength:", s15Field.maxLength);
-          console.log("DataType:", s15Field.dataType);
+        const plc = result.paperLessConfig;
+        if (plc?.sheets) {
+          console.group("[PaperLess Upload Debug] PaperLessConfig FOUND");
+          console.log("Raw PaperLessConfig:", plc);
+          for (const cs of plc.sheets) {
+            console.group(`Sheet: ${cs.name}`);
+            for (const cf of (cs.fields ?? [])) {
+              console.group(`Field: ${cf.id}`);
+              console.log("type:", cf.type);
+              console.log("cell:", cf.cell);
+              console.log("style:", cf.style);
+              console.log("config:", cf.config);
+              console.log("  appearance:", cf.config?.appearance);
+              console.log("  layout:", cf.config?.layout);
+              console.log("  behavior:", cf.config?.behavior);
+              console.log("  input:", cf.config?.input);
+              console.log("  inputRestriction:", cf.config?.inputRestriction);
+              console.log("  placeholder:", cf.config?.placeholder);
+              console.log("  defaultValue:", cf.config?.defaultValue);
+              console.log("  hAlign:", cf.style?.alignment?.horizontal);
+              console.log("  vAlign:", cf.style?.alignment?.vertical);
+              console.groupEnd();
+            }
+            console.groupEnd();
+          }
+          console.groupEnd();
+
+          // Log the runtime fields AFTER PaperLessConfig restoration
+          console.group("[PaperLess Upload Debug] RuntimeField AFTER PaperLessConfig Restoration");
+          for (const s of runtimeForm.sheets) {
+            console.group(`Sheet: ${s.name}`);
+            for (const f of s.fields) {
+              console.group(`Field: ${f.id}`);
+              console.log("type:", f.dataType);
+              console.log("cell:", f.cellReference);
+              console.log("Flat RuntimeField:", { font: f.font, fontSize: f.fontSize, bold: f.bold, fontColor: f.fontColor, alignment: f.alignment, required: f.required, maxLength: f.maxLength, placeholder: f.placeholder, defaultValue: f.defaultValue });
+              console.log("RuntimeField Config:", f.config);
+              console.log("  Config appearance:", f.config?.appearance);
+              console.log("  Config layout:", f.config?.layout);
+              console.log("  Config behavior:", f.config?.behavior);
+              console.log("  Config input:", f.config?.input);
+              console.log("  Config keyboardText:", (f.config as any)?.keyboardText);
+              console.log("  keyboardText.inputRestriction:", (f.config as any)?.keyboardText?.inputRestriction);
+              console.log("  keyboardText.align:", (f.config as any)?.keyboardText?.align);
+              console.log("  keyboardText.verticalAlignment:", (f.config as any)?.keyboardText?.verticalAlignment);
+              console.log("  layout.verticalAlign:", f.config?.layout?.verticalAlign);
+              console.log("  layout.horizontalAlign:", f.config?.layout?.horizontalAlign);
+              console.groupEnd();
+            }
+            console.groupEnd();
+          }
+          console.groupEnd();
+        } else {
+          console.group("[PaperLess Upload Debug] NO PaperLessConfig FOUND — Fresh Excel Field Creation");
+          console.log("Raw upload response pages:", result.pages);
+          for (const s of runtimeForm.sheets) {
+            console.group(`Sheet: ${s.name}`);
+            for (const f of s.fields) {
+              console.log("Fresh Field From Excel:", { id: f.id, type: f.dataType, cell: f.cellReference, font: f.font, fontSize: f.fontSize, fontColor: f.fontColor, alignment: f.alignment });
+              console.log("Fresh Field Config:", f.config);
+            }
+            console.groupEnd();
+          }
+          console.groupEnd();
         }
       }
-      console.log("%c=========================================================", "color: #7c3aed; font-weight: bold");
-      console.log("");
 
       setRuntimeForm(runtimeForm);
     } catch (err) {
@@ -562,14 +590,25 @@ export default function Home() {
     let fontColor = normalizeColorArgb(field.fontColor);
     let bgColor = normalizeColorArgb(field.backgroundColor);
     let hAlign = mapHorizontalAlignment(field.alignment);
-    let vAlign = undefined as string | undefined;
+    // Read vertical alignment from the restored PaperLessConfig (field.config.layout)
+    // as the baseline; fieldConfigs overrides below if present.
+    // This ensures PaperLessConfig is the source of truth for interactive field alignment,
+    // not the Excel cell's native vertical alignment (which defaults to "bottom").
+    let vAlign = undefined;
 
     // Override with FieldConfig (user edits in browser)
     if (appearance) {
       if (appearance.fontFamily !== undefined) fontFamily = appearance.fontFamily;
       if (appearance.fontSize !== undefined) fontSize = appearance.fontSize;
       if (appearance.fontWeight !== undefined && appearance.fontWeight.toLowerCase() === "bold") bold = true;
-      if (appearance.textColor !== undefined) fontColor = normalizeColorArgb(appearance.textColor);
+      if (appearance.textColor !== undefined) {
+        // appearance.textColor is "R,G,B" format e.g. "255,0,0";
+        // convert to "#RRGGBB" first then normalize to "#AARRGGBB"
+        const parts = appearance.textColor.split(",").map(s => parseInt(s.trim(), 10));
+        if (parts.length === 3 && !parts.some(isNaN)) {
+          fontColor = normalizeColorArgb("#" + parts.map(p => Math.min(255, Math.max(0, p)).toString(16).padStart(2, "0")).join(""));
+        }
+      }
       if (appearance.backgroundColor !== undefined) bgColor = normalizeColorArgb(appearance.backgroundColor);
     }
     if (layout) {
@@ -646,9 +685,50 @@ export default function Home() {
         name: sheet.name ?? `Page ${si + 1}`,
         index: si,
         fields: sheet.fields.map(f => {
+          // Precedence: 1) fieldConfigs (live user edits), 2) f.config (PaperLessConfig restoration),
+          // 3) flat RuntimeField properties (initial Excel / preview parser)
           const fc = fieldConfigs?.[f.id];
-          const beh = fc?.behavior ?? {};
-          const inp = fc?.input ?? {};
+          const beh = fc?.behavior ?? f.config?.behavior ?? {};
+          const inp = fc?.input ?? f.config?.input ?? {};
+
+          // [PaperLess Upload Debug] PART 7 — EXPORT FIELD CONFIG
+          if (true) {
+            const style = buildFieldStyle(f, fc);
+            const finalHAlign = style?.alignment?.horizontal;
+            const finalVAlign = style?.alignment?.vertical;
+            console.groupCollapsed(`[PaperLess Upload Debug] EXPORT FIELD ${f.id}`);
+            console.log("fieldId:", f.id);
+            console.log("fieldType:", f.dataType);
+            console.log("fieldConfigsEntry:", fc);
+            console.log("runtimeFieldConfig:", f.config);
+            console.log("appearance:", fc?.appearance ?? f.config?.appearance);
+            console.log("layout:", fc?.layout ?? f.config?.layout);
+            console.log("behavior:", beh);
+            console.log("input:", inp);
+            console.log("finalFont:", style?.font?.name);
+            console.log("finalFontSize:", style?.font?.sizePt);
+            console.log("finalFontColor:", style?.font?.colorArgb);
+            console.log("finalHorizontalAlignment:", finalHAlign);
+            console.log("finalVerticalAlignment:", finalVAlign);
+            console.log("inputRestriction:", (fc?.input as any)?.inputRestriction ?? (f.config as any)?.keyboardText?.inputRestriction);
+            console.log("placeholder:", inp.placeholder ?? f.placeholder);
+            console.log("defaultValue:", inp.defaultValue ?? f.defaultValue);
+            console.log("required:", beh.required);
+            console.log("readOnly:", beh.readOnly);
+            console.log("hidden:", beh.visible === false);
+            console.log("maxLength:", inp.maxLength);
+            console.log("validateOnEditing:", beh.validateOnEditing);
+            console.log("Alignment Source:", {
+              horizontal: { value: finalHAlign, fromFieldConfig: fc?.layout?.horizontalAlign, fromFieldConfigLayout: f.config?.layout?.horizontalAlign, fromFieldFlat: f.alignment },
+              vertical: { value: finalVAlign, fromFieldConfig: fc?.layout?.verticalAlign, fromFieldConfigLayout: f.config?.layout?.verticalAlign },
+            });
+            console.log("InputRestriction Source:", {
+              value: (fc?.input as any)?.inputRestriction ?? (f.config as any)?.keyboardText?.inputRestriction,
+              fromFieldConfigInput: (fc?.input as any)?.inputRestriction,
+              fromKeyboardText: (f.config as any)?.keyboardText?.inputRestriction,
+            });
+            console.groupEnd();
+          }
           return {
             id: f.id,
             cell: {
@@ -669,9 +749,10 @@ export default function Home() {
             locked: beh.readOnly === true ? true : undefined,
             visible: beh.visible !== false ? undefined : false,
             maxLength: (inp.maxLength ?? 0) > 0 ? inp.maxLength : undefined,
-            placeholder: fc?.input?.placeholder || undefined,
-            defaultValue: fc?.input?.defaultValue || undefined,
+            placeholder: fc?.input?.placeholder ?? f.placeholder ?? undefined,
+            defaultValue: fc?.input?.defaultValue ?? f.defaultValue ?? undefined,
             validateOnEditing: beh.validateOnEditing === true ? true : undefined,
+            inputRestriction: fc?.input?.inputRestriction ?? (f.config?.input as any)?.inputRestriction ?? undefined,
           };
         }),
       })),

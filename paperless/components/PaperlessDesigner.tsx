@@ -108,6 +108,16 @@ export function PaperlessDesigner({
     console.log("SELECTION CHANGED", { selectedFieldId, timestamp: new Date().toISOString() });
   }, [selectedFieldId]);
 
+  // [PaperLess Upload Debug] PART 5 — fieldConfigs STATE
+  useEffect(() => {
+    if (Object.keys(fieldConfigs).length === 0) return;
+    console.groupCollapsed("[PaperLess Upload Debug] fieldConfigs STATE");
+    for (const [fid, fc] of Object.entries(fieldConfigs)) {
+      console.log(`Field ${fid}:`, { fieldId: fid, appearance: fc.appearance, layout: fc.layout, behavior: fc.behavior, input: fc.input });
+    }
+    console.groupEnd();
+  }, [fieldConfigs]);
+
   // Auto-migrate legacy text fields to KeyboardText on selection.
   // Also populates ktConfigs for KeyboardText fields that have a config
   // (e.g. restored from PaperLessConfig on re-upload) so the property panel
@@ -116,7 +126,38 @@ export function PaperlessDesigner({
     if (!selectedField) return;
     if (ktConfigs[selectedField.id]) return;
     if (isLegacyTextField(selectedField) || (selectedField.dataType === "KeyboardText" && selectedField.config)) {
+      // [PaperLess Upload Debug] PART 4 — ktConfigs BEFORE Migration
+      console.group(`[PaperLess Upload Debug] ktConfigs BEFORE Migration — Field ${selectedField.id}`);
+      console.log("Field:", selectedField.id);
+      console.log("Existing Config:", selectedField.config);
+      console.log("Existing ktConfig:", ktConfigs[selectedField.id]);
+      console.log("Flat alignment:", selectedField.alignment);
+      console.log("Config layout:", selectedField.config?.layout);
+      console.log("Config layout.verticalAlign:", selectedField.config?.layout?.verticalAlign);
+      console.log("Config keyboardText:", (selectedField.config as any)?.keyboardText);
+      console.groupEnd();
+
       const params = convertLegacyConfigToKtParams(selectedField.config);
+
+      // [PaperLess Upload Debug] PART 4 — ktConfigs AFTER Migration
+      console.group(`[PaperLess Upload Debug] ktConfigs AFTER Migration — Field ${selectedField.id}`);
+      console.log("Migrated KeyboardText Config:", params);
+      console.log("  font:", params.font);
+      console.log("  fontSize:", params.fontSize);
+      console.log("  weight:", params.weight);
+      console.log("  color:", params.color);
+      console.log("  align:", params.align);
+      console.log("  verticalAlignment:", params.verticalAlignment);
+      console.log("  required:", params.required);
+      console.log("  validateOnEditing:", params.validateOnEditing);
+      console.log("  readOnly:", params.readOnly);
+      console.log("  hidden:", params.hidden);
+      console.log("  maxLength:", params.maxLength);
+      console.log("  placeholder:", params.placeholder);
+      console.log("  defaultValue:", params.defaultValue);
+      console.log("  inputRestriction:", params.inputRestriction);
+      console.groupEnd();
+
       setKtConfigs((prev) => ({
         ...prev,
         [selectedField.id]: params,
@@ -135,6 +176,13 @@ export function PaperlessDesigner({
       setFieldConfigs((prev) => {
         const existing = prev[fieldId];
         const categoryConfig = existing?.[category] ?? {};
+
+        // [PaperLess Upload Debug] PART 5 — updateFieldConfig
+        console.groupCollapsed(`[PaperLess Upload Debug] updateFieldConfig — Field ${fieldId}`);
+        console.log("category:", category, "key:", key, "value:", value);
+        console.log("existing fieldConfigs entry:", existing);
+        console.groupEnd();
+
         return {
           ...prev,
           [fieldId]: {
@@ -149,6 +197,15 @@ export function PaperlessDesigner({
 
   const updateKeyboardTextConfig = useCallback(
     (fieldId: string, params: KeyboardTextInputParameters) => {
+      // [PaperLess Upload Debug] PART 6 — updateKeyboardTextConfig BEFORE
+      console.groupCollapsed(`[PaperLess Upload Debug] updateKeyboardTextConfig — Field ${fieldId}`);
+      console.log("Incoming params:", params);
+      console.log("  align:", params.align);
+      console.log("  verticalAlignment:", params.verticalAlignment);
+      console.log("  inputRestriction:", params.inputRestriction);
+      console.log("Incoming params.full:", { ...params });
+      console.groupEnd();
+
       setKtConfigs((prev) => ({ ...prev, [fieldId]: params }));
       // Sync keyboard text properties into fieldConfigs.appearance so that
       // buildFieldStyle (in page.tsx) picks them up during export/save.
@@ -159,6 +216,29 @@ export function PaperlessDesigner({
         const layout = existing?.layout ?? {};
         const behavior = existing?.behavior ?? {};
         const input = existing?.input ?? {};
+
+        const newLayout = {
+          ...layout,
+          horizontalAlign: params.align ? params.align.toLowerCase() as "left" | "center" | "right" : undefined,
+          verticalAlign: params.verticalAlignment !== undefined ? (params.verticalAlignment === 0 ? "top" : params.verticalAlignment === 1 ? "middle" : "bottom") : undefined,
+        };
+        const newInput = {
+          ...input,
+          maxLength: params.maxLength > 0 ? params.maxLength : undefined,
+          placeholder: params.placeholder || undefined,
+          defaultValue: params.defaultValue || undefined,
+          inputRestriction: params.inputRestriction !== "None" ? params.inputRestriction : undefined,
+        };
+
+        // [PaperLess Upload Debug] PART 6 — updateKeyboardTextConfig fieldConfigs UPDATE
+        console.groupCollapsed(`[PaperLess Upload Debug] updateKeyboardTextConfig fieldConfigs — Field ${fieldId}`);
+        console.log("Previous fieldConfigs:", existing);
+        console.log("New layout:", newLayout);
+        console.log("New input:", newInput);
+        console.log("incoming params.inputRestriction:", params.inputRestriction);
+        console.log("NOTE: inputRestriction IS now written into fieldConfigs.input!");
+        console.groupEnd();
+
         return {
           ...prev,
           [fieldId]: {
@@ -170,11 +250,7 @@ export function PaperlessDesigner({
               fontWeight: params.weight?.toLowerCase() === "bold" ? "bold" : undefined,
               textColor: params.color || undefined,
             },
-            layout: {
-              ...layout,
-              horizontalAlign: params.align ? params.align.toLowerCase() as "left" | "center" | "right" : undefined,
-              verticalAlign: params.verticalAlignment !== undefined ? (params.verticalAlignment === 0 ? "top" : params.verticalAlignment === 1 ? "middle" : "bottom") : undefined,
-            },
+            layout: newLayout,
             behavior: {
                 ...behavior,
                 required: params.required || undefined,
@@ -182,12 +258,7 @@ export function PaperlessDesigner({
                 visible: params.hidden ? false : undefined,
                 validateOnEditing: params.validateOnEditing || undefined,
               },
-            input: {
-              ...input,
-              maxLength: params.maxLength > 0 ? params.maxLength : undefined,
-              placeholder: params.placeholder || undefined,
-              defaultValue: params.defaultValue || undefined,
-            },
+            input: newInput,
           } as FieldConfig,
         };
       });
@@ -828,10 +899,32 @@ export function PaperlessDesigner({
 
                 {/* ── Field configuration panel ── */}
                 {(fieldTypes[selectedField.id] ?? selectedField.dataType) === "KeyboardText" ? (
-                  <KeyboardTextPropertyPanel
-                    params={ktConfigs[selectedField.id] ?? DEFAULTS}
-                    onChange={(params) => updateKeyboardTextConfig(selectedField.id, params)}
-                  />
+                  (() => {
+                    const panelParams = ktConfigs[selectedField.id] ?? DEFAULTS;
+                    // [PaperLess Upload Debug] PART 8 — Property Panel params
+                    console.groupCollapsed(`[PaperLess Upload Debug] PROPERTY PANEL RENDER — Field ${selectedField.id}`);
+                    console.log("params:", panelParams);
+                    console.log("  inputRestriction:", panelParams.inputRestriction);
+                    console.log("  align:", panelParams.align);
+                    console.log("  verticalAlignment:", panelParams.verticalAlignment);
+                    console.log("  placeholder:", panelParams.placeholder);
+                    console.log("  defaultValue:", panelParams.defaultValue);
+                    console.log("  font:", panelParams.font);
+                    console.log("  fontSize:", panelParams.fontSize);
+                    console.log("  weight:", panelParams.weight);
+                    console.log("  color:", panelParams.color);
+                    console.log("  required:", panelParams.required);
+                    console.log("  maxLength:", panelParams.maxLength);
+                    console.log("ktConfigs[selectedField.id]:", ktConfigs[selectedField.id]);
+                    console.log("Is using DEFAULTS:", !ktConfigs[selectedField.id]);
+                    console.groupEnd();
+                    return (
+                      <KeyboardTextPropertyPanel
+                        params={panelParams}
+                        onChange={(params) => updateKeyboardTextConfig(selectedField.id, params)}
+                      />
+                    );
+                  })()
                 ) : (
                   <div className="border border-slate-100 rounded-md p-4 text-center">
                     <div className="text-xs text-slate-400 mb-1">

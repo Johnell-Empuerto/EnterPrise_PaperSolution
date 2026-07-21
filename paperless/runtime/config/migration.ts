@@ -8,14 +8,25 @@ export function isLegacyTextField(field: RuntimeField): boolean {
 }
 
 export function convertLegacyConfigToKtParams(config: Record<string, any> | undefined): KeyboardTextInputParameters {
-  if (!config) return { ...DEFAULTS };
+  if (!config) {
+    // [PaperLess Upload Debug] PART 8 — convertLegacyConfigToKtParams (NO config)
+    console.groupCollapsed(`[PaperLess Upload Debug] convertLegacyConfigToKtParams — NO CONFIG`);
+    console.log("Returning DEFAULTS:", { ...DEFAULTS });
+    console.groupEnd();
+    return { ...DEFAULTS };
+  }
 
   const input = (config.input ?? {}) as Record<string, any>;
   const behavior = (config.behavior ?? {}) as Record<string, any>;
   const appearance = (config.appearance ?? {}) as Record<string, any>;
   const layout = (config.layout ?? {}) as Record<string, any>;
 
-  const rawRestriction: string | undefined = input.characterRestriction;
+  // Read from canonical config.input.inputRestriction (set by restoration),
+  // then config.keyboardText.inputRestriction (legacy restoration path),
+  // then config.input.characterRestriction (legacy/non-canonical path).
+  const rawRestriction: string | undefined = input.inputRestriction
+    ?? (config as any).keyboardText?.inputRestriction
+    ?? input.characterRestriction;
   const inputRestriction: InputRestriction = rawRestriction
     ? mapCharacterRestriction(rawRestriction)
     : "None";
@@ -24,6 +35,38 @@ export function convertLegacyConfigToKtParams(config: Record<string, any> | unde
   const align = mapHorizontalAlign(layout.horizontalAlign);
   const weight = mapFontWeight(appearance.fontWeight);
   const color = hexToRgbString(appearance.textColor ?? "#000000");
+
+  // [PaperLess Upload Debug] PART 8 — convertLegacyConfigToKtParams
+  console.groupCollapsed(`[PaperLess Upload Debug] convertLegacyConfigToKtParams`);
+  console.log("Raw config:", config);
+  console.log("  appearance:", appearance);
+  console.log("  layout:", layout);
+  console.log("  behavior:", behavior);
+  console.log("  input:", input);
+  console.log("  characterRestriction:", input.characterRestriction);
+  console.log("  inputRestriction (mapped):", inputRestriction);
+  console.log("  layout.verticalAlign:", layout.verticalAlign);
+  console.log("  layout.horizontalAlign:", layout.horizontalAlign);
+  console.log("  verticalAlignment (mapped):", verticalAlignment);
+  console.log("  horizontalAlign (mapped):", align);
+  console.log("  appearance.fontWeight:", appearance.fontWeight);
+  console.log("  weight (mapped):", weight);
+  console.log("  appearance.textColor:", appearance.textColor);
+  console.log("  color (mapped):", color);
+  console.log("  config.keyboardText?.placeholder:", config.keyboardText?.placeholder);
+  console.log("  input.placeholder:", input.placeholder);
+  console.log("  config.placeholder:", config.placeholder);
+  console.log("  config.keyboardText?.defaultValue:", config.keyboardText?.defaultValue);
+  console.log("  input.defaultValue:", input.defaultValue);
+  console.log("  config.defaultValue:", config.defaultValue);
+  console.log("Result:", {
+    align, inputRestriction, verticalAlignment, weight, color,
+    font: appearance.fontFamily?.split(",")[0]?.trim() ?? DEFAULTS.font,
+    fontSize: appearance.fontSize ?? DEFAULTS.fontSize,
+    placeholder: (config.keyboardText?.placeholder as string) ?? (input.placeholder as string) ?? (config.placeholder as string) ?? "",
+    defaultValue: (config.keyboardText?.defaultValue as string) ?? (input.defaultValue as string) ?? (config.defaultValue as string) ?? "",
+  });
+  console.groupEnd();
 
   return {
     required: behavior.required ?? false,
@@ -40,8 +83,11 @@ export function convertLegacyConfigToKtParams(config: Record<string, any> | unde
     weight,
     color,
     verticalAlignment,
-    placeholder: (config.placeholder as string) ?? "",
-    defaultValue: (config.defaultValue as string) ?? "",
+    // Read from config.keyboardText (set by PaperLessConfig restoration),
+    // then config.input (set by PaperLessConfig restoration), then config top-level (legacy).
+    // This ensures placeholder/defaultValue survive re-upload round trips.
+    placeholder: (config.keyboardText?.placeholder as string) ?? (input.placeholder as string) ?? (config.placeholder as string) ?? "",
+    defaultValue: (config.keyboardText?.defaultValue as string) ?? (input.defaultValue as string) ?? (config.defaultValue as string) ?? "",
   };
 }
 

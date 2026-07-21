@@ -220,12 +220,7 @@ namespace ExcelAPI.Application
                                 Required = field.Required,
                                 MinLength = 0,
                                 MaxLength = field.MaxLength,
-                                InputRestriction = field.Type switch
-                                {
-                                    WbDef.FieldType.Number => "Numeric",
-                                    WbDef.FieldType.Date => "Date",
-                                    _ => "None"
-                                },
+                                InputRestriction = MapInputRestriction(field),
                                 Lines = 1,
                                 ValidateOnEditing = field.ValidateOnEditing,
                                 ReadOnly = field.Locked,
@@ -269,6 +264,45 @@ namespace ExcelAPI.Application
                 return null;
 
             return style;
+        }
+
+        /// <summary>
+        /// Maps the field's data validation type (or field type) to an InputRestriction string.
+        /// Precedence:
+        ///   1. field.InputRestriction (frontend PaperLess config — canonical path)
+        ///   2. field.DataValidation.Type (Excel data validation)
+        ///   3. field.Type (fallback for native Number/Date types)
+        /// </summary>
+        private static string MapInputRestriction(WbDef.FieldDefinition field)
+        {
+            // 1. Frontend sent PaperLess input restriction directly
+            if (!string.IsNullOrEmpty(field.InputRestriction))
+                return field.InputRestriction;
+
+            // 2. If the frontend sent an explicit data validation type, use it
+            if (field.DataValidation != null && !string.IsNullOrEmpty(field.DataValidation.Type))
+            {
+                return field.DataValidation.Type.ToLowerInvariant() switch
+                {
+                    "any" => "None",
+                    "whole" or "wholenumber" => "Numeric",
+                    "decimal" => "Decimal",
+                    "date" => "Date",
+                    "time" => "Time",
+                    "textlength" => "TextLength",
+                    "list" => "List",
+                    "custom" => "Custom",
+                    _ => field.DataValidation.Type // preserve original if unrecognized
+                };
+            }
+
+            // 3. Fall back to field type for native Number/Date fields
+            return field.Type switch
+            {
+                WbDef.FieldType.Number => "Numeric",
+                WbDef.FieldType.Date => "Date",
+                _ => "None"
+            };
         }
 
         private static string BuildWorksheetXml(string json)

@@ -72,6 +72,9 @@ namespace ExcelAPI.Models.WorkbookDefinition
         /// </summary>
         public bool ValidateOnEditing { get; set; }
 
+        /// <summary>PaperLess input restriction type (e.g., "Numeric", "Alphabet", "None").</summary>
+        public string? InputRestriction { get; set; }
+
         /// <summary>
         /// User-entered value for this field (set by the frontend editor).
         /// Written back to the original XLSX by WorkbookValueWriter.
